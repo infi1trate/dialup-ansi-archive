@@ -1,6 +1,6 @@
 # Pass 4 roadmap
-- [ ] A1 rate limit check-before-record + test
-- [ ] A2 delete test rows
+- [x] A1 rate limit check-before-record + test
+- [x] A2 SKIPPED by owner: list test rows in STATUS owner to-do; no approval tools this pass
 - [ ] A3 who's online 15s refresh
 - [ ] A4 share card scale wide
 - [ ] A5 debug flags busy/time; drive flows in browser

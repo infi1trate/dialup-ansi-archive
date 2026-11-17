@@ -66,16 +66,17 @@ function Lab() {
 
   async function stream() {
     const e = engine.current; if (!e) return;
-    const [{ getFile }, { parseSauce }, { modeFor, binToAnsi }] = await Promise.all([import("@/data/archive"), import("@/term/sauce"), import("@/bbs/board")]);
+    const [{ getFile }, { parseSauce }, { prepareArt }] = await Promise.all([import("@/data/archive"), import("@/term/sauce"), import("@/term/prepare")]);
     e.modem.clear();
     try {
       const bytes = await getFile(pack.trim(), file.trim());
       const art = parseSauce(bytes);
-      const mode = modeFor(file, art.sauce);
+      const prep = prepareArt(file, bytes);
+      const mode = prep.mode;
       e.term.setMode(mode); e.term.reset();
       e.modem.bps = speed;
       meta.current = `${pack}/${file}\nsize ${bytes.length}, body ${art.body.length}\nsauce ${art.sauce ? `"${art.sauce.title}" by ${art.sauce.author}/${art.sauce.group} w${art.sauce.tInfo1} h${art.sauce.tInfo2} flags ${art.sauce.tFlags}` : "none"}\n`;
-      e.modem.write(/\.bin$/i.test(file) ? binToAnsi(art.body, mode.cols) : art.body);
+      e.modem.write(prep.stream);
     } catch (err) {
       meta.current = `fetch failed: ${(err as Error).message}\n`;
     }

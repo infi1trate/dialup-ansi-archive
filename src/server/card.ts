@@ -1,8 +1,8 @@
 // Server-only: share card PNG (1200x630) — the first 25 rows of a piece drawn by our own
 // text-mode renderer logic inside a plain CRT bezel. The only place art exists as an image.
 import { Terminal } from "@/term/terminal";
-import { parseSauce } from "@/term/sauce";
-import { VGA_RGB } from "@/term/palette";
+import { prepareArt } from "@/term/prepare";
+import { rasterize } from "@/term/raster";
 import { VGA_8X16_B64 } from "@/term/vga-font";
 
 const W = 1200, H = 630;
@@ -28,39 +28,16 @@ class Img {
   }
 }
 
-/** Render the top of a piece into a cells framebuffer, returns RGB rows sized cols*cw x rows*16. */
-function screen(bytes: Uint8Array) {
-  const art = parseSauce(bytes);
-  const s = art.sauce;
-  let cols = 80;
-  if (s && s.dataType === 1 && s.tInfo1 > 80 && s.tInfo1 <= 320) cols = s.tInfo1;
-  const t = new Terminal({ cols, ice: !!s?.ice, ninePixel: s?.letterSpacing !== 8 });
-  t.feed(art.body);
-  const cw = t.ninePixel ? 9 : 8, rows = t.rows;
-  const fw = cols * cw, fh = rows * 16;
-  const fb = new Uint8Array(fw * fh * 3);
-  const f = font();
-  for (let row = 0; row < rows; row++) {
-    const line = t.lines[row];
-    for (let col = 0; col < cols; col++) {
-      const cell = line ? line[col] : 0x0720;
-      const ch = cell & 0xff, at = cell >> 8;
-      const fg = VGA_RGB[at & 15], bg = VGA_RGB[((at >> 4) & 7) | (t.ice && at & 0x80 ? 8 : 0)];
-      for (let r = 0; r < 16; r++) {
-        const b = f[ch * 16 + r];
-        const bits = (b << 1) | (ch >= 0xc0 && ch <= 0xdf ? b & 1 : 0);
-        for (let c = 0; c < cw; c++) {
-          const on = bits & (0x100 >> c);
-          const o = ((row * 16 + r) * fw + col * cw + c) * 3;
-          const k = on ? fg : bg; fb[o] = k[0]; fb[o + 1] = k[1]; fb[o + 2] = k[2];
-        }
-      }
-    }
-  }
-  return { fb, fw, fh };
+/** The top of a piece (25 rows at 80 columns; proportionally more rows when wider). */
+function screen(name: string, bytes: Uint8Array) {
+  const prep = prepareArt(name, bytes);
+  const t = new Terminal(prep.mode);
+  t.setMode(prep.mode);
+  t.feed(prep.stream);
+  return rasterize(t, Math.round((25 * t.cols) / 80));
 }
 
-export async function renderCard(bytes: Uint8Array, line1: string, line2: string): Promise<Uint8Array> {
+export async function renderCard(name: string, bytes: Uint8Array, line1: string, line2: string): Promise<Uint8Array> {
   const img = new Img();
   img.rect(0, 0, W, H, [10, 9, 13]);
   // bezel + tube
@@ -70,11 +47,18 @@ export async function renderCard(bytes: Uint8Array, line1: string, line2: string
   img.rect(sx - 14, sy - 12, sw + 28, sh + 24, [24, 24, 22]);
   img.text("KESTREL VGA", sx - 30, sy + sh + 28, 1, [110, 100, 80]);
   img.rect(sx + sw - 4, sy + sh + 30, 10, 10, [60, 200, 90]);
-  const { fb, fw, fh } = screen(bytes);
-  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
-    const o = ((Math.floor((y * fh) / sh) * fw) + Math.floor((x * fw) / sw)) * 3;
+  const { fb, fw, fh } = screen(name, bytes);
+  // scale the whole width into the tube (wide pieces shrink instead of cropping), 4:3 cell aspect kept
+  const s = Math.min(sw / fw, sh / (fh * (400 / 400)));
+  const dw = Math.max(1, Math.round(fw * s)), dh = Math.max(1, Math.round(fh * s));
+  const ox = sx + Math.floor((sw - dw) / 2), oy = sy + Math.floor((sh - dh) / 2);
+  for (let y = 0; y < dh; y++) for (let x = 0; x < dw; x++) {
+    // box-filter downscale so shrunk text stays legible instead of aliasing
+    const x0 = Math.floor(x / s), x1 = Math.max(x0 + 1, Math.floor((x + 1) / s)), y0 = Math.floor(y / s), y1 = Math.max(y0 + 1, Math.floor((y + 1) / s));
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let yy = y0; yy < y1 && yy < fh; yy++) for (let xx = x0; xx < x1 && xx < fw; xx++) { const o = (yy * fw + xx) * 3; r += fb[o]; g += fb[o + 1]; b += fb[o + 2]; n++; }
     const scan = y % 2 ? 0.86 : 1;
-    img.set(sx + x, sy + y, [fb[o] * scan, fb[o + 1] * scan, fb[o + 2] * scan]);
+    if (n) img.set(ox + x, oy + y, [(r / n) * scan, (g / n) * scan, (b / n) * scan]);
   }
   const fit = (s: string, scale: number) => (s.length * 8 * scale > W - 40 ? s.slice(0, Math.floor((W - 40) / (8 * scale)) - 1) + "…".replace("…", ".") : s);
   const l1 = fit(line1, 2), l2 = fit(line2, 1);

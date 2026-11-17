@@ -2,13 +2,22 @@
 // Cell = uint16: low byte CP437 char, high byte VGA attribute
 // (bits 0-3 fg, 4-6 bg, 7 blink — or bright background in iCE mode).
 
-export interface TermMode { cols: number; ice: boolean; ninePixel: boolean }
+export interface TermMode { cols: number; ice: boolean; ninePixel: boolean; palette?: Uint32Array | null; font?: { bytes: Uint8Array; height: number } | null }
 export interface TermStats { bytes: number; sequences: number; unknown: number; unknownList: string[]; linesScrolled: number }
 
 const BLANK = 0x0720;
 /** ANSI SGR color order -> VGA palette index (the mapping is its own inverse). */
 export const ANSI_VGA = [0, 4, 2, 6, 1, 5, 3, 7];
 const SCROLLBACK = 2400;
+
+function xterm256(i: number): number {
+  const V = [[0,0,0],[170,0,0],[0,170,0],[170,85,0],[0,0,170],[170,0,170],[0,170,170],[170,170,170],[85,85,85],[255,85,85],[85,255,85],[255,255,85],[85,85,255],[255,85,255],[85,255,255],[255,255,255]];
+  let r: number, g: number, b: number;
+  if (i < 16) [r, g, b] = V[Math.max(0, i)];
+  else if (i < 232) { const n = i - 16, l = [0, 95, 135, 175, 215, 255]; r = l[Math.floor(n / 36)]; g = l[Math.floor(n / 6) % 6]; b = l[n % 6]; }
+  else { r = g = b = 8 + (Math.min(i, 255) - 232) * 10; }
+  return (1 << 24) | (r << 16) | (g << 8) | b;
+}
 
 export class Terminal {
   cols = 80;
@@ -30,6 +39,12 @@ export class Terminal {
   /** Optional overlay drawn on top (e.g. TELEWIRE's local info panel). */
   overlay: Terminal | null = null;
   mask: Uint8Array | null = null;
+  /** Per-line 24-bit overrides (PabloDraw ESC[0;R;G;Bt / ESC[1;R;G;Bt): [fg0,bg0,fg1,bg1...] as 0xRRGGBB|1<<24, 0 = palette. */
+  ext: (Uint32Array | null)[] = [];
+  /** Optional per-file palette (XBin) as ABGR u32 x16, and font (XBin) bytes with its glyph height. */
+  palette: Uint32Array | null = null;
+  font: { bytes: Uint8Array; height: number } | null = null;
+  private tfg = 0; private tbg = 0;
 
   private fg = 7; private bg = 0; private bold = false; private blink = false;
   private reverse = false; private conceal = false;
@@ -48,6 +63,8 @@ export class Terminal {
     this.rows = cols > 80 ? Math.round((25 * cols) / 80) : 25;
     if (m.ice !== undefined) this.ice = m.ice;
     if (m.ninePixel !== undefined) this.ninePixel = m.ninePixel;
+    this.palette = m.palette ?? null; // per-file palette/font last only as long as the file
+    this.font = m.font ?? null;
     if (colsChanged) this.reset();
     this.version++;
   }
@@ -55,6 +72,8 @@ export class Terminal {
   reset() {
     this.lines = [];
     for (let i = 0; i < this.rows; i++) this.lines.push(this.blankLine());
+    this.ext = this.lines.map(() => null);
+    this.tfg = this.tbg = 0;
     this.x = this.y = this.savedX = this.savedY = 0;
     this.fg = 7; this.bg = 0; this.bold = this.blink = this.reverse = this.conceal = false;
     this.state = 0; this.params = ""; this.stopped = false; this.viewOffset = 0; this.cursorVisible = true;
@@ -87,8 +106,8 @@ export class Terminal {
 
   private lineFeed() {
     if (this.y < this.rows - 1) { this.y++; return; }
-    this.lines.push(this.blankLine());
-    if (this.lines.length > this.rows + SCROLLBACK) this.lines.shift();
+    this.lines.push(this.blankLine()); this.ext.push(null);
+    if (this.lines.length > this.rows + SCROLLBACK) { this.lines.shift(); this.ext.shift(); }
     else if (this.viewOffset > 0) this.viewOffset++;
     this.stats.linesScrolled++;
   }
@@ -96,6 +115,11 @@ export class Terminal {
   private put(ch: number) {
     const line = this.lines[this.top + this.y];
     line[this.x] = ch | (this.attr() << 8);
+    const li = this.top + this.y;
+    if (this.tfg || this.tbg || this.ext[li]) {
+      const e = this.ext[li] ?? (this.ext[li] = new Uint32Array(this.cols * 2));
+      e[this.x * 2] = this.tfg; e[this.x * 2 + 1] = this.tbg;
+    }
     if (this.mask) this.mask[this.y * 80 + this.x] = 1;
     this.x++;
     if (this.x >= this.cols) { this.x = 0; this.lineFeed(); }
@@ -144,7 +168,8 @@ export class Terminal {
     const n = (i: number, d = 1) => (Number.isFinite(nums[i]) && nums[i] > 0 ? nums[i] : d);
     if (priv) {
       if (p === "?25" && (f === "h" || f === "l")) { this.cursorVisible = f === "h"; return; }
-      if (p === "?7" && (f === "h" || f === "l")) return;
+      if (p === "?33" && (f === "h" || f === "l")) { this.ice = f === "h"; this.version++; return; } // PabloDraw iCE
+      if (f === "h" || f === "l") return; // ?7 wrap, =3h/=7h video modes: harmless on a fixed 80x25 terminal
       this.unknown(`CSI ${p}${f}`); return;
     }
     switch (f) {
@@ -159,7 +184,7 @@ export class Terminal {
         const blank = 0x20 | ((this.attr() & 0x70 | 0x07) << 8);
         const t = this.top;
         if (mode === 2) {
-          for (let r = 0; r < this.rows; r++) this.lines[t + r].fill(blank);
+          for (let r = 0; r < this.rows; r++) { this.lines[t + r].fill(blank); this.ext[t + r] = null; }
           this.x = 0; this.y = 0; this.mask?.fill(0);
         } else if (mode === 0) {
           this.lines[t + this.y].fill(blank, this.x);
@@ -180,25 +205,43 @@ export class Terminal {
       }
       case "m": {
         const list = nums.length ? nums : [0];
-        for (const v0 of list) {
-          const v = Number.isFinite(v0) ? v0 : 0;
-          if (v === 0) { this.fg = 7; this.bg = 0; this.bold = this.blink = this.reverse = this.conceal = false; }
+        for (let li = 0; li < list.length; li++) {
+          const v = Number.isFinite(list[li]) ? list[li] : 0;
+          if (v === 38 || v === 48) { // xterm extended color
+            let rgb = 0;
+            if (list[li + 1] === 2) { rgb = (1 << 24) | ((list[li + 2] & 255) << 16) | ((list[li + 3] & 255) << 8) | (list[li + 4] & 255); li += 4; }
+            else if (list[li + 1] === 5) { rgb = xterm256(list[li + 2] | 0); li += 2; }
+            else { this.unknown(`SGR ${v}`); continue; }
+            if (v === 38) this.tfg = rgb; else this.tbg = rgb;
+            continue;
+          }
+          if (v === 0) { this.fg = 7; this.bg = 0; this.bold = this.blink = this.reverse = this.conceal = false; this.tfg = this.tbg = 0; }
           else if (v === 1) this.bold = true;
           else if (v === 5 || v === 6) this.blink = true;
           else if (v === 7) this.reverse = true;
           else if (v === 8) this.conceal = true;
           else if (v === 21 || v === 22) this.bold = false;
           else if (v === 25) this.blink = false;
+          else if (v === 2 || v === 3 || v === 4 || v === 23 || v === 24) { /* faint/italic/underline: no such thing in VGA text mode */ }
           else if (v === 27) this.reverse = false;
           else if (v === 28) this.conceal = false;
-          else if (v >= 30 && v <= 37) this.fg = ANSI_VGA[v - 30];
+          else if (v >= 30 && v <= 37) { this.fg = ANSI_VGA[v - 30]; this.tfg = 0; }
+          else if (v >= 90 && v <= 97) { this.fg = ANSI_VGA[v - 90]; this.bold = true; this.tfg = 0; }
+          else if (v >= 100 && v <= 107) { this.bg = ANSI_VGA[v - 100]; this.tbg = 0; }
           else if (v === 39) this.fg = 7;
-          else if (v >= 40 && v <= 47) this.bg = ANSI_VGA[v - 40];
+          else if (v >= 40 && v <= 47) { this.bg = ANSI_VGA[v - 40]; this.tbg = 0; }
           else if (v === 49) this.bg = 0;
           else this.unknown(`SGR ${v}`);
         }
         break;
       }
+      case "t": { // PabloDraw 24-bit: ESC[0;R;G;Bt background, ESC[1;R;G;Bt foreground
+        if (nums.length !== 4 || !nums.every(Number.isFinite)) { this.unknown(`CSI ${p}t`); break; }
+        const rgb = (1 << 24) | ((nums[1] & 255) << 16) | ((nums[2] & 255) << 8) | (nums[3] & 255);
+        if (nums[0] === 0) this.tbg = rgb; else if (nums[0] === 1) this.tfg = rgb; else this.unknown(`CSI ${p}t`);
+        break;
+      }
+      case "n": break; // device status report: nobody to answer on a one-way stream
       case "s": this.savedX = this.x; this.savedY = this.y; break;
       case "u": this.x = this.savedX; this.y = this.savedY; break;
       case "h": case "l": break; // mode set/reset (e.g. ESC[=7h) is harmless here

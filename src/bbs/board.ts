@@ -8,6 +8,8 @@ import { getFile, getGroupPacks, getGroups, getPack, getYearPacks, getYears, MAX
 import { HOUSE_PACK } from "@/data/housepack";
 import type { PackFile, PackInfo, PackSummary, Page } from "@/data/types";
 import { parseSauce, sauceDate, type Sauce } from "@/term/sauce";
+import { prepareArt, type Prepared } from "@/term/prepare";
+export { modeFor } from "@/term/prepare";
 import { ANSI_VGA, type TermMode } from "@/term/terminal";
 import { artViewed, net, newSessionId, setLiveSession, timeAgo, type CallerInfo } from "@/data/net";
 import { checkHandle, checkOneliner } from "@/lib/filter";
@@ -842,11 +844,13 @@ class Board {
       let bytes: Uint8Array;
       try { bytes = await getFile(pack.name, f.name); } catch (e) { restore(); await this.errorScreen(`${f.name}: ${(e as Error).message}`); return; }
       await io.drain();
-      const art = parseSauce(bytes);
-      const mode = modeFor(f.name, art.sauce);
+      let prep: Prepared;
+      try { prep = prepareArt(f.name, bytes); } catch (e) { restore(); await this.errorScreen(`${f.name}: ${(e as Error).message}`); return; }
+      const art = { sauce: prep.sauce };
+      const mode = prep.mode, stream = prep.stream;
       io.client.setMode(mode);
       io.client.markTop();
-      io.send(/\.bin$/i.test(f.name) ? binToAnsi(art.body, mode.cols) : art.body);
+      io.send(stream);
       const seen = `${pack.name}/${f.name}`;
       const before = maxSpeed(io.profile);
       if (!io.profile.filesSeen.includes(seen)) { io.profile.filesSeen.push(seen); io.save(); }
@@ -971,40 +975,7 @@ function truncateVisible(l: Uint8Array, n: number) {
   return l.subarray(0, i);
 }
 
-export function modeFor(name: string, s: Sauce | null): TermMode {
-  const isBin = /\.bin$/i.test(name);
-  let cols = 80;
-  if (s) {
-    if (isBin && s.dataType === 5 && s.fileType > 0) cols = s.fileType * 2;
-    else if (s.dataType === 1 && s.tInfo1 > 80 && s.tInfo1 <= 320 && (s.fileType === 1 || s.fileType === 2)) cols = s.tInfo1;
-  } else if (isBin) cols = 160;
-  return {
-    cols,
-    ice: /\.ice$/i.test(name) || isBin || !!s?.ice,
-    ninePixel: s?.letterSpacing !== 8,
-  };
-}
 
-/** .BIN: raw char/attribute pairs -> ANSI with wrap at `cols`. */
-export function binToAnsi(b: Uint8Array, cols: number): Uint8Array {
-  const out: number[] = [];
-  let last = -1;
-  const push = (s: string) => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
-  for (let i = 0; i + 1 < b.length; i += 2) {
-    let ch = b[i];
-    const at = b[i + 1];
-    if ([0x07, 0x08, 0x09, 0x0a, 0x0d, 0x1a, 0x1b].includes(ch)) ch = 0x20;
-    if (at !== last) {
-      const fg = at & 15, bg = (at >> 4) & 15;
-      push(`\x1b[0${fg & 8 ? ";1" : ""}${bg & 8 ? ";5" : ""};3${ANSI_VGA[fg & 7]};4${ANSI_VGA[bg & 7]}m`);
-      last = at;
-    }
-    out.push(ch);
-  }
-  void cols;
-  push("\x1b[0m");
-  return new Uint8Array(out);
-}
 
 function infoPanel(pack: PackInfo, f: PackFile, s: Sauce | null, size: number, mode: TermMode, unlocked: number, url: string) {
   const x = a();

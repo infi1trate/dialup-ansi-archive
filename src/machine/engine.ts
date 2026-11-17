@@ -1,3 +1,4 @@
+import { blinkPhase, CURSOR_BLINK_HZ, TEXT_BLINK_HZ } from "@/term/blink";
 // Display engine: terminal + renderer + modem + CRT, driven by one animation loop.
 import { Terminal } from "@/term/terminal";
 import { TermRenderer } from "@/term/renderer";
@@ -59,8 +60,8 @@ export class Engine {
     } else this.modem.tick(dt);
     this.flowT += dt;
     if (this.flowT > 0.25) { this.flowT = 0; if (this.modem.rate > 0) audio.emit("byteFlow", this.modem.rate); }
-    const blinkOn = Math.floor(t * 2 * 2) % 2 === 0; // ~2 Hz text blink
-    const cursorOn = Math.floor(t * 2 * 3.6) % 2 === 0; // faster cursor blink
+    const blinkOn = blinkPhase(t, TEXT_BLINK_HZ, this.crt.reducedMotion);
+    const cursorOn = blinkPhase(t, CURSOR_BLINK_HZ, this.crt.reducedMotion);
     const changed = this.renderer.render(this.term, blinkOn, cursorOn);
     this.crt.render(this.renderer.canvas, changed, this.power, t);
     this.avgT += dt;

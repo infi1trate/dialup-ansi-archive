@@ -77,7 +77,7 @@ void main(){
   // noise + tiny flicker
   float n = hash(uv*outSize + (motion > 0.5 ? fract(time)*91. : 0.));
   col += (n-0.5)*0.022;
-  col *= 1. - motion*0.008*sin(time*120.);
+  col *= 1. - motion*0.006*sin(time*2.5); // slow breathing, well under 3 flashes/s
   // tube glass base glow
   col += vec3(0.018,0.022,0.02);
   // rounded corners of the tube

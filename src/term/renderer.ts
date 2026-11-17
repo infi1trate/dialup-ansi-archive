@@ -28,6 +28,16 @@ function glyphs9() {
   return GLYPH9;
 }
 
+const abgr = (rgb: number) => ((0xff << 24) | ((rgb & 255) << 16) | (rgb & 0xff00) | ((rgb >> 16) & 255)) >>> 0;
+
+/** Glyph masks from an embedded (XBin) font of any height, 8 wide (bit 8 = leftmost; no 9th column). */
+const fontCache = new WeakMap<Uint8Array, Uint16Array>();
+export function glyphsFrom(bytes: Uint8Array, fh: number): Uint16Array {
+  let g = fontCache.get(bytes);
+  if (!g) { g = new Uint16Array(256 * fh); for (let i = 0; i < 256 * fh && i < bytes.length; i++) g[i] = bytes[i] << 1; fontCache.set(bytes, g); }
+  return g;
+}
+
 export class TermRenderer {
   canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -48,8 +58,9 @@ export class TermRenderer {
   /** Returns true if the framebuffer changed. */
   render(t: Terminal, blinkOn: boolean, cursorOn: boolean): boolean {
     const cw = t.ninePixel ? 9 : 8;
-    const W = t.cols * cw, H = t.rows * 16;
-    const key = `${t.version}|${blinkOn}|${cursorOn}|${W}|${t.overlay?.version ?? -1}`;
+    const fh = t.font?.height ?? 16;
+    const W = t.cols * cw, H = t.rows * fh;
+    const key = `${t.version}|${blinkOn}|${cursorOn}|${W}|${H}|${t.overlay?.version ?? -1}`;
     if (key === this.lastKey) return false;
     this.lastKey = key;
     if (this.canvas.width !== W || this.canvas.height !== H || !this.img) {
@@ -58,23 +69,25 @@ export class TermRenderer {
       this.px = new Uint32Array(this.img.data.buffer);
     }
     const px = this.px!;
-    const G = glyphs9();
+    const G = t.font ? glyphsFrom(t.font.bytes, fh) : glyphs9();
+    const P = t.palette ?? VGA_U32;
     const start = t.top - t.viewOffset;
     for (let row = 0; row < t.rows; row++) {
       const line = t.lines[start + row];
+      const ext = t.ext[start + row];
       for (let col = 0; col < t.cols; col++) {
         const cell = line[col];
         const isCursor = cursorOn && t.cursorVisible && t.viewOffset === 0 && row === t.y && col === t.x;
-        this.drawCell(px, W, col * cw, row * 16, cell, t.ice, blinkOn, isCursor, cw, G);
+        this.drawCell(px, W, col * cw, row * fh, cell, t.ice, blinkOn, isCursor, cw, G, fh, P, ext ? ext[col * 2] : 0, ext ? ext[col * 2 + 1] : 0);
       }
     }
     const ov = t.overlay;
     if (ov && ov.mask) {
       const ox = Math.floor((t.cols - 80) / 2) * cw;
-      const oy = Math.floor((t.rows - 25) / 2) * 16;
+      const oy = Math.floor((t.rows - 25) / 2) * fh;
       for (let row = 0; row < 25; row++) for (let col = 0; col < 80; col++) {
         if (!ov.mask[row * 80 + col]) continue;
-        this.drawCell(px, W, ox + col * cw, oy + row * 16, ov.cell(row, col), false, blinkOn, false, cw, G);
+        this.drawCell(px, W, ox + col * cw, oy + row * fh, ov.cell(row, col), false, blinkOn, false, cw, glyphs9(), Math.min(fh, 16), VGA_U32, 0, 0);
       }
     }
     this.ctx.putImageData(this.img!, 0, 0);
@@ -83,13 +96,15 @@ export class TermRenderer {
   }
 
   private drawCell(px: Uint32Array, W: number, x0: number, y0: number, cell: number, ice: boolean,
-    blinkOn: boolean, cursor: boolean, cw: number, G: Uint16Array) {
+    blinkOn: boolean, cursor: boolean, cw: number, G: Uint16Array, fh: number, P: Uint32Array, tf: number, tb: number) {
     const ch = cell & 0xff, a = cell >> 8;
     let fg = a & 15, bg = (a >> 4) & 7;
-    if (a & 0x80) { if (ice) bg |= 8; else if (!blinkOn) fg = bg; }
-    const F = VGA_U32[fg], B = VGA_U32[bg];
-    const base = ch * 16;
-    for (let r = 0; r < 16; r++) {
+    let hide = false;
+    if (a & 0x80) { if (ice) bg |= 8; else if (!blinkOn) hide = true; }
+    const B = tb ? abgr(tb) : P[bg];
+    const F = hide ? B : tf ? abgr(tf) : P[fg];
+    const base = ch * fh;
+    for (let r = 0; r < fh; r++) {
       const bits = cursor ? 0x1ff : G[base + r];
       let o = (y0 + r) * W + x0;
       for (let c = 0; c < cw; c++) px[o++] = bits & (0x100 >> c) ? F : B;

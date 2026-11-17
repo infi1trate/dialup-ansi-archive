@@ -11,6 +11,8 @@ export interface ParsedArt {
   sauce: Sauce | null;
   /** Bytes to stream: everything before SAUCE and before the 0x1A EOF marker. */
   body: Uint8Array;
+  /** Binary formats (BIN/XB/ADF/IDF): everything before SAUCE, 0x1A is data, not EOF. */
+  raw: Uint8Array;
 }
 
 const str = (b: Uint8Array, o: number, n: number) => decode(b.subarray(o, o + n)).replace(/[\s\u0000]+$/, "").trim();
@@ -38,10 +40,14 @@ export function parseSauce(bytes: Uint8Array): ParsedArt {
       if (comments > 0 && cStart >= 0 && String.fromCharCode(...bytes.subarray(cStart, cStart + 5)) === "COMNT") end = cStart;
     }
   }
+  let rawEnd = end;
+  if (sauce && sauce.fileSize > 0 && sauce.fileSize <= end) rawEnd = sauce.fileSize;
+  else if (sauce && rawEnd > 0 && bytes[rawEnd - 1] === 0x1a) rawEnd--;
+  const raw = bytes.subarray(0, rawEnd);
   let body = bytes.subarray(0, end);
   const eof = body.indexOf(0x1a);
   if (eof >= 0) body = body.subarray(0, eof);
-  return { sauce, body };
+  return { sauce, body, raw };
 }
 
 export function sauceDate(d: string) {

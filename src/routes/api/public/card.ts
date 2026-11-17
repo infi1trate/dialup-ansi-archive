@@ -16,11 +16,11 @@ export const Route = createFileRoute("/api/public/card")({
         const { renderCard } = await import("@/server/card");
         const { HOUSE_PACK, houseFile } = await import("@/data/housepack");
         try {
-          const png = await cached(await cacheKey("card-v2", `${pack}/${file}`), async () => {
+          const png = await cached(await cacheKey("card-v3", `${pack}/${file}`), async () => {
             const meta = await shareMeta(pack, file, year);
             const bytes = pack.toLowerCase() === HOUSE_PACK ? houseFile(file) : await getRawFile(pack, meta.file);
             if (!bytes) throw new Error("no such file");
-            return renderCard(bytes, shareLine(meta), "dial 555-0142  -  THE CRAWLSPACE BBS  -  art preserved by 16colo.rs");
+            return renderCard(file, bytes, shareLine(meta), "dial 555-0142  -  THE CRAWLSPACE BBS  -  art preserved by 16colo.rs");
           });
           return new Response(png as unknown as BodyInit, { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
         } catch (e) {

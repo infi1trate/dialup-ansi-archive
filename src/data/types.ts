@@ -4,5 +4,5 @@ export interface PackInfo { name: string; year: number; groups: string[]; files:
 export interface Page<T> { items: T[]; page: number; pages: number; total: number }
 export interface GroupSummary { name: string; releases: number }
 
-export const VIEWABLE = /\.(ans|asc|ice|diz|nfo|txt|bin)$/i;
+export const VIEWABLE = /\.(ans|asc|ice|diz|nfo|txt|bin|xb|adf|idf)$/i;
 export function isViewable(name: string) { return VIEWABLE.test(name); }
