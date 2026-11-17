@@ -1,5 +1,6 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import { allow, type HitStore } from "@/lib/ratelimit";
 import { checkHandle, checkOneliner, FUNNEL, speedFor } from "@/lib/filter";
 
 type Json = Record<string, any>;
@@ -41,18 +42,25 @@ function safeEq(a: string, b: string) {
   return d === 0;
 }
 
-/** Sliding-window limit; records the hit when allowed. */
+/** Sliding-window limit; see src/lib/ratelimit.ts. */
 export async function limit(keys: string[], action: string, max: number, windowSec: number) {
   const s = await db();
-  const since = new Date(Date.now() - windowSec * 1000).toISOString();
-  // insert first, then count: concurrent bursts all see each other's hits
-  const { error } = await s.from("rate_hits").insert(keys.map((key) => ({ key, action })));
-  if (error) throw new NetError(503, "offline");
-  for (const key of keys) {
-    const { count, error: e } = await s.from("rate_hits").select("id", { count: "exact", head: true }).eq("key", key).eq("action", action).gte("at", since);
-    if (e) throw new NetError(503, "offline");
-    if ((count ?? 0) > max) throw new NetError(429, "slow down");
-  }
+  const store: HitStore = {
+    async count(key, act, since, upTo) {
+      let q = s.from("rate_hits").select("id", { count: "exact", head: true }).eq("key", key).eq("action", act).gte("at", new Date(since).toISOString());
+      if (upTo !== undefined) q = q.lte("id", upTo);
+      const { count, error } = await q;
+      if (error) throw new NetError(503, "offline");
+      return count ?? 0;
+    },
+    async record(ks, act) {
+      const { data, error } = await s.from("rate_hits").insert(ks.map((key) => ({ key, action: act }))).select("id");
+      if (error || !data) throw new NetError(503, "offline");
+      return data.map((r: any) => Number(r.id));
+    },
+    async remove(ids) { await s.from("rate_hits").delete().in("id", ids); },
+  };
+  if (!(await allow(store, keys, action, max, windowSec))) throw new NetError(429, "slow down");
   if (Math.random() < 0.02) await s.from("rate_hits").delete().lt("at", new Date(Date.now() - 86400_000).toISOString());
 }
 

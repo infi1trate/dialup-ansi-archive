@@ -1,0 +1,16 @@
+# Pass 4 roadmap
+- [ ] A1 rate limit check-before-record + test
+- [ ] A2 delete test rows
+- [ ] A3 who's online 15s refresh
+- [ ] A4 share card scale wide
+- [ ] A5 debug flags busy/time; drive flows in browser
+- [ ] A6 backend down fallback
+- [ ] A7 prod build + code split
+- [ ] A8 parser check vs ~40 real files; PabloDraw 24-bit etc
+- [ ] A9 blink <3Hz; reduced motion steady blink
+- [ ] B XBin, BIN 160, ADF, IDF; The Attic 555-0199
+- [ ] C Animations area
+- [ ] D VOID//NODE, sticky note 2, DIZ hint, manual dial M, WARDIAL.EXE
+- [ ] E mobile tube view, io.hint keycap bar, hidden input, tap/swipe
+- [ ] F /gallery
+- [ ] STATUS.md
