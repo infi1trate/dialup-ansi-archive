@@ -70,12 +70,21 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-plastic: var(--plastic);
+  --color-plastic-shade: var(--plastic-shade);
+  --color-plastic-deep: var(--plastic-deep);
+  --color-bezel: var(--bezel);
+  --color-led-on: var(--led-on);
+  --color-led-off: var(--led-off);
+  --color-glass: var(--glass);
+  --font-plate: "Michroma", "Arial Narrow", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  --background: oklch(0.08 0.005 80);
+  --foreground: oklch(0.86 0.03 85);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
@@ -106,6 +115,15 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* Physical objects */
+  --plastic: oklch(0.86 0.035 88);
+  --plastic-shade: oklch(0.74 0.04 84);
+  --plastic-deep: oklch(0.58 0.04 80);
+  --bezel: oklch(0.2 0.01 80);
+  --led-on: oklch(0.82 0.2 140);
+  --led-off: oklch(0.32 0.04 140);
+  --glass: oklch(0.13 0.008 160);
+  --shadow-case: 0 2.5rem 6rem oklch(0 0 0 / 0.75), inset 0 0.25rem 0 oklch(1 0 0 / 0.35), inset 0 -0.6rem 1.2rem oklch(0.4 0.04 80 / 0.35);
 }
 
 .dark {
@@ -152,4 +170,96 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+/* ── Dial-Up: the room and the monitor ───────────────────────── */
+@layer components {
+  .room {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(ellipse at 50% 40%, oklch(0.13 0.008 80), var(--background) 70%);
+    overflow: hidden;
+    user-select: none;
+  }
+  .monitor-case {
+    --w: min(94vw, calc(94vh * 1.02));
+    width: var(--w);
+    padding: calc(var(--w) * 0.045) calc(var(--w) * 0.05) calc(var(--w) * 0.02);
+    border-radius: calc(var(--w) * 0.035) calc(var(--w) * 0.035) calc(var(--w) * 0.02) calc(var(--w) * 0.02);
+    background: linear-gradient(170deg, var(--plastic), var(--plastic-shade) 85%, var(--plastic-deep));
+    box-shadow: var(--shadow-case);
+    position: relative;
+  }
+  .monitor-bezel {
+    padding: calc(var(--w) * 0.03);
+    border-radius: calc(var(--w) * 0.03);
+    background: linear-gradient(160deg, var(--plastic-shade), var(--plastic) 40%, var(--plastic-shade));
+    box-shadow: inset 0 0.3rem 0.8rem oklch(0.3 0.03 80 / 0.55), inset 0 -0.2rem 0.4rem oklch(1 0 0 / 0.4);
+  }
+  .monitor-tube {
+    aspect-ratio: 4 / 3;
+    border-radius: calc(var(--w) * 0.03) / calc(var(--w) * 0.035);
+    background: var(--bezel);
+    padding: calc(var(--w) * 0.012);
+    box-shadow: inset 0 0 2rem oklch(0 0 0 / 0.9);
+  }
+  .monitor-screen {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: calc(var(--w) * 0.022) / calc(var(--w) * 0.028);
+    background: var(--glass);
+    image-rendering: auto;
+  }
+  .monitor-chin {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: calc(var(--w) * 0.018) calc(var(--w) * 0.01) calc(var(--w) * 0.005);
+  }
+  .monitor-plate {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    font-family: var(--font-plate);
+    font-size: calc(var(--w) * 0.017);
+    letter-spacing: 0.3em;
+    padding: 0.35em 0.9em;
+    border-radius: 0.2em;
+    background: linear-gradient(180deg, var(--plastic-deep), var(--plastic-shade));
+    color: var(--plastic);
+    box-shadow: inset 0 0.08em 0.15em oklch(0 0 0 / 0.4);
+  }
+  .monitor-model { opacity: 0.75; font-size: 0.8em; }
+  .monitor-vents { display: flex; gap: calc(var(--w) * 0.006); flex: 1; justify-content: center; }
+  .monitor-vents span { width: calc(var(--w) * 0.004); height: calc(var(--w) * 0.022); border-radius: 99px; background: var(--plastic-deep); box-shadow: inset 0 1px 1px oklch(0 0 0 / 0.5); }
+  .monitor-controls { display: flex; align-items: center; gap: calc(var(--w) * 0.018); }
+  .monitor-knob {
+    width: calc(var(--w) * 0.03); aspect-ratio: 1; border-radius: 50%; cursor: pointer;
+    background: conic-gradient(from 0deg, var(--plastic-deep), var(--plastic-shade), var(--plastic-deep), var(--plastic-shade), var(--plastic-deep));
+    box-shadow: 0 0.15rem 0.3rem oklch(0 0 0 / 0.5), inset 0 0 0 0.12rem var(--plastic-shade);
+    position: relative; transition: transform 120ms;
+  }
+  .monitor-knob::after { content: ""; position: absolute; left: 50%; top: 12%; width: 12%; height: 30%; transform: translateX(-50%); border-radius: 99px; background: var(--bezel); }
+  .monitor-led { width: calc(var(--w) * 0.01); aspect-ratio: 1; border-radius: 50%; background: var(--led-off); box-shadow: inset 0 1px 2px oklch(0 0 0 / 0.6); transition: background 200ms, box-shadow 200ms; }
+  .monitor-led-on { background: var(--led-on); box-shadow: 0 0 0.6rem var(--led-on); }
+  .monitor-power {
+    width: calc(var(--w) * 0.05); height: calc(var(--w) * 0.028); border-radius: 0.3rem; cursor: pointer;
+    background: linear-gradient(180deg, var(--plastic), var(--plastic-shade));
+    box-shadow: 0 0.2rem 0 var(--plastic-deep), 0 0.3rem 0.5rem oklch(0 0 0 / 0.45);
+    transition: transform 80ms, box-shadow 80ms;
+  }
+  .monitor-power[aria-pressed="true"] { transform: translateY(0.12rem); box-shadow: 0 0.08rem 0 var(--plastic-deep), 0 0.15rem 0.3rem oklch(0 0 0 / 0.45); }
+  .monitor-power:focus-visible, .monitor-knob:focus-visible { outline: 2px solid var(--led-on); outline-offset: 3px; }
+
+  .lab { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem; padding: 1.5rem; background: var(--background); color: var(--foreground); font-family: var(--font-mono); font-size: 0.8rem; }
+  .lab .monitor-case { --w: min(62vw, calc(90vh * 1.02)); align-self: start; }
+  .lab-panel { display: flex; flex-direction: column; gap: 0.75rem; }
+  .lab-panel label { display: flex; flex-direction: column; gap: 0.25rem; color: var(--plastic-shade); }
+  .lab-panel input, .lab-panel select, .lab-panel button { background: var(--bezel); color: var(--foreground); border: 1px solid var(--plastic-deep); padding: 0.4rem 0.5rem; border-radius: 0.25rem; font: inherit; }
+  .lab-panel button { cursor: pointer; }
+  .lab-panel button:hover { border-color: var(--plastic); }
+  .lab-stats { white-space: pre-wrap; background: var(--bezel); padding: 0.75rem; border-radius: 0.25rem; line-height: 1.5; }
 }

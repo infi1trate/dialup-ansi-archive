@@ -28,3 +28,11 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Dial-Up architecture
+- Modules are split by role: `src/term` (parser, cells, renderer), `src/modem` (byte scheduler), `src/bbs` (virtual host), `src/crt` (WebGL2 post-process), `src/machine` (state machine, engine, storage), `src/audio` (event bus), `src/data` (archive access). Why: later passes add room, sound and multi-user features on these seams.
+- The board (`src/bbs`) only writes bytes through `HostIO.send` and reads keys; client-side terminal features (mode, scrollback, info overlay) go through `HostIO.client`. Why: everything the board shows must arrive at modem speed.
+- Nothing on the CRT is HTML: every screen is CP437/ANSI bytes fed to the terminal; author screens with `src/bbs/ansi.ts`, whose colors take VGA palette indexes (mapped to ANSI SGR order internally).
+- The browser never calls 16colo.rs; it goes through `/api/public/archive/json` and `/api/public/archive/raw`, which cache permanently in the private `archive-cache` storage bucket. Why: polite to upstream and resilient.
+- All canvas/WebGL/audio/localStorage code is created inside effects (dynamic import of `@/machine/engine` and `@/machine/machine`). Why: SSR safety.
+- tsconfig turns off `noUncheckedIndexedAccess`/`exactOptionalPropertyTypes`/`noPropertyAccessFromIndexSignature`. Why: hot typed-array loops in the renderer and parser.

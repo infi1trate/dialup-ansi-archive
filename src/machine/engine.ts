@@ -1,0 +1,67 @@
+// Display engine: terminal + renderer + modem + CRT, driven by one animation loop.
+import { Terminal } from "@/term/terminal";
+import { TermRenderer } from "@/term/renderer";
+import { Modem } from "@/modem/modem";
+import { CRTDisplay, type PowerState } from "@/crt/crt";
+import { audio } from "@/audio/bus";
+import { screenAverageColor } from "./signals";
+
+export class Engine {
+  term = new Terminal();
+  renderer = new TermRenderer();
+  modem: Modem;
+  crt: CRTDisplay;
+  power: PowerState = { onT: -1, offT: 99 };
+  powered = false;
+  private raf = 0;
+  private last = 0;
+  private avgT = 0;
+  private flowT = 0;
+  fps = 60;
+  /** Called every frame (for lab stats etc.). */
+  onFrame: ((dt: number) => void) | null = null;
+
+  constructor(canvas: HTMLCanvasElement) {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    this.crt = new CRTDisplay(canvas, reduce);
+    this.modem = new Modem((b) => this.term.feed(b));
+    this.term.onBell = () => audio.emit("beep");
+    this.last = performance.now();
+    const loop = (now: number) => {
+      this.raf = requestAnimationFrame(loop);
+      const dt = Math.min(0.1, (now - this.last) / 1000);
+      this.last = now;
+      this.fps = this.fps * 0.95 + (dt > 0 ? 1 / dt : 60) * 0.05;
+      this.frame(dt, now / 1000);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  powerOn() { this.powered = true; this.power = { onT: 0, offT: -1 }; }
+  powerOff() { this.powered = false; this.power = { onT: -1, offT: 0 }; this.modem.clear(); }
+
+  private frame(dt: number, t: number) {
+    if (this.power.onT >= 0) this.power.onT += dt;
+    if (this.power.offT >= 0) this.power.offT += dt;
+    this.modem.tick(dt);
+    this.flowT += dt;
+    if (this.flowT > 0.25) { this.flowT = 0; if (this.modem.rate > 0) audio.emit("byteFlow", this.modem.rate); }
+    const blinkOn = Math.floor(t * 2 * 2) % 2 === 0; // ~2 Hz text blink
+    const cursorOn = Math.floor(t * 2 * 3.6) % 2 === 0; // faster cursor blink
+    const changed = this.renderer.render(this.term, blinkOn, cursorOn);
+    this.crt.render(this.renderer.canvas, changed, this.power, t);
+    this.avgT += dt;
+    if (this.avgT > 0.1) {
+      this.avgT = 0;
+      const k = this.powered ? 1 : 0;
+      const [r, g, b] = this.renderer.avg;
+      screenAverageColor.set([r * k, g * k, b * k]);
+    }
+    this.onFrame?.(dt);
+  }
+
+  /** Local output (BIOS, DOS, TELEWIRE): straight to the terminal. */
+  local(bytes: Uint8Array) { this.term.feed(bytes); }
+
+  destroy() { cancelAnimationFrame(this.raf); }
+}

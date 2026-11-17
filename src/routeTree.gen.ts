@@ -10,33 +10,89 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LabRouteImport } from './routes/lab'
+import { Route as ApiPublicArchiveJsonRouteImport } from './routes/api/public/archive.json'
+import { Route as ApiPublicArchiveRawRouteImport } from './routes/api/public/archive.raw'
+import { Route as DialNumberYearPackFileRouteImport } from './routes/dial.$number.$year.$pack.$file'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LabRoute = LabRouteImport.update({
+  id: '/lab',
+  path: '/lab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicArchiveJsonRoute = ApiPublicArchiveJsonRouteImport.update({
+  id: '/api/public/archive/json',
+  path: '/api/public/archive/json',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicArchiveRawRoute = ApiPublicArchiveRawRouteImport.update({
+  id: '/api/public/archive/raw',
+  path: '/api/public/archive/raw',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DialNumberYearPackFileRoute = DialNumberYearPackFileRouteImport.update({
+  id: '/dial/$number/$year/$pack/$file',
+  path: '/dial/$number/$year/$pack/$file',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/lab': typeof LabRoute
+  '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
+  '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
+  '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/lab': typeof LabRoute
+  '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
+  '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
+  '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/lab': typeof LabRoute
+  '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
+  '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
+  '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/lab'
+    | '/api/public/archive/json'
+    | '/api/public/archive/raw'
+    | '/dial/$number/$year/$pack/$file'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/lab'
+    | '/api/public/archive/json'
+    | '/api/public/archive/raw'
+    | '/dial/$number/$year/$pack/$file'
+  id:
+    | '__root__'
+    | '/'
+    | '/lab'
+    | '/api/public/archive/json'
+    | '/api/public/archive/raw'
+    | '/dial/$number/$year/$pack/$file'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LabRoute: typeof LabRoute
+  ApiPublicArchiveJsonRoute: typeof ApiPublicArchiveJsonRoute
+  ApiPublicArchiveRawRoute: typeof ApiPublicArchiveRawRoute
+  DialNumberYearPackFileRoute: typeof DialNumberYearPackFileRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +104,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lab': {
+      id: '/lab'
+      path: '/lab'
+      fullPath: '/lab'
+      preLoaderRoute: typeof LabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/archive/json': {
+      id: '/api/public/archive/json'
+      path: '/api/public/archive/json'
+      fullPath: '/api/public/archive/json'
+      preLoaderRoute: typeof ApiPublicArchiveJsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/archive/raw': {
+      id: '/api/public/archive/raw'
+      path: '/api/public/archive/raw'
+      fullPath: '/api/public/archive/raw'
+      preLoaderRoute: typeof ApiPublicArchiveRawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dial/$number/$year/$pack/$file': {
+      id: '/dial/$number/$year/$pack/$file'
+      path: '/dial/$number/$year/$pack/$file'
+      fullPath: '/dial/$number/$year/$pack/$file'
+      preLoaderRoute: typeof DialNumberYearPackFileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LabRoute: LabRoute,
+  ApiPublicArchiveJsonRoute: ApiPublicArchiveJsonRoute,
+  ApiPublicArchiveRawRoute: ApiPublicArchiveRawRoute,
+  DialNumberYearPackFileRoute: DialNumberYearPackFileRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,0 +1,427 @@
+// The PC: off -> boot -> dos -> comm -> dialing -> handshake -> session -> hangup.
+// Local programs (BIOS, DOS, TELEWIRE) draw straight to the terminal; the board only through the modem.
+import { Ansi, a, box, center, pad, rpad } from "@/bbs/ansi";
+import { DIRECTORY, type DeepLink, type DirEntry, type HostIO } from "@/bbs/io";
+import { runBoard } from "@/bbs/board";
+import { audio } from "@/audio/bus";
+import { Engine } from "./engine";
+import { Aborted, KeyQueue, toKey, type Key } from "./keyboard";
+import { allowedSpeeds, loadProfile, maxSpeed, saveProfile, type Profile } from "./storage";
+import { Signal } from "./signals";
+import { Terminal } from "@/term/terminal";
+import type { Speed } from "@/modem/modem";
+
+export type MachineState = "off" | "boot" | "dos" | "comm" | "dialing" | "handshake" | "session" | "hangup";
+
+const CALL_MINUTES = 60;
+const CAPTURE = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "PageUp", "PageDown", "Backspace", "Tab", "Home", "End", "Enter", "Escape", "F1", "F3", "F5"]);
+
+export class Machine {
+  state = new Signal<MachineState>("off");
+  powered = new Signal(false);
+  keys = new KeyQueue();
+  profile: Profile = loadProfile();
+  private gen = 0;
+  private callsThisPower = 0;
+  private lastBusy = false;
+  private skipping = false;
+  private cwd = "C:\\";
+  private deepLink: (DeepLink & { number: string }) | null = null;
+  private timeTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(public engine: Engine) {}
+
+  // ── input ──────────────────────────────────────────────────────
+  handleKeyDown(e: KeyboardEvent) {
+    if (!this.powered.value) return;
+    if (e.metaKey || (e.ctrlKey && !["c", "C"].includes(e.key))) return;
+    if (CAPTURE.has(e.key) || e.key.length === 1) e.preventDefault();
+    audio.emit("keyDown", e.key);
+    this.keys.push(toKey(e));
+  }
+  handleKeyUp(e: KeyboardEvent) { if (this.powered.value) audio.emit("keyUp", e.key); }
+
+  // ── power ──────────────────────────────────────────────────────
+  togglePower() { if (this.powered.value) this.powerOff(); else this.powerOn(); }
+
+  powerOn(deepLink?: DeepLink & { number: string }) {
+    if (this.powered.value) return;
+    audio.unlock();
+    this.gen++;
+    this.keys.revive();
+    this.deepLink = deepLink ?? null;
+    this.powered.set(true);
+    this.engine.term.setMode({ cols: 80, ice: false, ninePixel: true });
+    this.engine.term.reset();
+    this.engine.modem.clear();
+    this.engine.powerOn();
+    audio.emit("powerOn");
+    this.callsThisPower = 0;
+    void this.run(this.gen);
+  }
+
+  powerOff() {
+    if (!this.powered.value) return;
+    this.gen++;
+    this.keys.abort("power");
+    this.stopTimer();
+    this.engine.powerOff();
+    this.powered.set(false);
+    this.state.set("off");
+    audio.emit("powerOff");
+  }
+
+  private alive(g: number) { if (g !== this.gen) throw new Aborted("power"); }
+
+  // ── helpers ────────────────────────────────────────────────────
+  out(x: Ansi | string) { this.engine.local(typeof x === "string" ? a().t(x).build() : x.build()); }
+  private key(): Promise<Key> { return this.keys.next(); }
+
+  /** Skippable wait: Esc or Space skip (and keep skipping the rest of this phase). */
+  private async wait(ms: number) {
+    if (this.skipping) return true;
+    const timer = new Promise((r) => setTimeout(r, ms));
+    for (;;) {
+      const k = await this.keys.nextOr(timer);
+      if (k === null) return false;
+      if (k.key === "Escape" || k.key === " ") { this.skipping = true; return true; }
+    }
+  }
+  private sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+
+  private async run(g: number) {
+    try {
+      if (this.deepLink) {
+        await this.sleep(500); this.alive(g);
+        const entry = DIRECTORY.find((d) => d.number === this.deepLink!.number) ?? DIRECTORY[0];
+        await this.call(entry, g, true);
+        await this.comm(g);
+      } else {
+        await this.boot(g);
+        await this.dos(g, true);
+      }
+    } catch (e) {
+      if (!(e instanceof Aborted)) { console.error(e); this.out(a().reset().nl().k(12, "General failure reading drive C").nl()); }
+    }
+  }
+
+  // ── BIOS ───────────────────────────────────────────────────────
+  private async boot(g: number) {
+    this.state.set("boot");
+    this.skipping = false;
+    const fast = this.profile.fastBoot;
+    const s = fast ? 0.4 : 1;
+    await this.sleep(700); this.alive(g); // tube warm-up
+    const x = a().cls();
+    x.at(1, 1).k(15, "Kestrel Systems BIOS v1.04").k(7, "  Copyright (C) 1991-92 Kestrel Systems Inc.");
+    x.at(1, 72).k(9, "▄█▀▀▄").at(2, 72).k(9, "█▄▄▀ ").at(3, 72).k(1, "▀ KS ");
+    x.at(3, 1).k(7, "486DX-33 CPU at 33 MHz, math coprocessor present").at(5, 1).k(7, "Memory Test :      ");
+    this.out(x);
+    for (let k = 0; k <= 4096; k += 128) {
+      this.out(a().at(5, 15).k(15, `${String(k).padStart(5)}K`));
+      if (!this.skipping) { await this.wait(38 * s); this.alive(g); }
+    }
+    this.out(a().at(5, 15).k(15, " 4096K OK"));
+    audio.emit("beep");
+    const lines: [number, string][] = [
+      [7, "Detecting IDE Primary Master ... KS-120A  (120 MB)"],
+      [7, "Detecting IDE Primary Slave  ... None"],
+      [7, "Floppy Drive A: 1.44M, 3.5 in."],
+      [7, "Serial Ports  : COM1 3F8  COM2 2F8   Parallel: LPT1 378"],
+    ];
+    let row = 7;
+    for (const [c, t] of lines) {
+      if (t.startsWith("Floppy")) audio.emit("floppySeek"); else audio.emit("diskSeek");
+      this.out(a().at(row++, 1).k(c, t));
+      await this.wait(420 * s); this.alive(g);
+    }
+    this.out(a().at(13, 1).k(7, "Press ").k(15, "DEL").k(7, " to enter SETUP, ").k(15, "ESC").k(7, " to skip memory test").at(24, 1).k(8, "09/14/92-KS486-0104"));
+    await this.wait(700 * s); this.alive(g);
+    this.profile.fastBoot = true;
+    saveProfile(this.profile);
+  }
+
+  // ── DOS ────────────────────────────────────────────────────────
+  private async dos(g: number, autoexec: boolean) {
+    this.state.set("dos");
+    this.skipping = false;
+    if (autoexec) {
+      this.out(a().cls().k(7, "Starting Kestrel DOS...").nl(2));
+      audio.emit("diskSeek");
+      await this.wait(400); this.alive(g);
+      const boot = ["DEVICE=C:\\DOS\\HIMEM.SYS", "HIMEM: Kestrel Extended Memory Manager v2.77", "DOS=HIGH", "FILES=30", "BUFFERS=20",
+        "DEVICE=C:\\DOS\\KSMOUSE.SYS  (no mouse? fine.)", "", "C:\\>PROMPT $P$G", "C:\\>PATH C:\\DOS;C:\\TELEWIRE", "C:\\>MODE COM2:9600,N,8,1",
+        "COM2: 9600,n,8,1,-", ""];
+      for (const l of boot) { this.out(a().k(7, l).nl()); await this.wait(70); this.alive(g); }
+      this.out(a().k(11, "Starting TELEWIRE in 2 seconds — press any key for the DOS prompt.").nl());
+      this.skipping = false;
+      const k = await this.keys.nextOr(this.sleep(2000));
+      this.alive(g);
+      if (!k) { this.out(a().k(7, "C:\\>TELEWIRE").nl()); await this.comm(g); }
+      else this.out(a().nl());
+    }
+    for (;;) {
+      this.state.set("dos");
+      this.out(a().k(7, `${this.cwd}>`));
+      const line = await this.readLine(g, 70);
+      const r = await this.dosCommand(line.trim(), g);
+      if (r === "comm") await this.comm(g);
+    }
+  }
+
+  private async readLine(g: number, max: number) {
+    let s = "";
+    for (;;) {
+      const k = await this.key(); this.alive(g);
+      if (k.key === "Enter") { this.out(a().nl()); return s; }
+      if (k.key === "Backspace") { if (s) { s = s.slice(0, -1); this.out(a().raw("\b \b")); } continue; }
+      if (k.key === "Escape") { this.out(a().raw("\\").nl().k(7, `${this.cwd}>`)); s = ""; continue; }
+      if (k.ch !== null && s.length < max) { s += String.fromCharCode(k.ch); this.out(a().k(7, String.fromCharCode(k.ch))); }
+    }
+  }
+
+  private async dosCommand(line: string, g: number): Promise<"comm" | void> {
+    const [cmd0, ...rest] = line.split(/\s+/);
+    const cmd = (cmd0 ?? "").toUpperCase();
+    const arg = rest.join(" ").toUpperCase();
+    const p = (t: string, c = 7) => this.out(a().k(c, t).nl());
+    const now = new Date();
+    switch (cmd) {
+      case "": return;
+      case "CLS": this.out(a().cls()); return;
+      case "VER": p(""); p("Kestrel DOS Version 5.0"); p(""); return;
+      case "DATE": p(`Current date is ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(1993, now.getMonth(), now.getDate()).getDay()]} ${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}-1993`); return;
+      case "TIME": p(`Current time is ${now.toTimeString().slice(0, 8)}.${String(Math.floor(now.getMilliseconds() / 10)).padStart(2, "0")}`); return;
+      case "HELP": case "/?":
+        p("Kestrel DOS 5.0 commands:", 15);
+        p("  DIR   CLS   VER   DATE   TIME   TYPE <file>   CD <dir>   MEM");
+        p("  DIAL  start TELEWIRE and the dialing directory");
+        p("  (and some things Kestrel won't tell you)", 8); return;
+      case "MEM":
+        p(""); p("    655360 bytes total conventional memory"); p("    633904 bytes available to Kestrel DOS"); p("    598016 largest executable program size");
+        p("   3407872 bytes total contiguous extended memory"); p("   3407872 bytes available XMS memory"); p("           Kestrel DOS resident in High Memory Area"); p(""); return;
+      case "CD": case "CHDIR": {
+        if (!arg) { p(this.cwd); return; }
+        const t = arg === ".." || arg === "\\" ? "C:\\" : arg.replace(/^C:\\?/, "").replace(/\\$/, "");
+        if (t === "C:\\") { this.cwd = "C:\\"; return; }
+        if (["TELEWIRE", "GAMES", "DOS"].includes(t) && this.cwd === "C:\\") { this.cwd = `C:\\${t}`; return; }
+        p("Invalid directory"); return;
+      }
+      case "DIR": {
+        const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["DOS", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
+          : this.cwd.endsWith("TELEWIRE") ? [["TELEWIRE", "EXE", "184320"], ["TELEWIRE", "DIR", "1024"], ["CAPTURE", "LOG", "0"]]
+          : this.cwd.endsWith("GAMES") ? [["DIG", "EXE", "34012"], ["TETRA", "EXE", "41210"]]
+          : [["HIMEM", "SYS", "11552"], ["KSMOUSE", "SYS", "32158"], ["EDIT", "COM", "413"]];
+        p(""); p(" Volume in drive C is KESTREL"); p(" Volume Serial Number is 1A2B-0142"); p(` Directory of ${this.cwd}`); p("");
+        for (const [n, ext, size] of files) p(`${pad(n, 9)}${ext === "<DIR>" ? pad("", 4) + pad("<DIR>", 10) : pad(ext, 4) + rpad(size, 10)}  11-17-93   4:20a`);
+        p(`${rpad(String(files.length), 9)} file(s)   ${rpad("88,342,528", 12)} bytes free`); p(""); return;
+      }
+      case "TYPE": {
+        const docs: Record<string, string[]> = {
+          "AUTOEXEC.BAT": ["@ECHO OFF", "PROMPT $P$G", "PATH C:\\DOS;C:\\TELEWIRE", "MODE COM2:9600,N,8,1", "TELEWIRE"],
+          "CONFIG.SYS": ["DEVICE=C:\\DOS\\HIMEM.SYS", "DOS=HIGH", "FILES=30", "BUFFERS=20"],
+          "README.TXT": ["Welcome to your Kestrel 486!", "Type DIAL to call a BBS. The Crawlspace is 555-0142.", "Don't pick up the phone while the modem is on line."],
+        };
+        const d = docs[arg.replace(/^C:\\/, "")];
+        if (!d || this.cwd !== "C:\\") { p("File not found"); return; }
+        d.forEach((l) => p(l)); return;
+      }
+      case "DIAL": case "TELEWIRE": case "EXIT": return "comm";
+      case "XYZZY": p("Nothing happens."); return;
+      case "WIN": p("Kestrel Windows is not installed. You have a modem. What more do you need?"); return;
+      case "FORMAT": p("Nice try. Static backed up nothing, so let's not."); return;
+      case "DIG": case "TETRA": p("This program requires a math coprocessor and a sense of humor."); return;
+      case "SYSOP": p("Static is asleep under the stairs. Shh."); return;
+      default: p("Bad command or file name");
+    }
+    void g;
+  }
+
+  // ── TELEWIRE ───────────────────────────────────────────────────
+  private dirScreen(sel: number) {
+    const x = a().c(15, 1).raw("\x1b[2J");
+    x.at(1, 1).c(1, 7).t(pad(" TELEWIRE v2.1  ·  Dialing Directory", 59) + pad(`COM2  ${this.profile.speed} N81`, 20));
+    box(x, 3, 3, 75, 12, 11, "DIRECTORY", true, 1);
+    x.at(5, 6).c(14, 1).t(pad("#", 4) + pad("Name", 26) + pad("Number", 12) + pad("Speed", 8) + "Last call");
+    x.at(6, 6).c(3, 1).t("─".repeat(68));
+    DIRECTORY.forEach((d, i) => {
+      const last = this.profile.lastCall[d.number] ?? "never";
+      const text = pad(String(i + 1), 4) + pad(d.name, 26) + pad(d.number, 12) + pad(String(this.profile.speed), 8) + pad(last, 18);
+      x.at(7 + i * 2, 5);
+      if (i === sel) x.c(1, 7).t(" " + text + " "); else x.c(15, 1).t(" " + text + " ");
+      x.at(8 + i * 2, 10).c(3, 1).t(pad(d.blurb, 40));
+    });
+    box(x, 16, 3, 75, 6, 3, "KEYS", true, 1);
+    x.at(17, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to DOS");
+    x.at(19, 6).c(7, 1).t("Inside a call: ").c(15, 1).t("ENTER").c(7, 1).t(" finish transfer  ").c(15, 1).t("SPACE").c(7, 1).t(" pause  ").c(15, 1).t("I").c(7, 1).t(" info  ").c(15, 1).t("ESC").c(7, 1).t(" back");
+    const fs = this.profile.filesSeen.length;
+    const nxt = fs < 5 ? `${5 - fs} more files to unlock 14400` : fs < 15 ? `${15 - fs} more files to unlock 28800` : "all speeds unlocked";
+    x.at(23, 1).c(0, 3).t(pad(` ${fs} files seen · ${nxt}`, 79));
+    x.at(24, 1).c(15, 1);
+    return x;
+  }
+
+  private async comm(g: number) {
+    let sel = 0;
+    for (;;) {
+      this.state.set("comm");
+      this.engine.term.setMode({ cols: 80, ice: false, ninePixel: true });
+      this.engine.term.cursorVisible = false;
+      this.out(this.dirScreen(sel));
+      const k = await this.key(); this.alive(g);
+      const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
+      if (k.key === "ArrowUp") sel = (sel + DIRECTORY.length - 1) % DIRECTORY.length;
+      else if (k.key === "ArrowDown") sel = (sel + 1) % DIRECTORY.length;
+      else if (c >= "1" && c <= "3") sel = +c - 1;
+      else if (k.key === "Enter" || c === "D") { this.engine.term.cursorVisible = true; await this.call(DIRECTORY[sel], g, false); }
+      else if (c === "S") await this.setup(g);
+      else if (k.key === "Escape" || (k.alt && c === "X")) {
+        this.engine.term.cursorVisible = true;
+        this.out(a().reset().cls().k(7, "TELEWIRE v2.1 · line closed.").nl(2));
+        return;
+      }
+    }
+  }
+
+  private async setup(g: number) {
+    const speeds: Speed[] = [2400, 9600, 14400, 28800];
+    let sel = Math.max(0, speeds.indexOf(this.profile.speed));
+    for (;;) {
+      const allowed = allowedSpeeds(this.profile);
+      const x = a().c(15, 1).raw("\x1b[2J");
+      x.at(1, 1).c(1, 7).t(pad(" TELEWIRE v2.1  ·  Modem Setup", 79));
+      box(x, 4, 18, 44, 12, 11, "LINE SPEED", true, 1);
+      speeds.forEach((s, i) => {
+        const ok = allowed.includes(s);
+        const label = pad(`${s} bps`, 12) + (s === 2400 ? "hard mode" : !ok ? (s === 14400 ? "locked: view 5 files" : "locked: view 15 files") : s === this.profile.speed ? "current" : "");
+        x.at(6 + i * 2, 21);
+        if (i === sel) x.c(1, 7).t(pad(" " + label, 38)); else x.c(ok ? 15 : 8, 1).t(pad(" " + label, 38));
+      });
+      x.at(14, 21).c(3, 1).t(`Files seen: ${this.profile.filesSeen.length}  ·  best: ${maxSpeed(this.profile)}`);
+      x.at(17, 18).c(7, 1).t("↑↓ select · ENTER set · ESC back");
+      this.out(x);
+      const k = await this.key(); this.alive(g);
+      if (k.key === "ArrowUp") sel = Math.max(0, sel - 1);
+      else if (k.key === "ArrowDown") sel = Math.min(3, sel + 1);
+      else if (k.key === "Escape") return;
+      else if (k.key === "Enter" && allowed.includes(speeds[sel])) { this.profile.speed = speeds[sel]; saveProfile(this.profile); return; }
+    }
+  }
+
+  // ── the call ───────────────────────────────────────────────────
+  private async call(entry: DirEntry, g: number, express: boolean) {
+    const speed = allowedSpeeds(this.profile).includes(this.profile.speed) ? this.profile.speed : 9600;
+    this.state.set("dialing");
+    this.skipping = false;
+    const t = express ? 0.25 : 1;
+    this.out(a().reset().cls().k(15, "TELEWIRE v2.1").k(7, " — terminal mode").nl(2));
+    this.out(a().k(7, "ATZ").nl()); await this.wait(350 * t); this.alive(g);
+    this.out(a().k(7, "OK").nl()); await this.wait(250 * t); this.alive(g);
+    for (;;) {
+      this.out(a().k(7, `ATDT ${entry.number}`).nl());
+      audio.emit("offHook");
+      await this.wait(600 * t); this.alive(g);
+      for (const d of entry.number.replace(/\D/g, "")) { audio.emit("dialDigit", d); if (!this.skipping) await this.wait(95 * t); this.alive(g); }
+      const busy = !express && this.callsThisPower === 0 && !this.lastBusy && Math.random() < 0.2;
+      for (let r = 0; r < (busy ? 1 : 2); r++) { await this.wait(r === 0 ? 900 * t : 2600 * t); this.alive(g); if (!busy) audio.emit("ring"); }
+      if (busy) {
+        this.lastBusy = true;
+        audio.emit("busy");
+        await this.wait(1800); this.alive(g);
+        this.out(a().k(7, "BUSY").nl());
+        audio.emit("hangup");
+        this.skipping = false;
+        for (let n = 5; n > 0; n--) {
+          this.out(a().raw("\r").k(14, `Redialing in ${n} seconds... (ESC cancels)`).eol());
+          const k = await this.keys.nextOr(this.sleep(1000)); this.alive(g);
+          if (k?.key === "Escape") { this.out(a().nl().k(7, "Dial cancelled.").nl()); await this.sleep(700); return; }
+          if (k?.key === " ") break;
+        }
+        this.out(a().nl());
+        this.callsThisPower++;
+        continue;
+      }
+      this.lastBusy = false;
+      break;
+    }
+    this.callsThisPower++;
+    this.state.set("handshake");
+    audio.emit("handshakeStart", speed);
+    await this.wait(4000 * t); this.alive(g);
+    this.out(a().k(15, `CONNECT ${speed}`).nl(2));
+    audio.emit("connect", speed);
+    this.engine.modem.bps = speed;
+    await this.session(entry, speed, g);
+  }
+
+  private async session(entry: DirEntry, speed: number, g: number) {
+    this.state.set("session");
+    const started = Date.now();
+    const node = 1;
+    const term = this.engine.term;
+    const modem = this.engine.modem;
+    this.startTimer(started, g);
+    const io: HostIO = {
+      send: (b) => modem.write(b),
+      key: () => this.keys.next(),
+      keyOrDrain: () => this.keys.nextOr(modem.drain()),
+      drain: () => modem.drain(),
+      flush: () => modem.flush(),
+      pause: () => modem.pause(),
+      resume: () => modem.resume(),
+      isPaused: () => modem.paused,
+      clearOutput: () => modem.clear(),
+      client: {
+        setMode: (m) => { term.setMode(m); term.reset(); },
+        scroll: (d) => term.scrollView(d),
+        scrollTo: (w) => term.scrollViewTo(w === "top" ? term.scrollbackLines : 0),
+        markTop: () => { /* scrollback starts fresh at each setMode/reset */ },
+        overlay: (bytes) => {
+          if (!bytes) { term.overlay = null; term.version++; return; }
+          const ov = new Terminal({ cols: 80 }, { masked: true });
+          ov.feed(bytes);
+          term.overlay = ov; term.version++;
+        },
+        rows: () => term.rows,
+      },
+      speed, node, entry, profile: this.profile,
+      save: () => saveProfile(this.profile),
+      timeLeftMs: () => Math.max(0, CALL_MINUTES * 60000 - (Date.now() - started)),
+      deepLink: this.deepLink ?? undefined,
+    };
+    this.deepLink = null;
+    try {
+      await runBoard(io);
+      await modem.drain();
+    } catch (e) {
+      if (!(e instanceof Aborted) || e.reason === "power") throw e;
+    } finally {
+      this.stopTimer();
+    }
+    this.alive(g);
+    this.keys.revive();
+    this.state.set("hangup");
+    modem.clear(); modem.resume();
+    term.overlay = null;
+    term.setMode({ cols: 80, ice: false, ninePixel: true });
+    this.out(a().reset().nl(2).k(7, "NO CARRIER").nl());
+    audio.emit("hangup");
+    const d = new Date();
+    this.profile.lastCall[entry.number] = `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}-93 ${d.toTimeString().slice(0, 5)}`;
+    this.profile.calls++;
+    saveProfile(this.profile);
+    this.skipping = false;
+    await this.wait(1600); this.alive(g);
+  }
+
+  private startTimer(started: number, g: number) {
+    this.stopTimer();
+    this.timeTimer = setInterval(() => {
+      if (g !== this.gen) return this.stopTimer();
+      if (Date.now() - started >= CALL_MINUTES * 60000) { this.stopTimer(); this.keys.abort("timeup"); }
+    }, 1000);
+  }
+  private stopTimer() { if (this.timeTimer) clearInterval(this.timeTimer); this.timeTimer = null; }
+}
+
+export { center };
