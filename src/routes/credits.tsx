@@ -29,7 +29,8 @@ function Credits() {
       <h2>The font</h2>
       <p>IBM VGA 8x16 glyphs from "The Ultimate Oldschool PC Font Pack" by VileR (int10h.org), licensed CC BY-SA 4.0, via the pcface package.</p>
       <h2>Sound</h2>
-      <p>Every sound is synthesized live in the browser. No recordings are used.</p>
+      <p>Tracker music (.MOD, .S3M, .XM, .IT) plays through libopenmpt by the OpenMPT developers (BSD license), via the chiptune3 package by DrSnuggles (MIT license).</p>
+      <p>Every other sound is synthesized live in the browser. No recordings are used.</p>
       <h2>Brands</h2>
       <p>Kestrel, Telewire, Corvid, Nitewatch and Zapp are invented. The Crawlspace BBS, its sysop Static and its callers are fictional.</p>
       <h2>Takedown requests</h2>

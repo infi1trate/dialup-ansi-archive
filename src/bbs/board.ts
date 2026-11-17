@@ -267,9 +267,9 @@ export class Board {
     if (this.sk === VOID_SKIN) {
       // VOID//NODE: red chrome that bleeds down into static
       x.at(1, 1); for (let c = 0; c < 79; c++) x.k(c % 7 === 3 ? 4 : 8, "▀");
-      chromeText(x, 4, 12, "VOID", [15, 7, 12, 4, 4, 0], 4);
+      chromeText(x, 4, 12, "VOID", [15, 7, 12, 12, 4, 4], 4);
       x.at(5, 38).k(8, "//").at(6, 38).k(7, "//");
-      chromeText(x, 4, 42, "NODE", [7, 7, 8, 0, 8, 0], 0);
+      chromeText(x, 4, 42, "NODE", [15, 7, 7, 7, 8, 8], 0);
       const drip = [13, 16, 21, 26, 29, 33];
       for (let r = 0; r < 4; r++) for (const c of drip) if ((c * 7 + r * 3) % 5 < 4 - r) x.at(7 + r, c).k(r ? 4 : 12, ["▓", "▒", "░", "·"][r]);
       x.at(12, 1).k(8, "░".repeat(79));
@@ -493,7 +493,7 @@ export class Board {
     const v = this.sk === VOID_SKIN;
     if (v) {
       x.at(1, 1).k(8, "▀".repeat(79));
-      chromeText(x, 2, 6, "VOID", [15, 7, 12, 4, 4, 0], 4);
+      chromeText(x, 2, 6, "VOID", [15, 7, 12, 12, 4, 4], 4);
       x.at(3, 32).k(8, "//").k(7, "NODE");
       x.at(4, 32).k(4, "most viewed first. that's all.");
     } else {
@@ -732,6 +732,7 @@ export class Board {
       [7, ""],
       [13, "Font: IBM VGA 8x16 from the Ultimate Oldschool PC Font Pack by VileR"],
       [13, "(int10h.org), licensed CC BY-SA 4.0."],
+      [13, "KPLAY music: libopenmpt (BSD license) via chiptune3 (MIT license)."],
       [7, ""],
       [7, "Board software, house pack CRAWL-01, the machine and the modem: Dial-Up."],
       [7, "All brand names here are invented."],
@@ -756,7 +757,7 @@ export class Board {
     const x = a().cls();
     const v = this.sk === VOID_SKIN;
     x.at(1, 1); shadeBar(x, 79, v ? 4 : 5);
-    chromeText(x, 4, 6, "SEE YA", v ? [7, 7, 12, 4, 4, 0] : [15, 13, 13, 5, 5, 1], v ? 4 : 5);
+    chromeText(x, 4, 6, "SEE YA", v ? [7, 7, 12, 12, 4, 4] : [15, 13, 13, 5, 5, 1], v ? 4 : 5);
     x.at(8, 6).k(8, "...the line is yours again");
     if (!v) stairwell(x, 3, 50, 13);
     else x.at(5, 50).k(4, "the void says nothing back.");

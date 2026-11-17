@@ -46,3 +46,6 @@ use the editor.
 - Touch keys come from the board's out-of-band `io.hint(keys)`, never parsed from the byte stream; the context bar renders only those. Why: the CRT stays pure bytes.
 - `src/start.ts` loads the backend auth middleware lazily so the dark first frame ships no backend client. Why: first-load budget.
 - Write rate limits go through `src/lib/ratelimit.ts` (check before recording). Why: rejected attempts must not extend the window.
+- Downloads live in IndexedDB (`src/machine/drive.ts`, `C:\DOWNLOAD`, size-capped, oldest evicted); DOS VIEW replays them through the board viewer with a local HostIO. Why: offline reading without a server.
+- Tracker music plays only through `src/audio/kplay.ts` (lazy AudioWorklet from `public/wasm/chiptune3`) into the speaker bus in `src/audio/engine.ts`. Why: the 1.5 MB player must never touch the first load, and music needs a visible source.
+- BASEMENT CRAWL daily turns and scores go through `/api/public/net` actions (`doorTurn`, `doorScore`, `doorTop`) on RLS-locked tables. Why: same validation/rate-limit path as every board write.

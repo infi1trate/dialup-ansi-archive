@@ -1,55 +1,64 @@
-# Dial-Up status (passes 1-4)
+# Dial-Up status (passes 1-5)
 
 ## 1. Verified working (test browser = Playwright Chromium, software GL)
 - Pass 1-3 loop: power on, boot, DOS, TELEWIRE, dial, GUEST, browse 1993, view ANSI, I info, logoff; deep links; /lab; /credits; cross-browser oneliners/logons/presence.
-- Rate limit: unit test "first accepted, next rejected, accepted after window", rejected attempts do not extend it; a parallel burst lets exactly one through (src/test/ratelimit.test.ts, memory store).
-- `?debug=busy` forces BUSY + automatic redial countdown, then CONNECT. `?debug=time=1` kicks to the time's-up screen after one minute, then NO CARRIER.
-- Brightness, contrast and modem-volume knobs respond to the scroll wheel and persist (drag not scripted).
-- Modem setup: 2400 hard mode selectable, back to 9600; 14400/28800 show as locked until unlocked.
-- New-user form (handle, city, joke, transfer phrase) on screen; second fresh browser logs in with the handle, wrong phrase rejected, right phrase accepted.
-- Who's Online shows the real node row and refreshes every 15 s (changed rows only, code-reviewed; tick seen once).
-- Power off mid-stream, power back on: reboots cleanly, no errors.
-- Portrait desktop viewport starts leaned in with the tube centered. Fixed: an automated click scrolled the room sideways; the room now refuses to scroll.
-- Backend down (all /api/public/net requests aborted): login, last callers, oneliners and who's online say "the message base is offline" and fall back to seeds; art still streams.
-- WARDIAL.EXE finds 0113, 0142, 0167, 0193, 0199 (Esc skips). Manual dial M 5550113 reaches VOID//NODE; password STAIRWELL works; 28800 unlocked; files sorted by most viewed; red skin.
-- The Attic appears in the phone book after 10 files viewed; news says "a new board came online"; years 1997+ listed.
-- [A]nimations area: SPINNER and RAIN animate; no ENTER-finish key offered (Enter still works).
-- XBin AMBER.XB renders with its own palette and font through the modem; info panel shows it.
-- Phone 390x844 with touch: whole call loop by keycaps and row taps (power, dial, GUEST via OS keyboard input, 1993, pack, piece, info, logoff to NO CARRIER). Portrait art shows the "turn your phone" box; landscape fills the tube.
-- Gallery /gallery and /gallery/:year/:pack render on plain canvas (earlier this pass).
-- Production build: first-load JS excludes terminal, CRT, audio, board, house pack and backend client (import graph checked).
-- 42 tests pass; typecheck clean.
+- Rate limit: test "first accepted, next rejected, accepted after window"; parallel burst lets exactly one through (src/test/ratelimit.test.ts).
+- `?debug=busy` BUSY + redial; `?debug=time=1` time's-up then NO CARRIER.
+- Brightness/contrast/modem-volume knobs by scroll wheel, persisted.
+- Modem setup 2400 hard mode and back; 14400/28800 locked until unlocked.
+- New-user form; second browser logs in with handle + transfer phrase (wrong phrase rejected).
+- Who's Online refresh every 15 s; power off mid-stream and back on; portrait desktop starts leaned in.
+- Backend down: board says "the message base is offline" and falls back to seeds; art still streams.
+- WARDIAL.EXE finds 0113/0142/0167/0193/0199; manual dial M 5550113 reaches VOID//NODE; password works; 28800 unlocked.
+- The Attic unlocks after 10 files; Animations area; XBin AMBER.XB with own palette/font; /gallery.
+- Phone 390x844 touch: whole call loop by keycaps and row taps.
+- Pass 5:
+  - Download: D on a real 1996 file (mist0896 KS!-LOGO.ANS, 33,088 B) showed the ZMODEM screen at 960 cps, saved to C:\DOWNLOAD. House CRWL-LGO.ANS downloaded, hung up, DIR C:\DOWNLOAD listed it, VIEW drew it on the CRT.
+  - Music: real FB-GK.S3M ("Guru Kink", 508,849 B, mist0896) downloaded and played in KPLAY: 11 channels, 110 orders, order/row/time counters and VU bars moving; desk speaker LED lit. Not listened to by ear (headless).
+  - BASEMENT CRAWL: a pathfinding bot played two full runs as handle P5Crawler (died on floor 2 both times); scores 920 and 1470 posted and returned by the high-score table; "10 floor attempts left" then "6 left" seen.
+  - Sysop chat: answered on the 4th page; split screen; "who are you" and "secret" got keyword replies including the 555-01?3 hint; Esc ends.
+  - Screensaver: idle at DOS shows the starfield (timer shortened in test); a key returns to C:\>.
+  - Wrong URL (/no/such/page): room loads, TELEWIRE prints ATDT, NO CARRIER, "error 404 ... not in service", returns to DOS. Page title "Dial-Up".
+  - VOID//NODE logo fixed (bottom strokes were drawn in black) and re-checked on screen.
+  - Screenshots in docs/shots/*.b64 decode to JPEGs: room-menu 800x450 25 KB, tube-art 640x480 27 KB, sheet 800x450 26 KB.
+- 54 tests pass; typecheck clean; production build OK.
 
 ## 2. Built but untested
-- Knob dragging (only wheel tested); swipe scroll on finished art (test piece was shorter than the screen).
-- XBin compression with real archive files, 512-glyph XBin fonts (only the first 256 glyphs are used), ADF from the archive, IDF (decoder is a best guess; no real file tested).
-- Sysop console with a real SYSOP_KEY set; 14-day counters table.
-- Presence expiry for callers who vanish; share-card PNGs for wide pieces after the scale-to-fit change.
-- 60 fps on real integrated graphics; audio by ear (Playwright cannot listen).
-- Haptic tick (no device).
+- Esc-abort of a transfer, Enter-skip of a transfer; RD/HDD LED flicker during a transfer (one RD sample only).
+- DEL <file> (typed in the test; result not read back); info panel I inside a DOS VIEW.
+- 3 MB drive cap eviction in a browser (unit-tested only).
+- Fatal runtime error screen with reboot (no error was forced in the browser).
+- Speaker volume knob drag/scroll; music volume persistence; turbo/mute/reduced motion/lamp persistence across reload this pass (turbo persistence is new code).
+- Always-answer on the first page after 20 files viewed (unit-tested rule only).
+- .MOD/.XM/.IT playback (only S3M tried). 512-glyph XBin fonts, real ADF/IDF, sysop console with a real key.
+- 60 fps on real integrated graphics; audio by ear; haptics.
 
 ## 3. Known bugs and gaps
-- Rate limiter in the database is check-then-insert-then-rank, not a transaction; heavy concurrency could, in rare cases, reject both of two racing posts. It never lets extra posts through in tests.
-- VOID password is in the shipped board code (it's a puzzle, not security).
-- `?debug=offline` makes every message-base call fail (added last; verified only via the request-blocking test above).
-- Production preview server (vite preview) failed with a missing server file in a copied workspace; the build itself is fine.
-- Board text is ASCII-checked by eye only; a few long lines in narrow menus could clip.
+- Door turns: one attempt is taken per floor entered; clearing all five floors uses five. The score route trusts a plausible client score (capped, but not replayed server-side).
+- Door turn and rate-limit tables use check-then-write, not transactions; heavy concurrency on one identity could race.
+- Transfer timing is metered with invisible filler bytes so it lasts as long as the real file would.
+- Sysop chat screenshot shows Static's reply still being typed; long replies wrap onto a second line.
+- VOID password is in the shipped board code (puzzle, not security).
+- Fake DOS file dates use 1993 regardless of pack year.
 
 ## 4. Choices made
-- Blink 1.875 Hz text / 2.5 Hz cursor (under 3 flashes per second); CRT flicker is a slow 0.4 Hz drift; reduced motion = steady text, no flicker.
-- PabloDraw 24-bit `ESC[0;R;G;Bt`/`ESC[1;R;G;Bt` and SGR 38/48 are rendered as true color; `ESC[?7h`, `ESC[=3h`, `ESC[?33h` (iCE) accepted; harmless SGRs (e.g. 24) ignored.
-- Parser corpus: 42 real .ANS/.ICE/.ASC files 1990-1996 via the proxy, one at a time. Before: 41 files 0 unknown, TB-SANC.ASC (asia0595) 1 unknown (SGR 24). After the fix: 0 unknown in all 42.
-- Binary formats are converted to an ANSI byte stream so they still paint at modem speed.
-- Attic covers 1997-today with the same skin; VOID is never listed in the phone book.
-- Stair-creak clue: one panned creak soon after power-on (answer 1 -> 555-0113); second sticky note sits under the keyboard edge.
-- Mobile: tube-only below 820 px or on touch; keys come from io.hint, not the byte stream.
+- Blink 1.875 Hz text / 2.5 Hz cursor; reduced motion = steady text, no flicker.
+- PabloDraw 24-bit color rendered; parser corpus of 42 real files: 0 unknown sequences.
+- Music: chiptune3 0.8.10 (MIT) wrapping libopenmpt (BSD), credited on the board credits screen and /credits; loaded only on first play from /wasm/chiptune3.
+- Music is routed through the two desk speakers (panned left/right, small-speaker EQ); the right speaker's knob sets music volume.
+- Downloads live in the browser only (IndexedDB), 3 MB cap, oldest dropped first.
+- BASEMENT CRAWL is original: 5 floors, dust bunnies, a rogue dot-matrix printer, the sump pump; floppies, batteries, duct tape.
+- Sysop answers roughly every 4th page; scripted keyword replies only.
+- Screensaver after 3 minutes idle at DOS or in TELEWIRE only, never in a call.
+- noindex is on site-wide; remove it at launch in the root route.
 
 ## 5. Owner to-do
-- Set SYSOP_KEY (long random string) as a backend secret to enable the console; set IP_HASH_SALT for IP hashing. Both degrade gracefully when missing.
-- Test data was NOT deleted (approval declined). Remove by hand: callers Probe9957, Tester8804, Probe30410, Alpha769, Beta566, Burst474, Gamma*, and every P4test* caller from this pass, with their call_log, oneliners (2), presence (5), reports (2), views (3), rate hits and test daily_counters rows.
-- Publish and check share cards and the 60 fps bar on a real laptop.
+- Set SYSOP_KEY (long random string) as a backend secret to enable the console; set IP_HASH_SALT for IP hashing.
+- Test data was NOT deleted (approval declined). Remove by hand: callers Probe9957, Tester8804, Probe30410, Alpha769, Beta566, Burst474, Gamma*, every P4test* caller, and P5Crawler (pass 5), with their call_log, oneliners, presence, reports, views, rate hits, door_scores (2 rows), door_turns and test daily_counters rows.
+- Lift noindex at launch. Publish and check share cards and 60 fps on a real laptop.
 
 ## 6. Weight (production build, gzip -9)
-- First load (dark room, before power): 123.7 KB JS (378 KB raw) + 145 KB WebP images (lazy) + CSS.
-- After power click: 45.8 KB JS (121 KB raw): machine, board, house pack, terminal, CRT, audio, font.
-- Backend client (56.6 KB gz) loads only on the first server call; gallery, lab and credits are separate small chunks.
+- First load (dark room, before power): about 120 KB JS + 145 KB WebP images (lazy) + CSS. No terminal, CRT, audio, board, house pack or backend client.
+- After power click: about 55 KB JS (machine, board, house pack, terminal, CRT, font, archive client).
+- Music player: 518 KB gz (1.5 MB raw), fetched only on the first music play. KPLAY glue under 1 KB.
+- Backend client about 57 KB gz, loaded on the first server call.
