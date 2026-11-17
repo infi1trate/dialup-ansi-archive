@@ -23,11 +23,12 @@ async function api<T = any>(path: string): Promise<T> {
 
 export const MIN_YEAR = 1990, MAX_YEAR = 1996;
 
-export async function getYears(): Promise<{ year: number; packs: number }[]> {
+export async function getYears(min = MIN_YEAR, max = MAX_YEAR): Promise<{ year: number; packs: number }[]> {
   const d = await api<Record<string, { packs: number }>>("/v1/year/");
   return Object.entries(d)
     .map(([y, v]) => ({ year: +y, packs: v.packs }))
-    .filter((y) => y.year >= MIN_YEAR && y.year <= MAX_YEAR);
+    .filter((y) => y.year >= min && y.year <= max)
+    .sort((x, y) => x.year - y.year);
 }
 
 export async function getYearPacks(year: number, page: number, pagesize = 60): Promise<Page<PackSummary>> {
@@ -46,12 +47,12 @@ export async function getGroups(page: number, pagesize = 60): Promise<Page<Group
   };
 }
 
-export async function getGroupPacks(group: string): Promise<PackSummary[]> {
+export async function getGroupPacks(group: string, min = MIN_YEAR, max = MAX_YEAR): Promise<PackSummary[]> {
   const d = await api(`/v1/group/${encodeURIComponent(group).replace(/%20/g, "+")}`);
   const packs: Record<string, string[]> = d.results?.packs ?? {};
   const out: PackSummary[] = [];
   for (const [y, names] of Object.entries(packs)) {
-    if (+y < MIN_YEAR || +y > MAX_YEAR) continue;
+    if (+y < min || +y > max) continue;
     for (const n of names) out.push({ name: n, year: +y, groups: [group] });
   }
   return out.sort((x, y) => x.year - y.year || x.name.localeCompare(y.name));

@@ -218,7 +218,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
     }
     case "top": {
       await limit([ip], "read", 120, 600);
-      const { data } = await s.rpc("top_files", { _limit: 10 });
+      const { data } = await s.rpc("top_files", { _limit: Math.max(1, Math.min(50, Number(b.limit) || 10)) });
       return { top: data ?? [] };
     }
     case "report": {

@@ -4,7 +4,7 @@ export interface AudioEvents {
   powerOn: void; powerOff: void; keyDown: string; keyUp: string; beep: void;
   diskSeek: void; floppySeek: void; offHook: void; dialDigit: string; ring: void; busy: void;
   handshakeStart: number; connect: number; hangup: void; byteFlow: number;
-  monitorOn: void; monitorOff: void; lampToggle: boolean; mix: void;
+  monitorOn: void; monitorOff: void; lampToggle: boolean; mix: void; stairCreak: void;
 }
 type Handler<T> = (payload: T) => void;
 

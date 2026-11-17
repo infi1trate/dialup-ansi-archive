@@ -1,5 +1,5 @@
 // Keystroke queue between the physical keyboard and whatever program has the screen.
-export interface Key { key: string; ch: number | null; ctrl: boolean; alt: boolean }
+export interface Key { key: string; ch: number | null; ctrl: boolean; alt: boolean; /** key "Tap": 1-based text row touched */ tapRow?: number }
 
 export class Aborted extends Error { constructor(public reason: string) { super(reason); } }
 

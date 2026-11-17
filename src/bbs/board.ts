@@ -1,11 +1,11 @@
 // THE CRAWLSPACE BBS — the virtual host. Writes bytes, reads keys. Nothing else.
 import { Ansi, a, bigText, box, center, pad, rpad, shadeBar } from "./ansi";
-import type { HostIO, DeepLink } from "./io";
+import { ATTIC_UNLOCK, type HostIO, type DeepLink, type KeyHint } from "./io";
 import type { Key } from "@/machine/keyboard";
 import { Aborted } from "@/machine/keyboard";
 import { maxSpeed } from "@/machine/storage";
-import { getFile, getGroupPacks, getGroups, getPack, getYearPacks, getYears, MAX_YEAR, MIN_YEAR } from "@/data/archive";
-import { HOUSE_PACK } from "@/data/housepack";
+import { getFile, getGroupPacks, getGroups, getPack, getYearPacks, getYears, MAX_YEAR } from "@/data/archive";
+import { HOUSE_ANIMATIONS, HOUSE_PACK } from "@/data/housepack";
 import type { PackFile, PackInfo, PackSummary, Page } from "@/data/types";
 import { parseSauce, sauceDate, type Sauce } from "@/term/sauce";
 import { prepareArt, type Prepared } from "@/term/prepare";
@@ -15,6 +15,14 @@ import { artViewed, net, newSessionId, setLiveSession, timeAgo, type CallerInfo 
 import { checkHandle, checkOneliner } from "@/lib/filter";
 
 const SYSOP = "Static";
+/** VOID//NODE's new-user password. It is printed at the end of the Crawlspace credits screen. */
+export const VOID_NUP = "STAIRWELL";
+interface Skin { name: string; a: number; b: number; c: number; line: number; hot: [number, number, number] }
+const CRAWL_SKIN: Skin = { name: "THE CRAWLSPACE BBS", a: 11, b: 13, c: 3, line: 8, hot: [15, 13, 11] };
+const VOID_SKIN: Skin = { name: "VOID//NODE", a: 12, b: 7, c: 4, line: 8, hot: [15, 4, 7] };
+const NAV: KeyHint[] = [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "ENTER", key: "Enter" }, { label: "ESC", key: "Escape" }];
+const hk = (c: string, label = c): KeyHint => ({ label, key: c, ch: c });
+const ANY: KeyHint[] = [{ label: "CONTINUE", key: "Enter" }];
 const QUOTES = [
   "\"The modem is the message.\" — overheard at a 2600 meeting",
   "\"Real artists ship. Real sysops reboot.\" — Static",
@@ -84,7 +92,10 @@ class Board {
   private doing = "logging on";
   private lastBeat = 0;
   private beatTimer: ReturnType<typeof setInterval> | null = null;
-  constructor(private io: HostIO) { this.node = io.node; }
+  sk: Skin;
+  constructor(private io: HostIO) { this.node = io.node; this.sk = io.entry.mode === "void" ? VOID_SKIN : CRAWL_SKIN; }
+  hint(k: KeyHint[]) { this.io.hint(k); }
+  get filesSeen() { return Math.max(this.io.profile.filesSeen.length, this.io.profile.serverFiles ?? 0); }
 
   // ── presence ───────────────────────────────────────────────────
   async beat(doing?: string) {
@@ -142,6 +153,7 @@ class Board {
     if (row) x.at(row, 1); else x.nl();
     x.k(8, "  ░▒▓").k(5, "[").k(15, " press any key ").k(5, "]").k(8, "▓▒░");
     this.send(x);
+    this.hint(ANY);
     await this.key();
     this.io.clearOutput();
     this.send(a().raw("\r").eol());
@@ -150,6 +162,7 @@ class Board {
   /** Line input with remote echo through the modem. */
   async input(max: number, opts: { mask?: boolean; fg?: number } = {}): Promise<string> {
     let s = "";
+    this.hint([{ label: "type", key: "", text: true }, { label: "⌫", key: "Backspace" }, { label: "ENTER", key: "Enter" }]);
     this.send(a().c(opts.fg ?? 15));
     for (;;) {
       const k = await this.key();
@@ -165,9 +178,9 @@ class Board {
   header(x: Ansi, title: string, sub?: string) {
     x.cls().at(1, 1);
     shadeBar(x, 79, 1);
-    x.at(2, 3).k(11, "THE CRAWLSPACE BBS").k(8, " ── ").k(13, title);
-    if (sub) x.at(2, 79 - sub.length).k(3, sub);
-    x.at(3, 1).k(8, "─".repeat(79));
+    x.at(2, 3).k(this.sk.a, this.sk.name).k(this.sk.line, " ── ").k(this.sk.b, title);
+    if (sub) x.at(2, 79 - sub.length).k(this.sk.c, sub);
+    x.at(3, 1).k(this.sk.line, "─".repeat(79));
     return x;
   }
 
@@ -209,9 +222,18 @@ class Board {
     };
     if (!items.length) { this.send(a().at(row, col).k(8, "  (nothing here)")); }
     page();
+    this.hint([...NAV, { label: "PGUP", key: "PageUp" }, { label: "PGDN", key: "PageDown" }, ...[...(o.hotkeys ?? "")].map((c) => hk(c))]);
     for (;;) {
       const k = await this.key();
       const prev = i;
+      if (k.key === "Tap" && k.tapRow) {
+        const n = top + (k.tapRow - row);
+        if (k.tapRow >= row && k.tapRow < row + height && n < items.length) {
+          if (n === i) { this.io.clearOutput(); return { index: i }; }
+          i = n; this.send(a().bytes(line(prev, false).build()).bytes(line(i, true).build()));
+        }
+        continue;
+      }
       switch (k.key) {
         case "ArrowUp": i = Math.max(0, i - 1); break;
         case "ArrowDown": i = Math.min(items.length - 1, i + 1); break;
@@ -234,6 +256,15 @@ class Board {
   // ── login ──────────────────────────────────────────────────────
   logo(x: Ansi) {
     x.cls();
+    if (this.sk === VOID_SKIN) {
+      x.at(1, 1).k(8, "▒".repeat(79));
+      bigText(x, 5, 22, "VOID", [12, 4, 4], 8);
+      x.at(9, 47).k(7, "//").k(15, "NODE");
+      x.at(13, 1).k(8, "░".repeat(79));
+      x.at(14, 1).k(8, center("no sysop. no tagline. no mercy.", 79));
+      x.at(15, 1).k(4, center(`node 0 · ${this.io.entry.number} · you were never here`, 79));
+      return x;
+    }
     x.at(1, 1); shadeBar(x, 79, 1);
     x.at(3, 34).k(8, "· t h e ·");
     bigText(x, 5, 10, "CRAWLSPACE", [11, 3, 1], 8);
@@ -393,16 +424,17 @@ class Board {
 
   async news() {
     const x = this.header(a(), "News");
-    box(x, 5, 4, 72, 12, 9, "11.17.93");
+    box(x, 5, 4, 72, 13, 9, "11.17.93");
     const lines = [
       [15, "Archive drive is back on line!"], [7, "Static swapped the 120MB for a whole archive's worth of"],
       [7, "art packs, 1990-1996. Browse by year in the [F]ile areas."], [7, ""],
       [11, "Call our sister lines:"], [7, "  Group Vault  555-0167   ·   Class of '93  555-0193"], [7, ""],
       [13, "Door games: coming soon. Very soon. Any day now."],
-    ] as const;
-    lines.forEach(([c, t], n) => x.at(7 + n, 7).k(c, t));
+    ] as [number, string][];
+    if (this.filesSeen >= ATTIC_UNLOCK) lines.push([7, ""], [14, "A new board came online: The Attic, 555-0199."], [7, "1997 to the present. It's in your TELEWIRE phone book now."]);
+    lines.forEach(([c, t], n) => x.at(6 + n, 7).k(c, t));
     this.send(x);
-    await this.anyKey(18);
+    await this.anyKey(19);
   }
 
   async oneliners() {
@@ -443,17 +475,19 @@ class Board {
   // ── main menu ──────────────────────────────────────────────────
   menuScreen() {
     const x = a().cls();
-    x.at(1, 1); shadeBar(x, 79, 1);
-    bigText(x, 3, 10, "CRAWLSPACE", [11, 3, 1], 8);
-    x.at(6, 64).k(13, "main menu");
-    box(x, 8, 8, 64, 11, 5);
-    const left: [string, string][] = [["F", "iles"], ["B", "ulletins"], ["O", "neliners"], ["W", "ho's online"], ["U", "ser list"]];
-    const right: [string, string][] = [["P", "age sysop"], ["D", "oors"], ["C", "redits"], ["G", "oodbye"]];
-    left.forEach(([k, l], n) => x.at(9 + n * 2, 14).hot(k, l, 15, 13, 11));
-    right.forEach(([k, l], n) => x.at(9 + n * 2, 44).hot(k, l, 15, 13, 11));
+    const v = this.sk === VOID_SKIN;
+    if (v) { x.at(1, 1).k(8, "▒".repeat(79)); bigText(x, 3, 22, "VOID", [12, 4, 4], 8); x.at(5, 47).k(7, "//").k(15, "NODE"); }
+    else { x.at(1, 1); shadeBar(x, 79, 1); bigText(x, 3, 10, "CRAWLSPACE", [11, 3, 1], 8); }
+    x.at(6, 64).k(this.sk.b, "main menu");
+    box(x, 8, 8, 64, 11, v ? 8 : 5);
+    const left: [string, string][] = [["F", v ? "iles (most viewed)" : "iles"], ["A", "nimations"], ["B", "ulletins"], ["O", "neliners"], ["W", "ho's online"]];
+    const right: [string, string][] = [["U", "ser list"], ["P", "age sysop"], ["D", "oors"], ["C", "redits"], ["G", "oodbye"]];
+    const [h1, h2, h3] = this.sk.hot;
+    left.forEach(([k, l], n) => x.at(9 + n * 2, 14).hot(k, l, h1, h2, h3));
+    right.forEach(([k, l], n) => x.at(9 + n * 2, 44).hot(k, l, h1, h2, h3));
     x.at(19, 1).k(7, center(this.io.entry.blurb, 79));
     this.status(x, 21);
-    x.at(23, 4).k(13, "Main").k(8, " ▸ ").k(11, "Command").k(5, ": ").c(15);
+    x.at(23, 4).k(this.sk.b, "Main").k(8, " ▸ ").k(this.sk.a, "Command").k(v ? 4 : 5, ": ").c(15);
     return x;
   }
 
@@ -461,13 +495,15 @@ class Board {
     for (;;) {
       this.setDoing("at the main menu");
       this.send(this.menuScreen());
+      this.hint("FABOWUPDCG".split("").map((c) => hk(c)));
       const k = await this.key();
       const c = (k.ch !== null ? String.fromCharCode(k.ch) : "").toUpperCase();
       // a hotkey interrupts the menu still drawing, like any good BBS
-      if ("FBOWUPDCG".includes(c) && c) this.io.clearOutput();
+      if ("FABOWUPDCG".includes(c) && c) this.io.clearOutput();
       if (c) this.send(a().k(15, c));
       switch (c) {
         case "F": await this.files(); break;
+        case "A": await this.animations(); break;
         case "B": await this.bulletins(); break;
         case "O": await this.oneliners(); break;
         case "W": await this.whosOnline(); break;
@@ -516,23 +552,38 @@ class Board {
     await this.anyKey(20);
   }
 
+  /** Who's online: refreshes every 15 s while on screen, repainting only the rows that changed. */
   async whosOnline() {
     const x = this.header(a(), "Who's online");
     x.at(5, 4).k(13, pad("Node", 6)).k(13, pad("Caller", 18)).k(13, pad("From", 16)).k(13, pad("Speed", 8)).k(13, "Doing");
     x.at(6, 4).k(5, "─".repeat(72));
-    const r = this.online ? await this.beat("reading who's online") : null;
-    const list: any[] = r?.online ?? [{ handle: this.guest ? null : this.user, city: this.io.profile.city, speed: this.io.speed, doing: "reading who's online", me: true }];
-    for (let n = 0; n < 8; n++) {
-      const o = list[n];
-      const y = x.at(7 + n, 4).k(15, pad(String(n + 1), 6));
-      if (!o) { y.k(8, pad("-", 18)).k(8, pad("", 16)).k(8, pad("", 8)).k(8, "waiting for caller..."); continue; }
-      y.k(o.me ? 15 : 11, pad(o.handle || "Guest", 18)).k(3, pad(o.city || "-", 16)).k(14, pad(String(o.speed), 8)).k(7, String(o.doing).slice(0, 26));
-    }
-    if (!r) this.offlineNote(x, 17);
-    else if (!list.some((o) => !o.me)) x.at(17, 4).k(13, "Nobody else is on. Just you, the hum of the 486 and Static snoring.");
-    else x.at(17, 4).k(8, `${list.length} caller${list.length > 1 ? "s" : ""} on line. Static's phone bill weeps.`);
     this.send(x);
-    await this.anyKey(19);
+    let prev: string[] = [];
+    for (let first = true; ; first = false) {
+      const r = this.online ? await this.beat("reading who's online") : null;
+      const list: any[] = r?.online ?? [{ handle: this.guest ? null : this.user, city: this.io.profile.city, speed: this.io.speed, doing: "reading who's online", me: true }];
+      const rows: Uint8Array[] = [];
+      for (let n = 0; n < 8; n++) {
+        const o = list[n];
+        const y = a().at(7 + n, 4).k(15, pad(String(n + 1), 6));
+        if (!o) y.k(8, pad("-", 18)).k(8, pad("", 16)).k(8, pad("", 8)).k(8, pad("waiting for caller...", 26));
+        else y.k(o.me ? 15 : 11, pad(o.handle || "Guest", 18)).k(3, pad(o.city || "-", 16)).k(14, pad(String(o.speed), 8)).k(7, pad(String(o.doing).slice(0, 26), 26));
+        rows.push(y.build());
+      }
+      const foot = a().at(17, 4).eol();
+      if (!r) this.offlineNote(foot, 17);
+      else if (!list.some((o) => !o.me)) foot.k(13, "Nobody else is on. Just you, the hum of the 486 and Static snoring.");
+      else foot.k(8, `${list.length} caller${list.length > 1 ? "s" : ""} on line. Static's phone bill weeps.`);
+      rows.push(foot.build());
+      const key = rows.map((b) => String.fromCharCode(...b));
+      const out = a();
+      key.forEach((k, i) => { if (k !== prev[i]) out.bytes(rows[i]); });
+      if (first) out.at(19, 1).k(8, "  ░▒▓").k(5, "[").k(15, " any key leaves · refreshes every 15 s ").k(5, "]").k(8, "▓▒░");
+      this.send(out);
+      prev = key;
+      const k = await this.io.keyTimeout(15_000);
+      if (k) { this.io.clearOutput(); return; }
+    }
   }
 
   // ── sysop console (hidden: ! at the main menu) ─────────────────
@@ -647,6 +698,8 @@ class Board {
       [7, "All brand names here are invented."],
       [7, ""],
       [14, "Takedown requests: sysop@ (placeholder)"],
+      [7, ""],
+      [8, `p.s. the NUP is ${VOID_NUP}. you didn't read that here.`],
     ];
     L.forEach(([c, t], n) => x.at(5 + n, 5).k(c, t));
     this.send(x);
@@ -655,6 +708,7 @@ class Board {
 
   async confirmBye() {
     this.send(a().nl().at(23, 4).eol().k(14, "Log off? ").k(5, "[").k(15, "Y").k(5, "/").k(15, "n").k(5, "]").k(7, " "));
+    this.hint([hk("Y"), hk("N")]);
     const k = await this.key();
     return !(k.ch !== null && String.fromCharCode(k.ch).toLowerCase() === "n");
   }
@@ -692,6 +746,7 @@ class Board {
     const mode = this.io.entry.mode;
     if (mode === "year1993") return this.yearPacks(1993);
     if (mode === "groups") return this.groupList();
+    if (mode === "void") return this.mostViewed();
     return this.yearList();
   }
 
@@ -707,7 +762,8 @@ class Board {
       await this.loading("Spinning up the archive drive...");
       let years: { year: number; packs: number }[] = [];
       let failed = false;
-      try { years = await getYears(); } catch { failed = true; }
+      const [y0, y1] = this.io.entry.years;
+      try { years = await getYears(y0, y1); } catch { failed = true; }
       const items = [
         { text: `${pad("HOUSE", 8)}${pad("CRAWL-01 · the board's own pack", 44)}7 files`, color: 14 },
         ...years.map((y) => ({ text: `${pad(String(y.year), 8)}${pad("Art packs released in " + y.year, 44)}${y.packs} packs`, color: 11 })),
@@ -779,8 +835,9 @@ class Board {
       idx = r.index;
       if (it.name === "__house") { await this.packScreen({ name: HOUSE_PACK, year: 1994, groups: ["crawlspace"] }); continue; }
       const name = it.name!;
-      await this.pagedPacks(`Group: ${name}`, `${MIN_YEAR}-${MAX_YEAR}`, async () => {
-        const all = await getGroupPacks(name);
+      const [y0, y1] = this.io.entry.years;
+      await this.pagedPacks(`Group: ${name}`, `${y0}-${Math.min(y1, MAX_YEAR)}`, async () => {
+        const all = await getGroupPacks(name, y0, y1);
         return { items: all, page: 1, pages: 1, total: all.length };
       });
     }
@@ -835,7 +892,7 @@ class Board {
   }
 
   // ── viewer ─────────────────────────────────────────────────────
-  async viewer(pack: PackInfo, files: PackFile[], idx: number) {
+  async viewer(pack: PackInfo, files: PackFile[], idx: number, opts: { animation?: boolean } = {}) {
     const io = this.io;
     const restore = () => { io.client.overlay(null); io.client.setMode({ cols: 80, ice: false, ninePixel: true }); };
     for (;;) {
@@ -860,20 +917,27 @@ class Board {
       const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
       const unlocked = maxSpeed(io.profile) !== before ? maxSpeed(io.profile) : 0;
       let finished = false, info = false;
+      const viewHints = (done: boolean) => this.hint([
+        ...(done ? [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "PGUP", key: "PageUp" }, { label: "PGDN", key: "PageDown" }]
+          : [{ label: "SPACE pause", key: " " }, ...(opts.animation ? [] : [{ label: "ENTER finish", key: "Enter" }])]),
+        hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), hk("R", "R report"), { label: "ESC back", key: "Escape" },
+      ]);
+      viewHints(false);
+      io.client.artOpen(true);
       const showInfo = () => io.client.overlay(info ? infoPanel(pack, f, art.sauce, bytes.length, mode, unlocked, url) : null);
       let next = 0;
       while (!next) {
         const k = finished ? await io.key() : await io.keyOrDrain();
-        if (k === null) { finished = true; continue; }
+        if (k === null) { finished = true; viewHints(true); continue; }
         const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
         if (k.key === " " && !finished) { if (io.isPaused()) io.resume(); else io.pause(); continue; }
         if (k.key === "Enter") { io.flush(); continue; }
         if (k.key === "Escape") {
           if (info) { info = false; showInfo(); continue; }
-          io.clearOutput(); io.resume(); restore(); return;
+          io.clearOutput(); io.resume(); restore(); io.client.artOpen(false); return;
         }
         if (c === "I") { info = !info; showInfo(); continue; }
-        if (c === "R") { await this.report(pack, f); showInfo(); continue; }
+        if (c === "R") { await this.report(pack, f); showInfo(); viewHints(finished); continue; }
         if (c === "N" && idx < files.length - 1) { next = 1; break; }
         if (c === "P" && idx > 0) { next = -1; break; }
         const rows = io.client.rows();
@@ -886,7 +950,7 @@ class Board {
           case "End": io.client.scrollTo("bottom"); break;
         }
       }
-      io.clearOutput(); io.resume(); io.client.overlay(null);
+      io.clearOutput(); io.resume(); io.client.overlay(null); io.client.artOpen(false);
       idx += next;
     }
   }
@@ -899,6 +963,7 @@ class Board {
       io.client.overlay(x.build());
     };
     panel([[15, f.name], [7, ""], [11, "1  offensive"], [11, "2  renders wrong"], [11, "3  I made this, please remove"], [8, "ESC  never mind"]]);
+    this.hint([hk("1"), hk("2"), hk("3"), { label: "ESC", key: "Escape" }]);
     const k = await io.key();
     const n = k.ch !== null ? k.ch - 48 : 0;
     if (n >= 1 && n <= 3) {
@@ -909,9 +974,87 @@ class Board {
     io.client.overlay(null);
   }
 
+  // ── VOID//NODE ─────────────────────────────────────────────────
+  async voidGate() {
+    this.send(this.logo(a()).at(17, 1));
+    for (let t = 0; t < 3; t++) {
+      this.send(a().at(18, 4).eol().k(8, "new-user password").k(4, ": "));
+      const pw = await this.input(20, { mask: true, fg: 12 });
+      if (pw.toUpperCase() === VOID_NUP) {
+        const p = this.io.profile;
+        const first = !p.voidUnlocked;
+        p.voidUnlocked = true; this.io.save();
+        this.send(a().at(20, 4).eol().k(7, "accepted.").k(8, first ? " your modem has been told about 28800. it will not forget." : " welcome back to nowhere."));
+        await this.io.drain(); await sleep(1600);
+        return;
+      }
+      this.send(a().at(20, 4).eol().k(4, "no.").raw("\x07"));
+    }
+    this.send(a().at(20, 4).eol().k(8, "the line goes quiet."));
+    await this.io.drain(); await sleep(900);
+    throw new Aborted("hangup");
+  }
+
+  /** VOID//NODE's file area: the same archive, sorted by what callers actually opened. */
+  async mostViewed() {
+    let idx = 0;
+    for (;;) {
+      this.send(this.header(a(), "Most viewed", "every board, all callers"));
+      await this.loading("asking the other nodes what they looked at...");
+      const r = this.online ? await net("top", { limit: 40 }) : null;
+      const top: { pack: string; file: string; views: number }[] = r?.top ?? [];
+      const items = [
+        ...top.map((t) => ({ text: `${pad(t.file, 16)}${pad(String(t.pack).toUpperCase(), 30)}${rpad(String(t.views), 6)} callers`, color: 12 })),
+        { text: "browse the whole archive by year instead", color: 7 },
+      ];
+      const x = a().at(5, 4).k(7, pad("File", 16) + pad("Pack", 30) + rpad("Seen by", 14)).at(6, 4).k(8, "─".repeat(70));
+      if (!r) this.offlineNote(x, 21); else if (!top.length) x.at(21, 4).k(8, "nobody has opened anything yet. strange.");
+      x.at(23, 4).eol().k(8, "ENTER open · ESC main menu");
+      this.status(x);
+      this.send(x);
+      const pick = await this.lightbar({ row: 7, col: 3, width: 74, height: 13, items, index: idx });
+      if (!pick) return;
+      idx = pick.index;
+      if (pick.index === top.length) { await this.yearList(); continue; }
+      const t = top[pick.index];
+      let pack: PackInfo;
+      try { pack = await getPack(t.pack); } catch (e) { await this.errorScreen(String((e as Error).message)); continue; }
+      const files = pack.files.filter((f) => f.viewable);
+      const i = files.findIndex((f) => f.name === t.file);
+      if (i >= 0) await this.viewer(pack, files, i);
+    }
+  }
+
+  // ── animations ─────────────────────────────────────────────────
+  /** Ansimations: cursor-movement art whose modem speed is the frame rate, so nothing is fast-forwarded by default. */
+  async animations() {
+    this.setDoing("watching ansimations");
+    let idx = 0;
+    const pack = await getPack(HOUSE_PACK);
+    const files = pack.files.filter((f) => HOUSE_ANIMATIONS.includes(f.name));
+    for (;;) {
+      const x = this.header(a(), "Animations", "ansimations");
+      [
+        [15, "These pieces move. They are drawn with cursor moves, so your modem"],
+        [15, "speed is the frame rate: slower lines, slower films."],
+        [8, "They play out in full. (ENTER still works if you're impatient.)"],
+      ].forEach(([c, t], n) => x.at(5 + n, 5).k(c as number, t as string));
+      x.at(9, 4).k(this.sk.b, pad("File", 16) + pad("Title", 34) + rpad(`@${this.io.speed}`, 10)).at(10, 4).k(5, "─".repeat(62));
+      x.at(22, 4).k(8, "Archive ansimations are not tagged as such upstream; only the house ones are listed.");
+      this.status(x);
+      this.send(x);
+      const items = files.map((f) => ({ text: `${pad(f.name, 16)}${pad(f.name === "SPINNER.ANS" ? "Connecting spinner" : "Window rain", 34)}${rpad(this.estimate(f.size), 9)}`, color: 11 }));
+      const r = await this.lightbar({ row: 11, col: 3, width: 66, height: 8, items, index: idx });
+      if (!r) return;
+      idx = r.index;
+      await this.viewer(pack, files, r.index, { animation: true });
+    }
+  }
+
   async run(): Promise<void> {
     try {
       if (this.io.deepLink) return await this.runDeepLink(this.io.deepLink);
+      if (this.io.entry.mode === "void") await this.voidGate();
       await this.login();
       await this.logon();
       await this.lastCallers();

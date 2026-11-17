@@ -1,6 +1,10 @@
 // CRAWL-01: the board's own house pack, generated in code so the loop works offline.
 import { Ansi, a, bigText, shadeBar, center } from "@/bbs/ansi";
 import type { PackInfo } from "./types";
+import { VGA_8X16_B64 } from "@/term/vga-font";
+
+/** House ansimations shown in the board's [A]nimations area. */
+export const HOUSE_ANIMATIONS = ["SPINNER.ANS", "RAIN.ANS"];
 
 export const HOUSE_PACK = "crawl-01";
 
@@ -28,10 +32,9 @@ function diz() {
   x.k(9, "  ▄▄▄ ▄▄▄  ▄▄▄ ▄   ▄ ▄").nl().k(11, " █    █▄▄▀ █▄▄█ █ ▄ █ █").nl().k(3, " ▀▀▀▀ ▀  ▀ ▀  ▀ ▀▀ ▀▀ ▀▀▀").k(8, " -01").nl();
   x.k(8, "─────────────────────────────────────────────").nl();
   x.k(7, " The Crawlspace BBS house pack, volume one.").nl();
-  x.k(7, " Six pieces drawn by the sysop at 3am.").nl();
-  x.k(13, " Featuring: ").k(15, "logo, stairs, scroller,").nl().k(15, " spinner, an ascii and an iCE piece.").nl();
-  x.k(8, "─────────────────────────────────────────────").nl();
-  x.k(11, " Call ").k(15, "555-0142").k(11, " · 9600 baud · 24hrs").nl().reset();
+  x.k(13, " Eight pieces by the sysop at 3am: logo, stairs,").nl().k(15, " scroller, 2 ansimations, ascii, iCE and XBin.").nl();
+  x.k(11, " Call ").k(15, "555-0142").k(11, " · 9600 baud · 24hrs").nl();
+  x.k(8, " p.s. call 555-01?3 ... the middle digit is").nl().k(8, "      how many stairs creak").nl().reset();
   return x.build();
 }
 
@@ -111,6 +114,62 @@ function spinner() {
   return join(x.build(), sauce("Spinner (ansimation)", "Static", "Crawlspace"));
 }
 
+function rain() {
+  // Second ansimation: rain down a basement window, drawn with cursor moves only.
+  const x = a().cls();
+  x.at(2, 20).k(8, "╓" + "─".repeat(38) + "╖");
+  for (let r = 3; r <= 16; r++) x.at(r, 20).k(8, "║").at(r, 59).k(8, "║");
+  x.at(17, 20).k(8, "╙" + "─".repeat(38) + "╜");
+  x.at(19, 22).k(3, "2 AM. the streetlight hums. so does the 486.");
+  const R = rng(13);
+  const drops = Array.from({ length: 14 }, () => ({ c: 21 + Math.floor(R() * 38), r: 3 + Math.floor(R() * 14) }));
+  for (let f = 0; f < 120; f++) {
+    for (const d of drops) {
+      x.at(d.r, d.c).t(" ");
+      d.r++; if (d.r > 16) { d.r = 3; d.c = 21 + Math.floor(R() * 38); }
+      x.at(d.r, d.c).k(d.r % 3 ? 9 : 11, d.r > 14 ? "." : "│");
+    }
+    if (f % 40 === 30) x.at(10, 21).k(14, "░▒▓ headlights ▓▒░".padEnd(38)); else if (f % 40 === 34) x.at(10, 21).t(" ".repeat(38));
+  }
+  x.at(25, 1).reset();
+  return join(x.build(), sauce("Window rain (ansimation)", "Static", "Crawlspace"));
+}
+
+/** XBin piece with its own palette (amber phosphor ramp) and font tweak, RLE-compressed. */
+function xbinPiece() {
+  const W = 80, H = 25;
+  const cells = new Uint8Array(W * H * 2);
+  const put = (x: number, y: number, ch: number, at: number) => { const o = (y * W + x) * 2; cells[o] = ch; cells[o + 1] = at; };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = Math.sin(x / 9) + Math.cos(y / 4 + x / 23);
+    put(x, y, v > 1.1 ? 0xdb : v > 0.5 ? 0xb2 : v > 0 ? 0xb1 : v > -0.6 ? 0xb0 : 0x20, (Math.min(7, Math.max(0, Math.round((v + 2) * 1.7))) << 4) | 15);
+  }
+  const msg = " XBIN · CUSTOM PALETTE · CUSTOM FONT · CRWL ";
+  for (let i = 0; i < msg.length; i++) put(18 + i, 12, msg.charCodeAt(i), 0x0e);
+  put(17, 12, 0x01, 0x0e); put(18 + msg.length, 12, 0x01, 0x0e);
+  // palette: 16 amber tones (6-bit RGB)
+  const pal: number[] = [];
+  for (let i = 0; i < 16; i++) pal.push(Math.round((i / 15) * 63), Math.round((i / 15) * 44), Math.round((i / 15) * 12));
+  // font: VGA font with glyph 0x01 replaced by a little staircase
+  const vga = atob(VGA_8X16_B64);
+  const font = new Uint8Array(4096); for (let i = 0; i < 4096; i++) font[i] = vga.charCodeAt(i);
+  [0, 0, 0x03, 0x03, 0x0f, 0x0f, 0x3f, 0x3f, 0xff, 0xff, 0, 0, 0, 0, 0, 0].forEach((b, r) => (font[16 + r] = b));
+  // RLE: type 3 for repeated cells, type 0 literals
+  const out: number[] = [];
+  for (let i = 0; i < W * H;) {
+    let n = 1;
+    while (i + n < W * H && n < 64 && cells[(i + n) * 2] === cells[i * 2] && cells[(i + n) * 2 + 1] === cells[i * 2 + 1]) n++;
+    if (n >= 3) { out.push(0xc0 | (n - 1), cells[i * 2], cells[i * 2 + 1]); i += n; continue; }
+    let m = 1;
+    while (i + m < W * H && m < 64 && !(cells[(i + m) * 2] === cells[(i + m + 1) * 2] && cells[(i + m) * 2 + 1] === cells[(i + m + 1) * 2 + 1])) m++;
+    out.push(m - 1); for (let k = 0; k < m; k++) out.push(cells[(i + k) * 2], cells[(i + k) * 2 + 1]);
+    i += m;
+  }
+  const head = [..."XBIN"].map((c) => c.charCodeAt(0)).concat([0x1a, W, 0, H, 0, 16, 1 | 2 | 4 | 8]);
+  const body = new Uint8Array([...head, ...pal, ...font, ...out]);
+  return join(body, sauce("Amber (XBin)", "Static", "Crawlspace", { dt: 6, ft: 0, cols: W, lines: H }));
+}
+
 function ascii() {
   const s = [
     "", "        _______________________________________",
@@ -154,6 +213,8 @@ const FILES: Record<string, { make: () => Uint8Array; artists: string[] }> = {
   "STAIRS.ANS": { make: stairs, artists: ["static"] },
   "SCROLLER.ANS": { make: scroller, artists: ["static"] },
   "SPINNER.ANS": { make: spinner, artists: ["static"] },
+  "RAIN.ANS": { make: rain, artists: ["static"] },
+  "AMBER.XB": { make: xbinPiece, artists: ["static"] },
   "TERMINAL.ASC": { make: ascii, artists: ["static"] },
   "ICECOLD.ICE": { make: ice, artists: ["static"] },
   "CRAWL01.EXE": { make: () => new Uint8Array(0), artists: ["static"] },

@@ -80,6 +80,7 @@ class Synth {
     bus.on("handshakeStart", (s) => this.handshake(s));
     bus.on("connect", () => this.cutLine());
     bus.on("hangup", () => { this.cutLine(); this.relay(); });
+    bus.on("stairCreak", () => this.creak(0.85)); // the basement stairs, top right of the shot
     bus.on("lampToggle", () => this.switchClick(PAN.lamp, 0.5));
 
     this.roomTone();
@@ -170,14 +171,14 @@ class Synth {
     setTimeout(creak, rnd(25000, 60000));
     void c;
   }
-  creak() {
+  creak(pan?: number) {
     const t = this.now + 0.05, dur = rnd(0.7, 1.4);
     const o = this.osc("sawtooth", rnd(22, 34));
     o.frequency.setValueAtTime(o.frequency.value, t);
     o.frequency.linearRampToValueAtTime(rnd(12, 20), t + dur);
     const b1 = this.biquad("bandpass", rnd(500, 750), 14), b2 = this.biquad("bandpass", rnd(1100, 1500), 10), g = this.gain();
     o.connect(b1).connect(g); o.connect(b2).connect(g);
-    g.connect(this.panner(rnd(-0.4, 0.3))).connect(this.buses.room);
+    g.connect(this.panner(pan ?? 0.85)).connect(this.buses.room);
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.35, t + dur * 0.3); g.gain.linearRampToValueAtTime(0, t + dur);
     o.start(t); o.stop(t + dur + 0.05);
   }

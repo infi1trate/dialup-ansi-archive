@@ -1,7 +1,7 @@
 // The PC: off -> boot -> dos -> comm -> dialing -> handshake -> session -> hangup.
 // Local programs (BIOS, DOS, TELEWIRE) draw straight to the terminal; the board only through the modem.
 import { Ansi, a, box, center, pad, rpad } from "@/bbs/ansi";
-import { DIRECTORY, type DeepLink, type DirEntry, type HostIO } from "@/bbs/io";
+import { DIRECTORY, boardAt, normalizeNumber, phoneBook, type DeepLink, type DirEntry, type HostIO, type KeyHint } from "@/bbs/io";
 import { runBoard } from "@/bbs/board";
 import { count } from "@/data/net";
 import { audio } from "@/audio/bus";
@@ -16,6 +16,18 @@ import type { Speed } from "@/modem/modem";
 export type MachineState = "off" | "boot" | "dos" | "comm" | "dialing" | "handshake" | "session" | "hangup";
 
 const CALL_MINUTES = 60;
+
+/** ?debug=busy forces a busy signal on the first dial; ?debug=time=1 makes a call last 1 minute. Combine with commas. */
+export function parseDebug(search: string): { busy: boolean; minutes: number | null; offline: boolean } {
+  const v = new URLSearchParams(search).get("debug") ?? "";
+  const parts = v.split(",").map((p) => p.trim().toLowerCase());
+  const t = parts.find((p) => p.startsWith("time="));
+  const m = t ? Number(t.slice(5)) : NaN;
+  return { busy: parts.includes("busy"), minutes: Number.isFinite(m) && m > 0 ? m : null, offline: parts.includes("offline") };
+}
+
+const NAV: KeyHint[] = [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "ENTER", key: "Enter" }, { label: "ESC", key: "Escape" }];
+const hk = (c: string, label = c): KeyHint => ({ label, key: c, ch: c });
 const CAPTURE = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "PageUp", "PageDown", "Backspace", "Tab", "Home", "End", "Enter", "Escape", "F1", "F3", "F5"]);
 
 export class Machine {
@@ -33,8 +45,47 @@ export class Machine {
   private cwd = "C:\\";
   private deepLink: (DeepLink & { number: string }) | null = null;
   private timeTimer: ReturnType<typeof setInterval> | null = null;
+  private boardOverlay: Terminal | null = null;
+  private artOpen = false;
+  private portrait = false;
+  /** Portrait phone: art is a landscape thing, so TELEWIRE asks you to turn the phone (in text mode). */
+  setPortrait(v: boolean) { this.portrait = v; this.applyOverlay(); }
+  private applyOverlay() {
+    const term = this.engine.term;
+    if (this.artOpen && this.portrait) {
+      const ov = new Terminal({ cols: 80 }, { masked: true });
+      const x = a(); box(x, 8, 16, 48, 9, 14, "TELEWIRE");
+      x.at(10, 20).k(15, "This picture is wider than it is tall.");
+      x.at(12, 20).k(11, "Turn your phone sideways: ").k(14, "landscape").k(11, ".");
+      x.at(14, 20).k(8, "Menus are fine either way.");
+      ov.feed(x.build());
+      term.overlay = ov;
+    } else term.overlay = this.boardOverlay;
+    term.version++;
+  }
+  private debug = parseDebug(typeof location !== "undefined" ? location.search : "");
+  private creaked = false;
+  /** Keys the current screen accepts (out of band, for the touch context bar). */
+  hints = new Signal<KeyHint[]>([]);
+  private get callMinutes() { return this.debug.minutes ?? CALL_MINUTES; }
 
   constructor(public engine: Engine) {}
+
+  /** A tap on the touch context bar types this key. */
+  pressHint(h: KeyHint) {
+    if (!this.powered.value) return;
+    audio.emit("keyDown", h.key || " "); setTimeout(() => audio.emit("keyUp", h.key || " "), 70);
+    if (h.ch && h.ch.length > 1) { // macro, e.g. "DIAL\r"
+      for (const c of h.ch) this.keys.push(c === "\r" ? { key: "Enter", ch: null, ctrl: false, alt: false } : { key: c, ch: c.charCodeAt(0), ctrl: false, alt: false });
+      return;
+    }
+    this.keys.push({ key: h.key, ch: h.ch ? h.ch.charCodeAt(0) : null, ctrl: false, alt: false });
+  }
+  /** Characters typed into the hidden input that summons the phone's keyboard. */
+  typeText(ch: string) {
+    if (!this.powered.value) return;
+    for (const c of ch) { const code = c.charCodeAt(0); if (code >= 0x20 && code < 0x7f) this.keys.push({ key: c, ch: code, ctrl: false, alt: false }); }
+  }
 
   // ── input ──────────────────────────────────────────────────────
   handleKeyDown(e: KeyboardEvent) {
@@ -81,6 +132,7 @@ export class Machine {
     audio.emit("powerOn");
     count("powered_on");
     this.callsThisPower = 0;
+    if (!this.creaked) { this.creaked = true; const g0 = this.gen; setTimeout(() => { if (g0 === this.gen) audio.emit("stairCreak"); }, 20000); }
     void this.run(this.gen);
   }
 
@@ -91,6 +143,7 @@ export class Machine {
     this.stopTimer();
     this.engine.powerOff();
     this.powered.set(false);
+    this.hints.set([]);
     this.state.set("off");
     audio.emit("powerOff");
   }
@@ -117,7 +170,7 @@ export class Machine {
     try {
       if (this.deepLink) {
         await this.sleep(500); this.alive(g);
-        const entry = DIRECTORY.find((d) => d.number === this.deepLink!.number) ?? DIRECTORY[0];
+        const entry = boardAt(this.deepLink!.number) ?? DIRECTORY[0];
         await this.call(entry, g, true);
         await this.comm(g);
       } else {
@@ -132,6 +185,7 @@ export class Machine {
   // ── BIOS ───────────────────────────────────────────────────────
   private async boot(g: number) {
     this.state.set("boot");
+    this.hints.set([{ label: "ESC skip", key: "Escape" }]);
     this.skipping = false;
     const fast = this.profile.fastBoot;
     const s = fast ? 0.4 : 1;
@@ -186,6 +240,7 @@ export class Machine {
     }
     for (;;) {
       this.state.set("dos");
+      this.hints.set([{ label: "type", key: "", text: true }, { label: "DIAL", key: "", ch: "DIAL\r" }, { label: "ENTER", key: "Enter" }]);
       this.out(a().k(7, `${this.cwd}>`));
       const line = await this.readLine(g, 70);
       const r = await this.dosCommand(line.trim(), g);
@@ -193,12 +248,15 @@ export class Machine {
     }
   }
 
-  private async readLine(g: number, max: number) {
+  private async readLine(g: number, max: number): Promise<string>;
+  private async readLine(g: number, max: number, cancelable: true): Promise<string | null>;
+  private async readLine(g: number, max: number, cancelable = false): Promise<string | null> {
     let s = "";
     for (;;) {
       const k = await this.key(); this.alive(g);
       if (k.key === "Enter") { this.out(a().nl()); return s; }
       if (k.key === "Backspace") { if (s) { s = s.slice(0, -1); this.out(a().raw("\b \b")); } continue; }
+      if (k.key === "Escape" && cancelable) return null;
       if (k.key === "Escape") { this.out(a().raw("\\").nl().k(7, `${this.cwd}>`)); s = ""; continue; }
       if (k.ch !== null && s.length < max) { s += String.fromCharCode(k.ch); this.out(a().k(7, String.fromCharCode(k.ch))); }
     }
@@ -220,6 +278,7 @@ export class Machine {
         p("Kestrel DOS 5.0 commands:", 15);
         p("  DIR   CLS   VER   DATE   TIME   TYPE <file>   CD <dir>   MEM");
         p("  DIAL  start TELEWIRE and the dialing directory");
+        p("  WARDIAL  scan an exchange for carriers (don't tell the phone company)");
         p("  (and some things Kestrel won't tell you)", 8); return;
       case "MEM":
         p(""); p("    655360 bytes total conventional memory"); p("    633904 bytes available to Kestrel DOS"); p("    598016 largest executable program size");
@@ -232,7 +291,7 @@ export class Machine {
         p("Invalid directory"); return;
       }
       case "DIR": {
-        const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["DOS", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
+        const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["WARDIAL", "EXE", "21504"], ["DOS", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
           : this.cwd.endsWith("TELEWIRE") ? [["TELEWIRE", "EXE", "184320"], ["TELEWIRE", "DIR", "1024"], ["CAPTURE", "LOG", "0"]]
           : this.cwd.endsWith("GAMES") ? [["DIG", "EXE", "34012"], ["TETRA", "EXE", "41210"]]
           : [["HIMEM", "SYS", "11552"], ["KSMOUSE", "SYS", "32158"], ["EDIT", "COM", "413"]];
@@ -251,6 +310,7 @@ export class Machine {
         d.forEach((l) => p(l)); return;
       }
       case "DIAL": case "TELEWIRE": case "EXIT": return "comm";
+      case "WARDIAL": if (this.cwd !== "C:\\") { p("Bad command or file name"); return; } await this.wardial(g); return;
       case "XYZZY": p("Nothing happens."); return;
       case "WIN": p("Kestrel Windows is not installed. You have a modem. What more do you need?"); return;
       case "FORMAT": p("Nice try. Static backed up nothing, so let's not."); return;
@@ -261,6 +321,34 @@ export class Machine {
     void g;
   }
 
+  // ── WARDIAL.EXE ───────────────────────────────────────────────
+  /** Scans 555-0100..0199 (about 20 s, Esc/Space finishes instantly) and finds every board, hidden ones too. */
+  private async wardial(g: number) {
+    this.skipping = false;
+    this.hints.set([{ label: "ESC finish", key: "Escape" }]);
+    const p = (x: Ansi) => this.out(x);
+    p(a().nl().k(15, "WARDIAL v0.9").k(7, " · by ").k(13, "k0dez").k(7, " · \"if it hums, it's ours\"").nl());
+    p(a().k(8, "COM2 9600 N81 · scanning exchange 555-01xx · ").k(12, "use responsibly, which you won't").nl(2));
+    const found: string[] = [];
+    const rng = (n: number) => { const x = Math.sin(n * 91.7) * 10000; return x - Math.floor(x); };
+    for (let n = 100; n <= 199; n++) {
+      const num = `555-0${n}`;
+      const b = boardAt(num);
+      const r = rng(n);
+      const what = b ? "CARRIER" : r < 0.08 ? "BUSY" : r < 0.3 ? "VOICE" : r < 0.36 ? "FAX" : r < 0.4 ? "TONE" : "NO ANSWER";
+      if (b) found.push(num);
+      const col = b ? 10 : what === "VOICE" ? 14 : what === "FAX" || what === "TONE" ? 13 : 8;
+      p(a().k(7, `ATDT ${num}  `).k(col, pad(what, 10)).k(8, b ? "<- logged to WARDIAL.LOG" : "").nl());
+      if (b) audio.emit("diskSeek");
+      if (!this.skipping) { await this.wait(b ? 900 : 180); this.alive(g); }
+    }
+    p(a().nl().k(15, `Scan complete. ${found.length} carriers found:`).nl());
+    for (const num of found) p(a().k(10, `  ${num}`).k(8, "   carrier detected").nl());
+    p(a().nl().k(8, "Dial any of them from TELEWIRE with ").k(15, "M").k(8, " (manual dial).").nl(2));
+    this.profile.wardialed = true; saveProfile(this.profile);
+    this.skipping = false;
+  }
+
   // ── TELEWIRE ───────────────────────────────────────────────────
   private dirScreen(sel: number) {
     const x = a().c(15, 1).raw("\x1b[2J");
@@ -268,7 +356,7 @@ export class Machine {
     box(x, 3, 3, 75, 12, 11, "DIRECTORY", true, 1);
     x.at(5, 6).c(14, 1).t(pad("#", 4) + pad("Name", 26) + pad("Number", 12) + pad("Speed", 8) + "Last call");
     x.at(6, 6).c(3, 1).t("─".repeat(68));
-    DIRECTORY.forEach((d, i) => {
+    this.book().forEach((d, i) => {
       const last = this.profile.lastCall[d.number] ?? "never";
       const text = pad(String(i + 1), 4) + pad(d.name, 26) + pad(d.number, 12) + pad(String(this.profile.speed), 8) + pad(last, 18);
       x.at(7 + i * 2, 5);
@@ -285,6 +373,9 @@ export class Machine {
     return x;
   }
 
+  private filesSeenCount() { return Math.max(this.profile.filesSeen.length, this.profile.serverFiles ?? 0); }
+  private book() { return phoneBook(this.filesSeenCount()); }
+
   private async comm(g: number) {
     let sel = 0;
     audio.emit("diskSeek"); // TELEWIRE.EXE loading
@@ -292,14 +383,29 @@ export class Machine {
       this.state.set("comm");
       this.engine.term.setMode({ cols: 80, ice: false, ninePixel: true });
       this.engine.term.cursorVisible = false;
+      const book = this.book();
+      sel = Math.min(sel, book.length - 1);
+      this.hints.set([...NAV, hk("S", "S setup"), hk("M", "M dial #")]);
       this.out(this.dirScreen(sel));
       const k = await this.key(); this.alive(g);
       const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
-      if (k.key === "ArrowUp") sel = (sel + DIRECTORY.length - 1) % DIRECTORY.length;
-      else if (k.key === "ArrowDown") sel = (sel + 1) % DIRECTORY.length;
-      else if (c >= "1" && c <= "3") sel = +c - 1;
-      else if (k.key === "Enter" || c === "D") { this.engine.term.cursorVisible = true; await this.call(DIRECTORY[sel], g, false); }
+      if (k.key === "ArrowUp") sel = (sel + book.length - 1) % book.length;
+      else if (k.key === "ArrowDown") sel = (sel + 1) % book.length;
+      else if (c >= "1" && c <= String(book.length)) sel = +c - 1;
+      else if (k.key === "Tap" && k.tapRow) {
+        const i = Math.floor((k.tapRow - 7) / 2);
+        if (i >= 0 && i < book.length) { if (i === sel) { this.engine.term.cursorVisible = true; await this.call(book[sel], g, false); } else sel = i; }
+      }
+      else if (k.key === "Enter" || c === "D") { this.engine.term.cursorVisible = true; await this.call(book[sel], g, false); }
       else if (c === "S") await this.setup(g);
+      else if (c === "M") {
+        this.hints.set([{ label: "type", key: "", text: true }, { label: "ENTER", key: "Enter" }, { label: "ESC", key: "Escape" }]);
+        this.out(a().at(21, 6).c(14, 1).t("Manual dial · number: ").c(15, 1).raw("\x1b[K"));
+        this.engine.term.cursorVisible = true;
+        const typed = await this.readLine(g, 12, true);
+        const num = typed === null ? null : normalizeNumber(typed);
+        if (num) await this.call(boardAt(num) ?? { id: "unknown", name: num, number: num, mode: "archive", blurb: "", years: [1990, 1996] }, g, false);
+      }
       else if (k.key === "Escape" || (k.alt && c === "X")) {
         this.engine.term.cursorVisible = true;
         this.out(a().reset().cls().k(7, "TELEWIRE v2.1 · line closed.").nl(2));
@@ -324,6 +430,7 @@ export class Machine {
       });
       x.at(14, 21).c(3, 1).t(`Files seen: ${this.profile.filesSeen.length}  ·  best: ${maxSpeed(this.profile)}`);
       x.at(17, 18).c(7, 1).t("↑↓ select · ENTER set · ESC back");
+      this.hints.set(NAV);
       this.out(x);
       const k = await this.key(); this.alive(g);
       if (k.key === "ArrowUp") sel = Math.max(0, sel - 1);
@@ -343,12 +450,20 @@ export class Machine {
     this.out(a().reset().cls().k(15, "TELEWIRE v2.1").k(7, " — terminal mode").nl(2));
     this.out(a().k(7, "ATZ").nl()); await this.wait(350 * t); this.alive(g);
     this.out(a().k(7, "OK").nl()); await this.wait(250 * t); this.alive(g);
-    for (;;) {
+    this.hints.set([{ label: "ESC skip", key: "Escape" }]);
+    const known = !!boardAt(entry.number);
+    for (let attempt = 0; ; attempt++) {
       this.out(a().k(7, `ATDT ${entry.number}`).nl());
       audio.emit("offHook");
       await this.wait(600 * t); this.alive(g);
       for (const d of entry.number.replace(/\D/g, "")) { audio.emit("dialDigit", d); if (!this.skipping) await this.wait((DTMF_ON_MS + DTMF_OFF_MS) * t); this.alive(g); }
-      const busy = !express && this.callsThisPower === 0 && !this.lastBusy && Math.random() < 0.2;
+      if (!known) { // nobody home: it just rings
+        for (let r = 0; r < 4; r++) { await this.wait(r === 0 ? 900 * t : 2600 * t); this.alive(g); audio.emit("ring"); }
+        await this.wait(2000); this.alive(g);
+        this.out(a().k(7, "NO ANSWER").nl()); audio.emit("hangup");
+        this.skipping = false; await this.sleep(1200); return;
+      }
+      const busy = attempt === 0 && !express && !this.lastBusy && (this.debug.busy ? this.callsThisPower === 0 : this.callsThisPower === 0 && Math.random() < 0.2);
       for (let r = 0; r < (busy ? 1 : 2); r++) { await this.wait(r === 0 ? 900 * t : 2600 * t); this.alive(g); if (!busy) audio.emit("ring"); }
       if (busy) {
         this.lastBusy = true;
@@ -358,6 +473,7 @@ export class Machine {
         audio.emit("hangup");
         this.skipping = false;
         for (let n = 5; n > 0; n--) {
+          this.hints.set([{ label: "SPACE redial now", key: " " }, { label: "ESC cancel", key: "Escape" }]);
           this.out(a().raw("\r").k(14, `Redialing in ${n} seconds... (ESC cancels)`).eol());
           const k = await this.keys.nextOr(this.sleep(1000)); this.alive(g);
           if (k?.key === "Escape") { this.out(a().nl().k(7, "Dial cancelled.").nl()); await this.sleep(700); return; }
@@ -392,6 +508,8 @@ export class Machine {
       send: (b) => modem.write(b),
       key: () => this.keys.next(),
       keyOrDrain: () => this.keys.nextOr(modem.drain()),
+      keyTimeout: (ms) => this.keys.nextOr(this.sleep(ms)),
+      hint: (k) => this.hints.set(k),
       drain: () => modem.drain(),
       flush: () => modem.flush(),
       pause: () => modem.pause(),
@@ -404,16 +522,16 @@ export class Machine {
         scrollTo: (w) => term.scrollViewTo(w === "top" ? term.scrollbackLines : 0),
         markTop: () => { /* scrollback starts fresh at each setMode/reset */ },
         overlay: (bytes) => {
-          if (!bytes) { term.overlay = null; term.version++; return; }
-          const ov = new Terminal({ cols: 80 }, { masked: true });
-          ov.feed(bytes);
-          term.overlay = ov; term.version++;
+          if (!bytes) this.boardOverlay = null;
+          else { const ov = new Terminal({ cols: 80 }, { masked: true }); ov.feed(bytes); this.boardOverlay = ov; }
+          this.applyOverlay();
         },
+        artOpen: (on) => { this.artOpen = on; this.applyOverlay(); },
         rows: () => term.rows,
       },
       speed, node, entry, profile: this.profile,
       save: () => saveProfile(this.profile),
-      timeLeftMs: () => Math.max(0, CALL_MINUTES * 60000 - (Date.now() - started)),
+      timeLeftMs: () => Math.max(0, this.callMinutes * 60000 - (Date.now() - started)),
       deepLink: this.deepLink ?? undefined,
     };
     this.deepLink = null;
@@ -429,8 +547,10 @@ export class Machine {
     this.keys.revive();
     this.state.set("hangup");
     modem.clear(); modem.resume();
+    this.boardOverlay = null; this.artOpen = false;
     term.overlay = null;
     term.setMode({ cols: 80, ice: false, ninePixel: true });
+    this.hints.set([]);
     this.out(a().reset().nl(2).k(7, "NO CARRIER").nl());
     audio.emit("hangup");
     const d = new Date();
@@ -445,7 +565,7 @@ export class Machine {
     this.stopTimer();
     this.timeTimer = setInterval(() => {
       if (g !== this.gen) return this.stopTimer();
-      if (Date.now() - started >= CALL_MINUTES * 60000) { this.stopTimer(); this.keys.abort("timeup"); }
+      if (Date.now() - started >= this.callMinutes * 60000) { this.stopTimer(); this.keys.abort("timeup"); }
     }, 1000);
   }
   private stopTimer() { if (this.timeTimer) clearInterval(this.timeTimer); this.timeTimer = null; }

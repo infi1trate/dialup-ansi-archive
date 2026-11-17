@@ -7,7 +7,8 @@ import { DEFAULTS, brightnessGain, contrastGain, loadRoom, saveRoom, type RoomSe
 import { audio } from "@/audio/bus";
 import type { Machine } from "@/machine/machine";
 import type { DeepLink } from "@/bbs/io";
-import { HOUSE_PACK } from "@/data/housepack";
+// literal, not imported: the house pack (and the terminal it pulls in) must stay out of the first frame
+const HOUSE_PACK = "crawl-01";
 
 interface Props { deepLink?: DeepLink & { number: string } }
 

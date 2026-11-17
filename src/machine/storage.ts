@@ -7,6 +7,9 @@ export interface Profile {
   calls: number;
   /** Distinct files viewed as counted by the message base (survives device changes). */
   serverFiles?: number;
+  /** Reached VOID//NODE: 28800 unlocked at once. */
+  voidUnlocked?: boolean;
+  wardialed?: boolean;
 }
 
 const KEY = "dialup.profile.v1";
@@ -28,6 +31,7 @@ export function saveProfile(p: Profile) {
 /** Highest speed the caller has unlocked: 14400 after 5 files, 28800 after 15 (local or server count). */
 export function maxSpeed(p: Profile): Speed {
   const n = Math.max(p.filesSeen.length, p.serverFiles ?? 0);
+  if (p.voidUnlocked) return 28800;
   return n >= 15 ? 28800 : n >= 5 ? 14400 : 9600;
 }
 export function allowedSpeeds(p: Profile): Speed[] {
