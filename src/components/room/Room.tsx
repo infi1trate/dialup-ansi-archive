@@ -96,7 +96,7 @@ export function Room(p: RoomProps) {
   const L = (i: number) => (el: HTMLDivElement | null) => { layers.current[i] = el; };
 
   return (
-    <main ref={root} className={`room ${p.lamp ? "lamp-on" : ""} ${p.reduced ? "reduce" : ""} ${p.leaned ? "leaned" : ""}`} onClick={onClick}>
+    <main ref={root} className={`room ${p.lamp ? "lamp-on" : ""} ${p.reduced ? "reduce" : ""} ${p.leaned ? "leaned" : ""}`} onClick={onClick} onScroll={(e) => { const t = e.currentTarget; if (t.scrollLeft || t.scrollTop) { t.scrollLeft = 0; t.scrollTop = 0; } }}>
       <h1 className="sr-only">Dial-Up: a 486 in a dark basement, ready to call The Crawlspace BBS</h1>
       <div ref={cam} className="cam">
         <div ref={stage} className="stage" style={{ aspectRatio: `100 / ${STAGE_H}` }}>

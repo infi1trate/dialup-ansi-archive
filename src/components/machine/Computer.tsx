@@ -62,6 +62,7 @@ export function Computer({ deepLink }: Props) {
       const engine = new Engine(canvas.current);
       const m = new Machine(engine);
       machine.current = m;
+      if (import.meta.env.DEV) (window as unknown as { __machine?: Machine }).__machine = m; // test hook, dev only
       const c = cfgRef.current;
       engine.crt.brightness = brightnessGain(c.brightness);
       engine.crt.contrast = contrastGain(c.contrast);

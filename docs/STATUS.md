@@ -1,49 +1,55 @@
-# Dial-Up: status after pass 3
+# Dial-Up status (passes 1-4)
 
-## 1. Verified in the test browser (headless Chromium, Playwright)
-- Pass 1: power on, boot, DOS, Telewire, dial 555-0142, GUEST login, browse 1993, open an ACiD pack, stream an ANSI at 9600, I info panel, logoff, NO CARRIER. Deep link `/dial/...` lands in the viewer. `/lab` streams with parser stats.
-- Pass 2: dark room first frame, screen color spills onto wall/desk, lean in/out readable, lamp, turbo display 33/66, modem LEDs during a call, escape-hatch mute persists, `/credits`.
-- Pass 3, two separate browser contexts (two device tokens): NEW signup on both; B's Last Callers lists A; B's oneliners wall shows A's line; Who's Online on A shows A and B as nodes 1 and 2 with city, speed and activity.
-- Info panel shows the deep-link "phone number". R in the viewer files a report. `!` on the main menu asks for the key and answers "Console disabled" when SYSOP_KEY is unset.
-- API checks: reserved/profane handles rejected, duplicate handle (any case) rejected, transfer phrase login, view counts feed Top 10, hidden flag filters JSON and raw proxy (410), funnel counters increment.
-- A 12-request parallel burst of oneliner posts was all rejected (429).
-- Share card PNG (`/api/public/card`) renders 1200x630 and is cached; deep-link pages carry title/OG/Twitter tags like "ACID-RN.ANS by r noble / acid (acdu0193, 1993)".
-- Monitor fills 57% of frame width; sticky note sits on the bezel, off the tube.
-- Unit tests: 24 passing (`bunx vitest run`).
+## 1. Verified working (test browser = Playwright Chromium, software GL)
+- Pass 1-3 loop: power on, boot, DOS, TELEWIRE, dial, GUEST, browse 1993, view ANSI, I info, logoff; deep links; /lab; /credits; cross-browser oneliners/logons/presence.
+- Rate limit: unit test "first accepted, next rejected, accepted after window", rejected attempts do not extend it; a parallel burst lets exactly one through (src/test/ratelimit.test.ts, memory store).
+- `?debug=busy` forces BUSY + automatic redial countdown, then CONNECT. `?debug=time=1` kicks to the time's-up screen after one minute, then NO CARRIER.
+- Brightness, contrast and modem-volume knobs respond to the scroll wheel and persist (drag not scripted).
+- Modem setup: 2400 hard mode selectable, back to 9600; 14400/28800 show as locked until unlocked.
+- New-user form (handle, city, joke, transfer phrase) on screen; second fresh browser logs in with the handle, wrong phrase rejected, right phrase accepted.
+- Who's Online shows the real node row and refreshes every 15 s (changed rows only, code-reviewed; tick seen once).
+- Power off mid-stream, power back on: reboots cleanly, no errors.
+- Portrait desktop viewport starts leaned in with the tube centered. Fixed: an automated click scrolled the room sideways; the room now refuses to scroll.
+- Backend down (all /api/public/net requests aborted): login, last callers, oneliners and who's online say "the message base is offline" and fall back to seeds; art still streams.
+- WARDIAL.EXE finds 0113, 0142, 0167, 0193, 0199 (Esc skips). Manual dial M 5550113 reaches VOID//NODE; password STAIRWELL works; 28800 unlocked; files sorted by most viewed; red skin.
+- The Attic appears in the phone book after 10 files viewed; news says "a new board came online"; years 1997+ listed.
+- [A]nimations area: SPINNER and RAIN animate; no ENTER-finish key offered (Enter still works).
+- XBin AMBER.XB renders with its own palette and font through the modem; info panel shows it.
+- Phone 390x844 with touch: whole call loop by keycaps and row taps (power, dial, GUEST via OS keyboard input, 1993, pack, piece, info, logoff to NO CARRIER). Portrait art shows the "turn your phone" box; landscape fills the tube.
+- Gallery /gallery and /gallery/:year/:pack render on plain canvas (earlier this pass).
+- Production build: first-load JS excludes terminal, CRT, audio, board, house pack and backend client (import graph checked).
+- 42 tests pass; typecheck clean.
 
 ## 2. Built but untested
-- Sysop console with a real key (list/hide oneliners, ban, reports, hide/unhide file, 14-day counters): only the disabled path was exercised.
-- New-device login via transfer phrase in the UI (API path tested only).
-- "Message base offline" fallback with the backend actually down.
-- Presence expiry after a closed tab (leave beacon + 3-minute staleness).
-- Social crawlers reading the og:image (tags present, not checked with a real crawler).
-- From pass 2: brightness/contrast and modem-volume knobs, portrait default lean-in, busy signal + redial, 60-minute time-out, every sound by ear.
-- 60 fps: never established; the sandbox browser renders in software (~30 fps).
+- Knob dragging (only wheel tested); swipe scroll on finished art (test piece was shorter than the screen).
+- XBin compression with real archive files, 512-glyph XBin fonts (only the first 256 glyphs are used), ADF from the archive, IDF (decoder is a best guess; no real file tested).
+- Sysop console with a real SYSOP_KEY set; 14-day counters table.
+- Presence expiry for callers who vanish; share-card PNGs for wide pieces after the scale-to-fit change.
+- 60 fps on real integrated graphics; audio by ear (Playwright cannot listen).
+- Haptic tick (no device).
 
 ## 3. Known bugs and gaps
-- Rate-limit hits are recorded before checking, so a rejected attempt also extends the window.
-- The burst test ran from an IP that had already posted, so "first one accepted, rest rejected" was not shown in a single burst.
-- Profanity list is short and English-only; leetspeak evasion partly handled.
-- IP hashes use a built-in salt when IP_HASH_SALT is unset (weaker, still not reversible to an IP without brute force over the IPv4 space).
-- Oneliners, reports and test callers created during testing remain in the database (handles like Alpha*, Beta*, Tester*, Burst*).
-- Share card shows only the first 25 rows; wide (>80 col) pieces are cropped, not scaled.
-- Who's Online redraws only on entry; it is not live while you stare at it.
+- Rate limiter in the database is check-then-insert-then-rank, not a transaction; heavy concurrency could, in rare cases, reject both of two racing posts. It never lets extra posts through in tests.
+- VOID password is in the shipped board code (it's a puzzle, not security).
+- `?debug=offline` makes every message-base call fail (added last; verified only via the request-blocking test above).
+- Production preview server (vite preview) failed with a missing server file in a copied workspace; the build itself is fine.
+- Board text is ASCII-checked by eye only; a few long lines in narrow menus could clip.
 
 ## 4. Choices made
-- All tables deny direct client access (RLS on, no policies, service-role grants only); every read/write goes through `POST /api/public/net`, which validates input.
-- Device token: 32 random bytes in localStorage; server stores only SHA-256. Transfer phrase: PBKDF2-SHA256, 100k iterations, random salt.
-- Oneliner limit: one per 10 minutes per token hash AND per IP hash (two people behind one NAT share it).
-- Last callers padded with the seeded fictional callers below ten real ones.
-- GUEST views count toward Top 10 by device hash but cannot post.
-- Share cards cached under `card-v2/` in the private archive-cache bucket.
-- Pack groups come from the cached year listing (pack JSON has no groups).
+- Blink 1.875 Hz text / 2.5 Hz cursor (under 3 flashes per second); CRT flicker is a slow 0.4 Hz drift; reduced motion = steady text, no flicker.
+- PabloDraw 24-bit `ESC[0;R;G;Bt`/`ESC[1;R;G;Bt` and SGR 38/48 are rendered as true color; `ESC[?7h`, `ESC[=3h`, `ESC[?33h` (iCE) accepted; harmless SGRs (e.g. 24) ignored.
+- Parser corpus: 42 real .ANS/.ICE/.ASC files 1990-1996 via the proxy, one at a time. Before: 41 files 0 unknown, TB-SANC.ASC (asia0595) 1 unknown (SGR 24). After the fix: 0 unknown in all 42.
+- Binary formats are converted to an ANSI byte stream so they still paint at modem speed.
+- Attic covers 1997-today with the same skin; VOID is never listed in the phone book.
+- Stair-creak clue: one panned creak soon after power-on (answer 1 -> 555-0113); second sticky note sits under the keyboard edge.
+- Mobile: tube-only below 820 px or on touch; keys come from io.hint, not the byte stream.
 
-## 5. Owner to-do by hand
-- Sysop console: add a secret named `SYSOP_KEY` in Project Settings -> Secrets with a long random value you make up (e.g. `openssl rand -hex 24`). No default exists; without it the console says "console disabled".
-- Optional: add `IP_HASH_SALT` (any long random string) for stronger IP hashing. Changing it later resets per-IP limits only.
-- Replace the takedown placeholder (`sysop@`) in the credits screen and `/credits` with a real contact.
-- Delete test rows if you want a clean board before launch.
+## 5. Owner to-do
+- Set SYSOP_KEY (long random string) as a backend secret to enable the console; set IP_HASH_SALT for IP hashing. Both degrade gracefully when missing.
+- Test data was NOT deleted (approval declined). Remove by hand: callers Probe9957, Tester8804, Probe30410, Alpha769, Beta566, Burst474, Gamma*, and every P4test* caller from this pass, with their call_log, oneliners (2), presence (5), reports (2), views (3), rate hits and test daily_counters rows.
+- Publish and check share cards and the 60 fps bar on a real laptop.
 
-## 6. First-load weight (home page, measured in dev)
-- Images: ~144 KB WebP total (room assets; props lazy-load). No other images.
-- JS: ~2.9 MB in the dev server (unminified, unbundled modules incl. React and router). A production build was not measured in this pass; expect a fraction of that after minification. Audio engine, machine and CRT load only after the first power click.
+## 6. Weight (production build, gzip -9)
+- First load (dark room, before power): 123.7 KB JS (378 KB raw) + 145 KB WebP images (lazy) + CSS.
+- After power click: 45.8 KB JS (121 KB raw): machine, board, house pack, terminal, CRT, audio, font.
+- Backend client (56.6 KB gz) loads only on the first server call; gallery, lab and credits are separate small chunks.

@@ -1,16 +1,16 @@
 # Pass 4 roadmap
 - [x] A1 rate limit check-before-record + test
 - [x] A2 SKIPPED by owner: list test rows in STATUS owner to-do; no approval tools this pass
-- [ ] A3 who's online 15s refresh
-- [ ] A4 share card scale wide
-- [ ] A5 debug flags busy/time; drive flows in browser
-- [ ] A6 backend down fallback
-- [ ] A7 prod build + code split
-- [ ] A8 parser check vs ~40 real files; PabloDraw 24-bit etc
-- [ ] A9 blink <3Hz; reduced motion steady blink
-- [ ] B XBin, BIN 160, ADF, IDF; The Attic 555-0199
-- [ ] C Animations area
-- [ ] D VOID//NODE, sticky note 2, DIZ hint, manual dial M, WARDIAL.EXE
-- [ ] E mobile tube view, io.hint keycap bar, hidden input, tap/swipe
-- [ ] F /gallery
-- [ ] STATUS.md
+- [x] A3 who's online 15s refresh
+- [x] A4 share card scale wide
+- [x] A5 debug flags busy/time; drive flows in browser
+- [x] A6 backend down fallback
+- [x] A7 prod build + code split
+- [x] A8 parser check vs ~40 real files; PabloDraw 24-bit etc
+- [x] A9 blink <3Hz; reduced motion steady blink
+- [x] B XBin, BIN 160, ADF, IDF; The Attic 555-0199
+- [x] C Animations area
+- [x] D VOID//NODE, sticky note 2, DIZ hint, manual dial M, WARDIAL.EXE
+- [x] E mobile tube view, io.hint keycap bar, hidden input, tap/swipe
+- [x] F /gallery
+- [x] STATUS.md

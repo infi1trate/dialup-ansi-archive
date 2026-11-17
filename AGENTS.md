@@ -42,3 +42,7 @@ use the editor.
 - Board network features (identity, oneliners, presence, views, reports, flags, counters) go only through `POST /api/public/net` (`src/server/net.ts`), which uses the service-role client; all those tables keep RLS on with no client policies. Why: every write must be validated and rate-limited server-side, and clients never see token/IP hashes.
 - Device tokens are stored only as SHA-256 hashes; transfer phrases use PBKDF2; secrets (SYSOP_KEY, IP_HASH_SALT) are read from env inside handlers and their features degrade gracefully when missing. Why: no personal data and no default keys.
 - Share-card PNGs (`/api/public/card`) are the only place art becomes an image; they reuse the terminal and VGA font and are cached in storage. Why: rule 1 exception for social previews only.
+- Binary formats (.BIN/.XB/.ADF/.IDF) are decoded in `src/term/formats.ts` into an ANSI byte stream plus a `TermMode` palette/font, via `src/term/prepare.ts`; the gallery and share cards rasterize with DOM-free `src/term/raster.ts`. Why: every surface stays on one renderer and art still arrives at modem speed.
+- Touch keys come from the board's out-of-band `io.hint(keys)`, never parsed from the byte stream; the context bar renders only those. Why: the CRT stays pure bytes.
+- `src/start.ts` loads the backend auth middleware lazily so the dark first frame ships no backend client. Why: first-load budget.
+- Write rate limits go through `src/lib/ratelimit.ts` (check before recording). Why: rejected attempts must not extend the window.

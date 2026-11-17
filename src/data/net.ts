@@ -18,6 +18,8 @@ export interface CallerInfo { handle: string; city: string; calls: number; files
 export interface NetResult { [k: string]: any; error?: string; status?: number }
 
 export async function net(action: string, body: Record<string, unknown> = {}, timeoutMs = 7000): Promise<NetResult | null> {
+  // ?debug=offline simulates an unreachable message base
+  if (typeof location !== "undefined" && /[?&]debug=[^&]*offline/.test(location.search)) return null;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {

@@ -487,7 +487,7 @@ class Board {
     right.forEach(([k, l], n) => x.at(9 + n * 2, 44).hot(k, l, h1, h2, h3));
     x.at(19, 1).k(7, center(this.io.entry.blurb, 79));
     this.status(x, 21);
-    x.at(23, 4).k(this.sk.b, "Main").k(8, " ▸ ").k(this.sk.a, "Command").k(v ? 4 : 5, ": ").c(15);
+    x.at(23, 4).k(this.sk.b, "Main").k(8, " ► ").k(this.sk.a, "Command").k(v ? 4 : 5, ": ").c(15);
     return x;
   }
 
@@ -606,7 +606,7 @@ class Board {
       const m = this.header(a(), "Sysop console", "node 0");
       const items: [string, string][] = [["1", " list oneliners"], ["2", " hide a oneliner"], ["3", " ban a handle"], ["4", " list reports"], ["5", " hide a file"], ["6", " unhide a file"], ["7", " counters, 14 days"], ["Q", "uit console"]];
       items.forEach(([k, l], n) => m.at(5 + n * 2, 8).hot(k, l, 15, 12, 14));
-      m.at(22, 4).k(12, "Sysop").k(8, " ▸ ").k(14, "Command").k(5, ": ");
+      m.at(22, 4).k(12, "Sysop").k(8, " ► ").k(14, "Command").k(5, ": ");
       this.send(m);
       const k = await this.key();
       this.io.clearOutput();
@@ -1130,7 +1130,7 @@ function infoPanel(pack: PackInfo, f: PackFile, s: Sauce | null, size: number, m
   row(3, "Group", s?.group || pack.groups.join(", "));
   row(4, "Pack", pack.name.toUpperCase());
   row(5, "Year", String(pack.year) + (s?.date ? `  (${sauceDate(s.date)})` : ""));
-  row(6, "Font", `${s?.tInfoS || "IBM VGA"} · ${mode.ninePixel ? "9px" : "8px"}${mode.ice ? " · iCE" : ""}`);
+  row(6, "Font", `${mode.font ? `embedded 8x${mode.font.height}` : s?.tInfoS || "IBM VGA"}${mode.palette ? " · own palette" : ""} · ${mode.ninePixel ? "9px" : "8px"}${mode.ice ? " · iCE" : ""}`);
   row(7, "Size", `${size} bytes · ${mode.cols} cols${s ? "" : " · no SAUCE"}`);
   row(8, "File", f.name, 7);
   row(9, "Phone #", url.slice(0, V), 14);
