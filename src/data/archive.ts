@@ -1,4 +1,5 @@
 // Archive access: everything goes through this project's caching proxy, never to 16colo.rs directly.
+import { audio } from "@/audio/bus";
 import { houseFile, housePack, HOUSE_PACK } from "./housepack";
 import { isViewable, type GroupSummary, type PackInfo, type PackSummary, type Page } from "./types";
 
@@ -9,6 +10,7 @@ const files = new Map<string, Promise<Uint8Array>>();
 
 async function api<T = any>(path: string): Promise<T> {
   if (!json.has(path)) {
+    audio.emit("diskSeek");
     const p = fetch(`/api/public/archive/json?path=${encodeURIComponent(path)}`).then(async (r) => {
       if (!r.ok) throw new ArchiveError(`archive returned ${r.status}`);
       return r.json();
@@ -76,6 +78,7 @@ export async function getFile(pack: string, file: string): Promise<Uint8Array> {
   }
   const k = `${pack}/${file}`;
   if (!files.has(k)) {
+    audio.emit("diskSeek");
     const p = fetch(`/api/public/archive/raw?pack=${encodeURIComponent(pack)}&file=${encodeURIComponent(file)}`).then(async (r) => {
       if (!r.ok) throw new ArchiveError(`archive returned ${r.status}`);
       return new Uint8Array(await r.arrayBuffer());

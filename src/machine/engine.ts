@@ -37,13 +37,26 @@ export class Engine {
     this.raf = requestAnimationFrame(loop);
   }
 
-  powerOn() { this.powered = true; this.power = { onT: 0, offT: -1 }; }
-  powerOff() { this.powered = false; this.power = { onT: -1, offT: 0 }; this.modem.clear(); }
+  /** Tube power is separate from the PC: a lit tube with the PC off shows black. */
+  tube = false;
+  /** Turbo: the modem delivers without throttling. */
+  turbo = false;
+
+  setTube(on: boolean) {
+    if (on === this.tube) return;
+    this.tube = on;
+    this.power = on ? { onT: 0, offT: -1 } : { onT: -1, offT: 0 };
+  }
+  powerOn() { this.powered = true; }
+  powerOff() { this.powered = false; this.modem.clear(); this.term.overlay = null; this.term.reset(); }
 
   private frame(dt: number, t: number) {
     if (this.power.onT >= 0) this.power.onT += dt;
     if (this.power.offT >= 0) this.power.offT += dt;
-    this.modem.tick(dt);
+    if (this.turbo && !this.modem.paused) {
+      const bps = this.modem.bps;
+      this.modem.bps = 4_000_000; this.modem.tick(dt); this.modem.bps = bps;
+    } else this.modem.tick(dt);
     this.flowT += dt;
     if (this.flowT > 0.25) { this.flowT = 0; if (this.modem.rate > 0) audio.emit("byteFlow", this.modem.rate); }
     const blinkOn = Math.floor(t * 2 * 2) % 2 === 0; // ~2 Hz text blink
@@ -53,7 +66,7 @@ export class Engine {
     this.avgT += dt;
     if (this.avgT > 0.1) {
       this.avgT = 0;
-      const k = this.powered ? 1 : 0;
+      const k = this.powered && this.tube ? 1 : 0;
       const [r, g, b] = this.renderer.avg;
       screenAverageColor.set([r * k, g * k, b * k]);
     }

@@ -36,3 +36,6 @@ use the editor.
 - The browser never calls 16colo.rs; it goes through `/api/public/archive/json` and `/api/public/archive/raw`, which cache permanently in the private `archive-cache` storage bucket. Why: polite to upstream and resilient.
 - All canvas/WebGL/audio/localStorage code is created inside effects (dynamic import of `@/machine/engine` and `@/machine/machine`). Why: SSR safety.
 - tsconfig turns off `noUncheckedIndexedAccess`/`exactOptionalPropertyTypes`/`noPropertyAccessFromIndexSignature`. Why: hot typed-array loops in the renderer and parser.
+- The room (`src/components/room`) positions every object from `layout.ts` (cqw of a 16:9 stage); emissive parts (LEDs, digits) sit in their own layer above the multiply light map and reuse those coordinates. Why: darkness must never dim light sources, and parts must line up.
+- Screen spill, LEDs and headlights are driven by `useRoomLive` through CSS variables/classes, never React state. Why: 60 fps with no re-renders.
+- All sound is synthesized in `src/audio/engine.ts`, lazily imported on the first power/lamp click; producers only emit bus events. Telephony and handshake timings live in `src/audio/tables.ts`, shared with the machine so waits match the sound.

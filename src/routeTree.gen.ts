@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as LabRouteImport } from './routes/lab'
 import { Route as ApiPublicArchiveJsonRouteImport } from './routes/api/public/archive.json'
 import { Route as ApiPublicArchiveRawRouteImport } from './routes/api/public/archive.raw'
@@ -18,6 +19,11 @@ import { Route as DialNumberYearPackFileRouteImport } from './routes/dial.$numbe
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreditsRoute = CreditsRouteImport.update({
+  id: '/credits',
+  path: '/credits',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabRoute = LabRouteImport.update({
@@ -43,6 +49,7 @@ const DialNumberYearPackFileRoute = DialNumberYearPackFileRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/credits': typeof CreditsRoute
   '/lab': typeof LabRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/credits': typeof CreditsRoute
   '/lab': typeof LabRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/credits': typeof CreditsRoute
   '/lab': typeof LabRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
@@ -67,6 +76,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/credits'
     | '/lab'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
@@ -74,6 +84,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/credits'
     | '/lab'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
@@ -81,6 +92,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/credits'
     | '/lab'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
@@ -89,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CreditsRoute: typeof CreditsRoute
   LabRoute: typeof LabRoute
   ApiPublicArchiveJsonRoute: typeof ApiPublicArchiveJsonRoute
   ApiPublicArchiveRawRoute: typeof ApiPublicArchiveRawRoute
@@ -102,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/credits': {
+      id: '/credits'
+      path: '/credits'
+      fullPath: '/credits'
+      preLoaderRoute: typeof CreditsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lab': {
@@ -137,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CreditsRoute: CreditsRoute,
   LabRoute: LabRoute,
   ApiPublicArchiveJsonRoute: ApiPublicArchiveJsonRoute,
   ApiPublicArchiveRawRoute: ApiPublicArchiveRawRoute,

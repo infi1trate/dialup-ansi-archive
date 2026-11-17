@@ -8,6 +8,7 @@ import { Engine } from "./engine";
 import { Aborted, KeyQueue, toKey, type Key } from "./keyboard";
 import { allowedSpeeds, loadProfile, maxSpeed, saveProfile, type Profile } from "./storage";
 import { Signal } from "./signals";
+import { handshakeMs, DTMF_OFF_MS, DTMF_ON_MS } from "@/audio/tables";
 import { Terminal } from "@/term/terminal";
 import type { Speed } from "@/modem/modem";
 
@@ -19,6 +20,9 @@ const CAPTURE = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ",
 export class Machine {
   state = new Signal<MachineState>("off");
   powered = new Signal(false);
+  tube = new Signal(false);
+  turbo = new Signal(false);
+  private everOn = false;
   keys = new KeyQueue();
   profile: Profile = loadProfile();
   private gen = 0;
@@ -33,13 +37,30 @@ export class Machine {
 
   // ── input ──────────────────────────────────────────────────────
   handleKeyDown(e: KeyboardEvent) {
+    // the keyboard is a physical object: it clicks whether or not anything is listening
+    if (!e.repeat && !e.metaKey) audio.emit("keyDown", e.key);
     if (!this.powered.value) return;
     if (e.metaKey || (e.ctrlKey && !["c", "C"].includes(e.key))) return;
     if (CAPTURE.has(e.key) || e.key.length === 1) e.preventDefault();
-    audio.emit("keyDown", e.key);
     this.keys.push(toKey(e));
   }
-  handleKeyUp(e: KeyboardEvent) { if (this.powered.value) audio.emit("keyUp", e.key); }
+  handleKeyUp(e: KeyboardEvent) { if (!e.metaKey) audio.emit("keyUp", e.key); }
+
+  /** PC master rocker. The very first press also switches the tube on, so nobody has to hunt. */
+  pressPcPower() { audio.unlock(); this.togglePower(); }
+  /** Monitor button: first press powers everything; afterwards it switches only the tube. */
+  pressMonitorPower() {
+    audio.unlock();
+    if (!this.everOn) this.powerOn();
+    else this.setTube(!this.tube.value);
+  }
+  setTube(on: boolean) {
+    if (on === this.tube.value) return;
+    this.engine.setTube(on);
+    this.tube.set(on);
+    audio.emit(on ? "monitorOn" : "monitorOff");
+  }
+  toggleTurbo() { this.turbo.set(!this.turbo.value); this.engine.turbo = this.turbo.value; }
 
   // ── power ──────────────────────────────────────────────────────
   togglePower() { if (this.powered.value) this.powerOff(); else this.powerOn(); }
@@ -47,6 +68,7 @@ export class Machine {
   powerOn(deepLink?: DeepLink & { number: string }) {
     if (this.powered.value) return;
     audio.unlock();
+    if (!this.everOn) { this.everOn = true; this.setTube(true); }
     this.gen++;
     this.keys.revive();
     this.deepLink = deepLink ?? null;
@@ -263,6 +285,7 @@ export class Machine {
 
   private async comm(g: number) {
     let sel = 0;
+    audio.emit("diskSeek"); // TELEWIRE.EXE loading
     for (;;) {
       this.state.set("comm");
       this.engine.term.setMode({ cols: 80, ice: false, ninePixel: true });
@@ -321,7 +344,7 @@ export class Machine {
       this.out(a().k(7, `ATDT ${entry.number}`).nl());
       audio.emit("offHook");
       await this.wait(600 * t); this.alive(g);
-      for (const d of entry.number.replace(/\D/g, "")) { audio.emit("dialDigit", d); if (!this.skipping) await this.wait(95 * t); this.alive(g); }
+      for (const d of entry.number.replace(/\D/g, "")) { audio.emit("dialDigit", d); if (!this.skipping) await this.wait((DTMF_ON_MS + DTMF_OFF_MS) * t); this.alive(g); }
       const busy = !express && this.callsThisPower === 0 && !this.lastBusy && Math.random() < 0.2;
       for (let r = 0; r < (busy ? 1 : 2); r++) { await this.wait(r === 0 ? 900 * t : 2600 * t); this.alive(g); if (!busy) audio.emit("ring"); }
       if (busy) {
@@ -347,7 +370,7 @@ export class Machine {
     this.callsThisPower++;
     this.state.set("handshake");
     audio.emit("handshakeStart", speed);
-    await this.wait(4000 * t); this.alive(g);
+    await this.wait(handshakeMs(speed) * t); this.alive(g);
     this.out(a().k(15, `CONNECT ${speed}`).nl(2));
     audio.emit("connect", speed);
     this.engine.modem.bps = speed;

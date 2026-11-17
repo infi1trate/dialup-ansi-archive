@@ -62,7 +62,7 @@ void main(){
 const FS_OUT = `#version 300 es
 precision highp float;
 in vec2 uv; out vec4 o;
-uniform sampler2D scene; uniform vec2 srcSize; uniform vec2 outSize; uniform float time, motion, bright;
+uniform sampler2D scene; uniform vec2 srcSize; uniform vec2 outSize; uniform float time, motion, bright, contrast;
 vec2 curve(vec2 u){ u = u*2.-1.; vec2 off = abs(u.yx)/vec2(9.,7.); u = u + u*off*off; return u*0.5+0.5; }
 float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
 void main(){
@@ -84,6 +84,7 @@ void main(){
   vec2 q = abs(u-0.5)*2.; vec2 r = vec2(0.06*0.75, 0.06);
   vec2 d = max(q - (1.-r), 0.)/r; float corner = 1. - smoothstep(0.92, 1.0, length(d));
   float edge = step(0., u.x)*step(u.x,1.)*step(0.,u.y)*step(u.y,1.);
+  col = max((col-0.06)*contrast+0.06, 0.);
   o = vec4(col*corner*edge*bright, 1.);
 }`;
 
@@ -97,8 +98,10 @@ export class CRTDisplay {
   private ping = 0;
   private srcW = 0; private srcH = 0;
   brightness = 1;
+  /** Picture (gain) knob. */
+  contrast = 1;
 
-  constructor(private canvas: HTMLCanvasElement, private reducedMotion: boolean) {
+  constructor(private canvas: HTMLCanvasElement, public reducedMotion: boolean) {
     const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
     this.webgl = !!gl;
     if (gl) { this.gl = gl; this.initGL(gl); }
@@ -196,6 +199,7 @@ export class CRTDisplay {
     gl.uniform1f(u(this.progOut, "time"), time);
     gl.uniform1f(u(this.progOut, "motion"), motion);
     gl.uniform1f(u(this.progOut, "bright"), this.brightness);
+    gl.uniform1f(u(this.progOut, "contrast"), this.contrast);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     this.ping = 1 - this.ping;
   }

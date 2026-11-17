@@ -17,5 +17,5 @@ export const Route = createFileRoute("/dial/$number/$year/$pack/$file")({
 
 function DeepLinkPage() {
   const p = Route.useParams();
-  return <Computer deepLink={{ number: p.number, year: Number(p.year) || 1993, pack: p.pack, file: p.file }} />;
+  return <Computer key={`${p.number}/${p.year}/${p.pack}/${p.file}`} deepLink={{ number: p.number, year: Number(p.year) || 1993, pack: p.pack, file: p.file }} />;
 }

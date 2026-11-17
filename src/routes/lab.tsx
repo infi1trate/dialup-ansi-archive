@@ -37,7 +37,7 @@ function Lab() {
       if (!canvas.current) return;
       e = new Engine(canvas.current);
       engine.current = e;
-      e.powerOn(); setPowered(true);
+      e.powerOn(); e.setTube(true); setPowered(true);
       timer = setInterval(() => {
         const t = e!.term, m = e!.modem;
         setStats([
@@ -83,7 +83,7 @@ function Lab() {
 
   return (
     <main className="lab">
-      <Monitor ref={canvas} powered={powered} onPower={() => { const e = engine.current; if (!e) return; if (e.powered) e.powerOff(); else e.powerOn(); setPowered(e.powered); }}
+      <Monitor ref={canvas} powered={powered} onPower={() => { const e = engine.current; if (!e) return; if (e.powered) { e.powerOff(); e.setTube(false); } else { e.powerOn(); e.setTube(true); } setPowered(e.powered); }}
         onBrightness={(v) => { if (engine.current) engine.current.crt.brightness = v; }} />
       <aside className="lab-panel">
         <strong>/lab · terminal bench</strong>

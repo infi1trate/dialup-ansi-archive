@@ -260,8 +260,8 @@ class Board {
     box(x, 8, 8, 64, 11, 5);
     const left: [string, string][] = [["F", "iles"], ["B", "ulletins"], ["O", "neliners"], ["W", "ho's online"], ["U", "ser list"]];
     const right: [string, string][] = [["P", "age sysop"], ["D", "oors"], ["C", "redits"], ["G", "oodbye"]];
-    left.forEach(([k, l], n) => x.at(10 + n * 2, 14).hot(k, l, 15, 13, 11));
-    right.forEach(([k, l], n) => x.at(10 + n * 2, 44).hot(k, l, 15, 13, 11));
+    left.forEach(([k, l], n) => x.at(9 + n * 2, 14).hot(k, l, 15, 13, 11));
+    right.forEach(([k, l], n) => x.at(9 + n * 2, 44).hot(k, l, 15, 13, 11));
     x.at(19, 1).k(7, center(this.io.entry.blurb, 79));
     this.status(x, 21);
     x.at(23, 4).k(13, "Main").k(8, " ▸ ").k(11, "Command").k(5, ": ").c(15);
