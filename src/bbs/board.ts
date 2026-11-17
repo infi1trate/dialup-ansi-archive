@@ -313,7 +313,7 @@ class Board {
     box(x, 5, 6, 68, 6, 12, "READ THIS");
     x.at(6, 9).k(15, "Do NOT reuse a real password anywhere on this board.")
       .at(7, 9).k(7, "Your handle lives on the board; this machine remembers you.")
-      .at(8, 9).k(7, "A transfer phrase lets you log in from another machine. Optional.")
+      .at(8, 9).k(7, "A transfer phrase (optional) logs you in from other machines.")
       .at(9, 9).k(7, "Make it up. Write it on a sticky note like it's 1992.");
     if (!this.online) this.offlineNote(x, 22);
     this.send(x);
@@ -523,8 +523,8 @@ class Board {
     for (let n = 0; n < 8; n++) {
       const o = list[n];
       const y = x.at(7 + n, 4).k(15, pad(String(n + 1), 6));
-      if (!o) { y.k(8, pad("—", 18)).k(8, pad("", 16)).k(8, pad("", 8)).k(8, "waiting for caller..."); continue; }
-      y.k(o.me ? 15 : 11, pad(o.handle || "Guest", 18)).k(3, pad(o.city || "—", 16)).k(14, pad(String(o.speed), 8)).k(7, String(o.doing).slice(0, 26));
+      if (!o) { y.k(8, pad("-", 18)).k(8, pad("", 16)).k(8, pad("", 8)).k(8, "waiting for caller..."); continue; }
+      y.k(o.me ? 15 : 11, pad(o.handle || "Guest", 18)).k(3, pad(o.city || "-", 16)).k(14, pad(String(o.speed), 8)).k(7, String(o.doing).slice(0, 26));
     }
     if (!r) this.offlineNote(x, 17);
     else if (!list.some((o) => !o.me)) x.at(17, 4).k(13, "Nobody else is on. Just you, the hum of the 486 and Static snoring.");
@@ -899,7 +899,7 @@ class Board {
     const n = k.ch !== null ? k.ch - 48 : 0;
     if (n >= 1 && n <= 3) {
       const r = await net("report", { pack: pack.name, file: f.name, reason: n });
-      panel([[15, f.name], [7, ""], r?.ok ? [10, "Filed. Static reads these on Sundays."] : r?.status === 429 ? [12, "You've filed plenty. Try later."] : [12, "Message base offline. Not filed."]]);
+      panel([[15, f.name], [7, ""], r?.ok ? [10, "Filed. Static reads these on Sundays."] : r?.status === 429 ? [12, "You've filed plenty. Try later."] : [12, "Message base offline. Not filed."], [7, ""], [7, ""], [7, ""]]);
       await sleep(1500);
     }
     io.client.overlay(null);

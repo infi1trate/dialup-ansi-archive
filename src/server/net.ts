@@ -45,11 +45,14 @@ function safeEq(a: string, b: string) {
 export async function limit(keys: string[], action: string, max: number, windowSec: number) {
   const s = await db();
   const since = new Date(Date.now() - windowSec * 1000).toISOString();
+  // insert first, then count: concurrent bursts all see each other's hits
+  const { error } = await s.from("rate_hits").insert(keys.map((key) => ({ key, action })));
+  if (error) throw new NetError(503, "offline");
   for (const key of keys) {
-    const { count } = await s.from("rate_hits").select("id", { count: "exact", head: true }).eq("key", key).eq("action", action).gte("at", since);
-    if ((count ?? 0) >= max) throw new NetError(429, "slow down");
+    const { count, error: e } = await s.from("rate_hits").select("id", { count: "exact", head: true }).eq("key", key).eq("action", action).gte("at", since);
+    if (e) throw new NetError(503, "offline");
+    if ((count ?? 0) > max) throw new NetError(429, "slow down");
   }
-  await s.from("rate_hits").insert(keys.map((key) => ({ key, action })));
   if (Math.random() < 0.02) await s.from("rate_hits").delete().lt("at", new Date(Date.now() - 86400_000).toISOString());
 }
 
@@ -97,7 +100,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
     }
     case "claim": {
       const th = await tokenHash(b.token);
-      await limit([th, ip], "claim", 5, 3600);
+      await limit([th, ip], "claim", 10, 3600);
       const v = checkHandle(str(b.handle, 40));
       if (!v.ok) return { ok: false, why: v.why };
       const phrase = str(b.phrase, 64);
@@ -165,7 +168,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const since = new Date(Date.now() - 600_000).toISOString();
       const { count } = await s.from("oneliners").select("id", { count: "exact", head: true }).or(`token_hash.eq.${th},ip_hash.eq.${ip}`).gte("created_at", since);
       if ((count ?? 0) > 0) throw new NetError(429, "One oneliner per caller every 10 minutes.");
-      await limit([th, ip], "post", 3, 600);
+      await limit([th, ip], "post", 1, 600);
       await s.from("oneliners").insert({ caller_id: c.id, handle: c.handle, body: v.value, token_hash: th, ip_hash: ip });
       return { ok: true };
     }

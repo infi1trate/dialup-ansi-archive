@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Computer } from "@/components/machine/Computer";
-import { getShareMeta } from "@/server/share.functions";
+import { getShareMeta } from "@/lib/share.functions";
 
 export const Route = createFileRoute("/dial/$number/$year/$pack/$file")({
   loader: async ({ params }) => {

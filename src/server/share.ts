@@ -17,11 +17,24 @@ export async function shareMeta(pack: string, file: string, year: number): Promi
   const key = Object.keys(r?.files ?? {}).find((k) => k.toLowerCase() === file.toLowerCase());
   const e = key ? r.files[key] : null;
   const sauce = e?.sauce ?? e?.file?.sauce ?? null;
+  let group: string = r?.groups?.[0] ?? "";
+  if (!group && !(sauce?.group || "").trim()) {
+    // the pack record has no group; the year listing (already cached for browsing) does
+    const y = r?.year ?? year;
+    for (let page = 1; page <= 12 && !group; page++) {
+      try {
+        const yl = JSON.parse(new TextDecoder().decode(await getApiJson(`/v1/year/${y}?pagesize=60&page=${page}`)));
+        const hit = (yl.results ?? []).find((x: any) => String(x.name).toLowerCase() === pack.toLowerCase());
+        if (hit) group = hit.groups?.[0] ?? "";
+        if (page >= (yl.page?.pages ?? 1)) break;
+      } catch { break; }
+    }
+  }
   return {
     ...base, year: r?.year ?? year, file: key ?? file,
     title: (sauce?.title || "").trim() || key || file,
     artist: (sauce?.author || "").trim() || e?.artists?.[0] || base.artist,
-    group: (sauce?.group || "").trim() || r?.groups?.[0] || base.group,
+    group: (sauce?.group || "").trim() || group || base.group,
   };
 }
 
