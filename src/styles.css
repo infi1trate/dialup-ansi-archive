@@ -299,9 +299,10 @@
   /* monitor in the room */
   .monitor-mount { transform: translateY(-100%); z-index: 2; }
   .monitor-mount .monitor-case { --w: var(--mon-w, 50cqw); box-shadow: 0 1cqw 2cqw oklch(0 0 0 / 0.75), inset 0 0.25cqw 0 oklch(1 0 0 / 0.3), inset 0 -0.6cqw 1.2cqw oklch(0.4 0.04 80 / 0.35); padding-bottom: calc(var(--w) * 0.012); }
-  .monitor-mount .monitor-screen { cursor: zoom-in; }
+  /* pointer on every touchable object and nowhere else */
+  .room, .room .stage { cursor: default; }
+  .room [data-touch], .monitor-mount .monitor-screen { cursor: pointer; }
   .room.leaned .monitor-screen { cursor: default; }
-  .room.leaned .stage { cursor: zoom-out; }
   .monitor-tube { position: relative; }
   .monitor-glass {
     position: absolute; inset: calc(var(--w) * 0.012); border-radius: calc(var(--w) * 0.022) / calc(var(--w) * 0.028); pointer-events: none;
@@ -317,7 +318,7 @@
   .monitor-screw { position: absolute; top: calc(var(--w) * 0.018); width: calc(var(--w) * 0.011); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 40% 35%, var(--plastic), var(--plastic-deep)); box-shadow: inset 0 0 0 1px oklch(0 0 0 / 0.25); }
   .monitor-screw::after { content: ""; position: absolute; inset: 45% 15%; background: oklch(0 0 0 / 0.35); transform: rotate(30deg); }
   .monitor-screw-l { left: calc(var(--w) * 0.02); } .monitor-screw-r { right: calc(var(--w) * 0.02); }
-  .knob { cursor: ns-resize; touch-action: none; transform: rotate(var(--rot, 0deg)); transition: transform 60ms; }
+  .knob { cursor: pointer; touch-action: none; transform: rotate(var(--rot, 0deg)); transition: transform 60ms; }
   .monitor-knob { transform: rotate(var(--rot, 0deg)); }
 
   .sticky-note {
@@ -417,7 +418,10 @@
   .led { width: 0.38cqw; aspect-ratio: 1; margin: -0.19cqw 0 0 -0.19cqw; border-radius: 50%; opacity: 0; transition: opacity 40ms; }
   .led.is-on { opacity: 1; }
   .led-green { background: radial-gradient(circle, oklch(0.95 0.15 140), oklch(0.75 0.22 140) 45%, transparent 75%); box-shadow: 0 0 0.6cqw 0.15cqw oklch(0.7 0.22 140 / 0.45); }
-  .led-green.is-standby { opacity: 0.18; box-shadow: 0 0 0.3cqw oklch(0.7 0.22 140 / 0.3); }
+  .led-green.is-standby { opacity: 0.18; box-shadow: 0 0 0.3cqw oklch(0.7 0.22 140 / 0.3); animation: standby-breathe 3s ease-in-out infinite; }
+  .room.reduce .led-green.is-standby { animation: none; opacity: 0.3; }
+  @media (prefers-reduced-motion: reduce) { .led-green.is-standby { animation: none; opacity: 0.3; } }
+  @keyframes standby-breathe { 0%, 100% { opacity: 0.1; } 50% { opacity: 0.55; } }
   .led-amber { background: radial-gradient(circle, oklch(0.95 0.12 80), oklch(0.78 0.18 65) 45%, transparent 75%); box-shadow: 0 0 0.6cqw 0.15cqw oklch(0.75 0.18 65 / 0.45); transition: none; }
   .led-red { background: radial-gradient(circle, oklch(0.9 0.12 30), oklch(0.62 0.24 28) 45%, transparent 75%); box-shadow: 0 0 0.6cqw 0.15cqw oklch(0.6 0.24 28 / 0.5); }
   .led-modem { transition: none; }
@@ -473,12 +477,14 @@
   .stairs i:nth-child(1) { width: 20%; } .stairs i:nth-child(2) { width: 40%; } .stairs i:nth-child(3) { width: 60%; } .stairs i:nth-child(4) { width: 80%; } .stairs i:nth-child(5) { width: 100%; }
 
   /* ── phones: tube only, bezel to bezel, keycaps under it ── */
-  .tube-only { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; background: var(--background); padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); overflow: hidden; touch-action: manipulation; }
-  .tube-frame { width: min(100vw, calc((100dvh - 9rem) * 4 / 3)); aspect-ratio: 4 / 3; background: var(--bezel); border-radius: 1.2rem; padding: 0.35rem; box-shadow: inset 0 0 0 2px oklch(0.35 0.02 80 / 0.5); }
+  .tube-only { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0.5rem; background: var(--background); padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 0.5rem); overflow: hidden; touch-action: manipulation; }
+  .tube-frame { flex: none; width: min(100vw, calc((100dvh - 10rem) * 4 / 3)); aspect-ratio: 4 / 3; background: var(--bezel); border-radius: 1.2rem; padding: 0.35rem; box-shadow: inset 0 0 0 2px oklch(0.35 0.02 80 / 0.5); }
   .tube-frame .monitor-screen { width: 100%; height: 100%; display: block; border-radius: 0.9rem; touch-action: none; }
-  .ctxbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; padding: 0 0.5rem; max-width: 100vw; min-height: 3.2rem; }
+  .ctxbar { display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 0.5rem; padding: 0 0.5rem; max-width: 100vw; min-height: 3.5rem; max-height: calc(2 * 3.5rem + 0.5rem); overflow: hidden; }
+  .phone-note { flex: none; margin-top: auto; align-self: center; transform: rotate(-1.5deg); padding: 0.35rem 0.8rem 0.45rem; background: linear-gradient(170deg, oklch(0.9 0.14 98), oklch(0.83 0.15 92)); color: oklch(0.25 0.04 260); font-family: "Nanum Pen Script", cursive; font-size: 1.15rem; line-height: 1.05; text-align: center; box-shadow: 0 0.2rem 0.5rem oklch(0 0 0 / 0.55); max-width: 92vw; }
+  .phone-note p { margin: 0; }
   .keycap {
-    min-width: 3.1rem; height: 3rem; padding: 0 0.7rem; border-radius: 0.45rem; font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; letter-spacing: 0.02em;
+    min-width: 3.5rem; min-height: 3rem; height: 3.5rem; padding: 0 0.8rem; border-radius: 0.5rem; font-family: var(--font-mono); font-size: 1rem; font-weight: 700; letter-spacing: 0.02em;
     color: oklch(0.3 0.03 80); background: linear-gradient(180deg, var(--plastic), var(--plastic-shade));
     border: 0; box-shadow: inset 0 2px 0 oklch(1 0 0 / 0.35), inset 0 -4px 0 var(--plastic-deep), 0 2px 4px oklch(0 0 0 / 0.6);
     user-select: none; -webkit-user-select: none; touch-action: manipulation;
@@ -491,7 +497,8 @@
     .tube-only { flex-direction: row; gap: 0.5rem; }
     .tube-frame { width: min(calc(100vw - 7.5rem), calc((100dvh - 0.5rem) * 4 / 3)); }
     .ctxbar { flex-direction: column; flex-wrap: nowrap; overflow-y: auto; max-height: 100dvh; width: 7rem; }
-    .keycap { height: 2.4rem; }
+    .keycap { height: 3rem; }
+    .phone-note { display: none; }
   }
 
   .gallery-page { max-width: 64rem; }
@@ -519,7 +526,7 @@
 .speaker-badge { position: absolute; left: 0; right: 0; top: 77%; text-align: center; font: 700 0.42cqw/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0.08em; color: oklch(0.38 0.02 80); }
 .speaker-badge span { display: block; font-weight: 400; font-size: 0.32cqw; margin-top: 0.08cqw; }
 .speaker-shadow { position: absolute; left: -8%; right: -8%; bottom: -0.5cqw; height: 0.8cqw; background: radial-gradient(ellipse at center, oklch(0 0 0 / 0.65), transparent 70%); z-index: -1; }
-.speaker-knob { position: absolute; left: calc(50% - 0.75cqw); top: 79%; width: 1.5cqw; aspect-ratio: 1; border-radius: 50%; cursor: grab;
+.speaker-knob { position: absolute; left: calc(50% - 0.75cqw); top: 79%; width: 1.5cqw; aspect-ratio: 1; border-radius: 50%; cursor: pointer;
   background: conic-gradient(oklch(0.2 0.01 80), oklch(0.38 0.01 80), oklch(0.2 0.01 80), oklch(0.38 0.01 80), oklch(0.2 0.01 80));
   box-shadow: 0 0.1cqw 0.2cqw oklch(0 0 0 / 0.6); }
 .speaker-knob::after { content: ""; position: absolute; left: 46%; top: 8%; width: 8%; height: 34%; background: oklch(0.75 0.02 80); border-radius: 99px; }

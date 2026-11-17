@@ -160,6 +160,7 @@ export class CRTDisplay {
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
   }
 
+  private lastT = 0;
   render(src: HTMLCanvasElement, srcChanged: boolean, power: PowerState, time: number) {
     this.resize();
     const W = this.canvas.width, H = this.canvas.height;
@@ -187,7 +188,11 @@ export class CRTDisplay {
     gl.uniform1f(u(this.progScene, "offT"), power.offT);
     gl.uniform1f(u(this.progScene, "time"), time);
     gl.uniform1f(u(this.progScene, "motion"), motion);
-    gl.uniform1f(u(this.progScene, "persist"), power.offT >= 0 ? 0.0 : 0.42);
+    // Phosphor decay: frame-rate independent, tau ~27 ms. Scaled so a full-white ghost is
+    // ~19% after one 60 fps frame and ~4% (invisible) after two: no readable second copy.
+    const dt = this.lastT ? Math.min(0.2, Math.max(0, time - this.lastT)) : 1 / 60;
+    this.lastT = time;
+    gl.uniform1f(u(this.progScene, "persist"), power.offT >= 0 ? 0.0 : phosphorDecay(dt));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     // output pass
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H);
@@ -218,3 +223,6 @@ export class CRTDisplay {
     ctx.globalAlpha = 1;
   }
 }
+
+/** Phosphor persistence factor for a frame of dt seconds (time constant 27 ms, 0.35 ghost gain). */
+export function phosphorDecay(dt: number, tau = 0.027) { return 0.35 * Math.exp(-dt / tau); }

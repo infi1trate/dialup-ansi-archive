@@ -1,4 +1,4 @@
-# Dial-Up status (passes 1-5)
+# Dial-Up status (passes 1-6)
 
 ## 1. Verified working (test browser = Playwright Chromium, software GL)
 - Pass 1-3 loop: power on, boot, DOS, TELEWIRE, dial, GUEST, browse 1993, view ANSI, I info, logoff; deep links; /lab; /credits; cross-browser oneliners/logons/presence.
@@ -23,6 +23,11 @@
   - Screenshots in docs/shots/*.b64 decode to JPEGs: room-menu 800x450 25 KB, tube-art 640x480 27 KB, sheet 800x450 26 KB.
 - 54 tests pass; typecheck clean; production build OK.
 
+- Pass 6: 09-tube-art re-shot leaned in mid-scroll on ACID1193.ANS: no doubled lines. Phosphor decay is now per-frame-time (tau 27 ms, ghost gain 0.35: ~19% after one 60 fps frame, ~4% after two); bloom unchanged.
+- Pass 6: ACDL1293 pack header now reads "1993" with no group text (no group in listing, pack record or the first files' SAUCE). "unknown group" removed everywhere, share-card line included.
+- Pass 6: phone 390x844: tube pinned to the top (y=0, full width), handwritten hint note above keycaps, keycaps 56 px tall in at most two rows. 16-phone re-shot.
+- Pass 6: tests cover decay, SAUCE group fallback, DOS download dates (pack year) and word-wrapped sysop lines (58 tests pass).
+
 ## 2. Built but untested
 - Esc-abort of a transfer, Enter-skip of a transfer; RD/HDD LED flicker during a transfer (one RD sample only).
 - DEL <file> (typed in the test; result not read back); info panel I inside a DOS VIEW.
@@ -33,6 +38,9 @@
 - .MOD/.XM/.IT playback (only S3M tried). 512-glyph XBin fonts, real ADF/IDF, sysop console with a real key.
 - 60 fps on real integrated graphics; audio by ear; haptics.
 
+- Pass 6: breathing standby LED (3 s cycle, steady under reduced motion) and the pointer-cursor audit (knobs/speaker knob now pointer; leaned-in stage no longer zoom-out) were not screenshotted.
+- Pass 6: sysop chat word wrap is unit-tested on the layout, not watched live in the browser.
+
 ## 3. Known bugs and gaps
 - Door turns: one attempt is taken per floor entered; clearing all five floors uses five. The score route trusts a plausible client score (capped, but not replayed server-side).
 - Door turn and rate-limit tables use check-then-write, not transactions; heavy concurrency on one identity could race.
@@ -40,6 +48,9 @@
 - Sysop chat screenshot shows Static's reply still being typed; long replies wrap onto a second line.
 - VOID password is in the shipped board code (puzzle, not security).
 - Fake DOS file dates use 1993 regardless of pack year.
+
+- Group fallback skips the group endpoint: the API has no pack-to-group lookup that is cheap, so it goes straight to "omit". The SAUCE fallback reads at most two art files, and only when you open a pack.
+- Phone portrait leaves an empty band between the tube and the note, because the tube is limited by the screen width.
 
 ## 4. Choices made
 - Blink 1.875 Hz text / 2.5 Hz cursor; reduced motion = steady text, no flicker.

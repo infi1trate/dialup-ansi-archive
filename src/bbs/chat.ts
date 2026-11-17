@@ -29,6 +29,24 @@ export function reply(line: string): string {
 }
 export const isBye = (line: string) => RULES[0].k.test(line);
 
+const PANE_W = 78;
+/** Split into words and single spaces; words longer than the pane are hard-split. */
+export function wrapWords(t: string, w = PANE_W): string[] {
+  const out: string[] = [];
+  for (const tok of t.split(/( )/)) { if (!tok) continue; for (let i = 0; i < tok.length; i += w) out.push(tok.slice(i, i + w)); }
+  return out;
+}
+/** Lay out a reply into pane lines (what sysType draws). */
+export function layoutReply(t: string, w = PANE_W): string[] {
+  const lines = [""];
+  for (const tok of wrapWords(t, w)) {
+    const cur = lines[lines.length - 1];
+    if (cur.length && cur.length + tok.length > w) { lines.push(tok === " " ? "" : tok); continue; }
+    if (!cur.length && tok === " ") continue;
+    lines[lines.length - 1] = cur + tok;
+  }
+  return lines;
+}
 interface Pane { top: number; rows: number; row: number; col: number; fg: number }
 
 export async function sysopChat(io: HostIO, send: (x: Ansi) => void, hint: (k: KeyHint[]) => void, user: string, hintVoid: boolean) {
@@ -45,10 +63,15 @@ export async function sysopChat(io: HostIO, send: (x: Ansi) => void, hint: (k: K
       const x = a(); for (let r = 0; r < p.rows; r++) x.at(p.top + r, 1).eol(); send(x); p.row = 0;
     }
   };
-  const put = (p: Pane, ch: string) => { send(a().at(p.top + p.row, 1 + p.col).k(p.fg, ch)); p.col++; if (p.col >= 79) nl(p); };
+  const put = (p: Pane, ch: string) => { send(a().at(p.top + p.row, 1 + p.col).k(p.fg, ch)); p.col++; if (p.col >= PANE_W) nl(p); };
   let ended = false;
   const sysType = async (t: string) => {
-    for (const ch of t) {
+    const words = wrapWords(t, PANE_W);
+    for (let wi = 0; wi < words.length; wi++) {
+     const w = words[wi];
+     if (sys.col > 0 && sys.col + w.length > PANE_W) nl(sys); // word would cross the pane edge
+     if (sys.col === 0 && w === " ") continue;
+     for (const ch of w) {
       if (/[a-z]/.test(ch) && Math.random() < 0.04) { // typo, notice, fix
         put(sys, String.fromCharCode(97 + Math.floor(Math.random() * 26)));
         await sleep(160); send(a().at(sys.top + sys.row, sys.col).raw(" ")); sys.col--; await sleep(120);
@@ -57,6 +80,7 @@ export async function sysopChat(io: HostIO, send: (x: Ansi) => void, hint: (k: K
       await io.drain();
       await sleep(ch === " " ? 120 : 45 + Math.random() * 110);
       if (pendingEsc) return;
+     }
     }
     nl(sys);
   };

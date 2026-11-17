@@ -2,7 +2,7 @@
 export interface ShareMeta { title: string; artist: string; group: string; pack: string; year: number; file: string }
 
 export async function shareMeta(pack: string, file: string, year: number): Promise<ShareMeta> {
-  const base: ShareMeta = { title: file, artist: "unknown artist", group: "unknown group", pack, year, file };
+  const base: ShareMeta = { title: file, artist: "unknown artist", group: "", pack, year, file };
   const { HOUSE_PACK, housePack, houseFile } = await import("@/data/housepack");
   const { parseSauce } = await import("@/term/sauce");
   if (pack.toLowerCase() === HOUSE_PACK) {
@@ -18,6 +18,7 @@ export async function shareMeta(pack: string, file: string, year: number): Promi
   const e = key ? r.files[key] : null;
   const sauce = e?.sauce ?? e?.file?.sauce ?? null;
   let group: string = r?.groups?.[0] ?? "";
+  if (!group) { const { sauceGroup } = await import("@/data/archive"); group = sauceGroup(r?.files)[0] ?? ""; }
   if (!group && !(sauce?.group || "").trim()) {
     // the pack record has no group; the year listing (already cached for browsing) does
     const y = r?.year ?? year;
@@ -38,4 +39,4 @@ export async function shareMeta(pack: string, file: string, year: number): Promi
   };
 }
 
-export const shareLine = (m: ShareMeta) => `${m.title} by ${m.artist} / ${m.group} (${m.pack}, ${m.year})`;
+export const shareLine = (m: ShareMeta) => `${m.title} by ${m.artist}${m.group ? ` / ${m.group}` : ""} (${m.pack}, ${m.year})`;

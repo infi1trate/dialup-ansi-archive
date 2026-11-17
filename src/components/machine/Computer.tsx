@@ -157,6 +157,10 @@ export function Computer({ deepLink, lost }: Props) {
       <div className="tube-frame">
         <canvas ref={canvas} className="monitor-screen" aria-label="CRT screen" onPointerDown={onTubePointerDown} onPointerUp={onTubePointerUp} />
       </div>
+      <div className="phone-note" aria-label="Sticky note">
+        <p>PWR ON · ENTER = dial · login: GUEST</p>
+        <p>ENTER skips anything · I = who made it</p>
+      </div>
       <ContextBar
         hints={hints} powered={powered}
         onPower={() => machine.current?.pressPcPower()}

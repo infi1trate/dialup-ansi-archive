@@ -438,7 +438,7 @@ export class Machine {
     for (const f of fs) {
       const [n, e = ""] = f.name.split(".");
       const d = new Date(f.at);
-      p(`${pad(n, 9)}${pad(e, 4)}${rpad(String(f.bytes.length), 10)}  ${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}-93  ${pad(f.pack, 12)}`, MUSIC.test(f.name) ? 10 : 7);
+      p(`${pad(n, 9)}${pad(e, 4)}${rpad(String(f.bytes.length), 10)}  ${drive.dosDate(f.year, d)}  ${pad(f.pack, 12)}`, MUSIC.test(f.name) ? 10 : 7);
     }
     p(`${rpad(String(fs.length), 9)} file(s)   ${rpad(String(drive.DRIVE_CAP - drive.used(fs)), 12)} bytes free in DOWNLOAD`);
     p(fs.length ? "VIEW <file> shows it · KPLAY <file> plays music · DEL <file> erases" : "Nothing yet. Press D on a file in a BBS pack to download it.", 8);

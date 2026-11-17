@@ -60,3 +60,9 @@ export async function put(f: Omit<DiskFile, "name" | "at"> & { name: string }): 
   } catch { return null; }
 }
 export const used = (fs: DiskFile[]) => fs.reduce((n, f) => n + f.bytes.length, 0);
+
+/** DOS DIR date for a downloaded file: today's month/day in the pack's year (MM-DD-YY). */
+export function dosDate(year: number, d: Date): string {
+  const yy = Number.isFinite(year) && year > 1900 ? year % 100 : 93;
+  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}-${String(yy).padStart(2, "0")}`;
+}

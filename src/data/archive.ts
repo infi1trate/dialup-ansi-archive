@@ -68,7 +68,9 @@ export async function getPack(name: string, groups: string[] = []): Promise<Pack
   }));
   fl.sort((x, y) => Number(y.viewable) - Number(x.viewable) || x.name.localeCompare(y.name));
   const fileId = r.fileid ?? (fl.find((f) => /^file_id\.diz$/i.test(f.name))?.name ?? null);
-  return { name, year: r.year, groups: r.groups ?? groups, files: fl, fileId };
+  let gs: string[] = (r.groups ?? []).length ? r.groups : groups;
+  if (!gs.length) gs = sauceGroup(r.files);
+  return { name, year: r.year, groups: gs, files: fl, fileId };
 }
 
 export async function getFile(pack: string, file: string): Promise<Uint8Array> {
@@ -88,4 +90,13 @@ export async function getFile(pack: string, file: string): Promise<Uint8Array> {
     p.catch(() => files.delete(k));
   }
   return files.get(k)!;
+}
+
+/** Fallback group: SAUCE group of the first file that has one; otherwise none (never "unknown"). */
+export function sauceGroup(files: Record<string, any> | undefined): string[] {
+  for (const v of Object.values(files ?? {})) {
+    const g = String((v as any)?.sauce?.group ?? (v as any)?.file?.sauce?.group ?? "").trim();
+    if (g) return [g];
+  }
+  return [];
 }

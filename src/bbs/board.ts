@@ -900,6 +900,11 @@ export class Board {
     let pack: PackInfo;
     try { pack = await getPack(s.name, s.groups); } catch (e) { await this.errorScreen(String((e as Error).message)); return; }
     if (!pack.groups.length) pack.groups = s.groups;
+    if (!pack.groups.length) { // no group anywhere in the listing: try the SAUCE of the first art file, else omit
+      for (const f of pack.files.filter((x) => x.viewable && !/\.(diz|nfo|txt)$/i.test(x.name)).slice(0, 2)) {
+        try { const g = (parseSauce(await getFile(pack.name, f.name)).sauce?.group || "").trim(); if (g) { pack.groups = [g]; break; } } catch { /* skip */ }
+      }
+    }
     let diz: Uint8Array | null = null;
     if (pack.fileId) { try { diz = parseSauce(await getFile(pack.name, pack.fileId)).body; } catch { diz = null; } }
     const viewable = pack.files.filter((f) => f.viewable);
@@ -909,7 +914,7 @@ export class Board {
     }
     let idx = 0;
     for (;;) {
-      const x = this.header(a(), `Pack ${pack.name.toUpperCase()}`, `${pack.year} · ${pack.groups.join(", ") || "unknown group"}`);
+      const x = this.header(a(), `Pack ${pack.name.toUpperCase()}`, pack.groups.length ? `${pack.year} · ${pack.groups.join(", ")}` : String(pack.year));
       // FILE_ID.DIZ, drawn line by line into the top area
       if (diz) {
         const lines = splitLines(diz).slice(0, 10);
