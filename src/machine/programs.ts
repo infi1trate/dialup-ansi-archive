@@ -45,16 +45,15 @@ export async function kplay(env: LocalEnv, name: string, bytes: Uint8Array) {
       const x = a();
       if (m && !drawnMeta) {
         drawnMeta = true;
-        x.at(5, 5).eol().k(7, "Title ").k(14, pad(m.title || "(untitled)", 32)).k(7, "  Type ").k(11, pad(m.type, 24));
+        x.at(5, 5).k(7, "Title ").k(14, pad(m.title || "(untitled)", 32)).k(7, "  Type ").k(11, pad(m.type, 30));
         x.at(6, 5).k(7, "Channels ").k(15, String(m.channels)).k(7, "   Orders ").k(15, String(m.orders)).k(7, "   Length ").k(15, fmtT(m.dur));
-        x.at(3, 79).k(3, "╗");
         x.at(10, 2).k(3, "CHANNELS").at(10, 28).k(3, "PATTERN");
       }
       if (m && p) {
         x.at(7, 5).k(7, "Order ").k(15, `${String(p.order).padStart(3, "0")}/${String(Math.max(0, m.orders - 1)).padStart(3, "0")}`)
           .k(7, "  Pattern ").k(15, String(p.pattern).padStart(3, "0"))
           .k(7, "  Row ").k(15, String(p.row).padStart(2, "0")).k(7, "  Time ").k(15, fmtT(p.pos)).k(7, " / ").k(15, fmtT(m.dur))
-          .k(paused ? 12 : 10, paused ? "  PAUSED " : "  PLAYING").eol();
+          .k(paused ? 12 : 10, paused ? "  PAUSED " : "  PLAYING").k(7, "      ");
         // VU bars, up to 12 channels
         const n = Math.min(12, m.channels);
         for (let i = 0; i < n; i++) {

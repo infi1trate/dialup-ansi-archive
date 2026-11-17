@@ -499,11 +499,10 @@ export class Board {
     } else {
       x.at(1, 1); shadeBar(x, 79, 1);
       chromeText(x, 2, 4, "CRAWLSPACE", [15, 7, 11, 11, 3, 1], 1);
-      x.at(3, 66).k(13, "▄▄▄").at(4, 63).k(13, "▄▄▄").k(5, "███");
-      x.at(2, 69).k(6, "▄▄▄").k(8, "▓").at(3, 69).k(8, "▓▓▓▓").at(4, 69).k(8, "▓▓▓▓");
+      x.at(2, 75).k(6, "▄▄▄").at(3, 71).k(6, "▄▄▄█").k(8, "▓▓▓").at(4, 67).k(6, "▄▄▄█").k(8, "▓▓▓▓▓▓▓");
     }
     x.at(6, 1).k(this.sk.line, "─".repeat(60)).k(this.sk.b, " main menu ").k(this.sk.line, "─".repeat(8));
-    box(x, 7, 4, 72, 12, v ? 8 : 5);
+    box(x, 7, 4, 72, 11, v ? 8 : 5);
     const items: [string, string, string][] = [
       ["F", v ? "iles" : "iles", v ? "most viewed" : "the archive"], ["U", "ser list", "who calls here"],
       ["A", "nimations", "art that moves"], ["P", "age sysop", "he might answer"],
@@ -527,8 +526,8 @@ export class Board {
       this.setDoing("at the main menu");
       this.send(this.menuScreen());
       this.hint("FABOWUPDCG".split("").map((c) => hk(c)));
-      const k = await this.key();
-      const c = (k.ch !== null ? String.fromCharCode(k.ch) : "").toUpperCase();
+      let c = "";
+      while (!"FABOWUPDCG!".includes(c) || !c) { const k = await this.key(); c = (k.ch !== null ? String.fromCharCode(k.ch) : "").toUpperCase(); }
       // a hotkey interrupts the menu still drawing, like any good BBS
       if ("FABOWUPDCG".includes(c) && c) this.io.clearOutput();
       if (c) this.send(a().k(15, c));

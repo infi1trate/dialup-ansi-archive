@@ -221,6 +221,7 @@ export class Machine {
         const entry = boardAt(this.deepLink!.number) ?? DIRECTORY[0];
         await this.call(entry, g, true);
         await this.comm(g);
+        await this.dos(g, false);
       } else if (this.lostAt) {
         const path = this.lostAt.slice(0, 60); this.lostAt = null;
         this.state.set("dos");

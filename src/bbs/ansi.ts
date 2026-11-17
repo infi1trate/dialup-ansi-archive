@@ -6,10 +6,13 @@ export const ESC = "\x1b[";
 
 export class Ansi {
   private out: number[] = [];
+  /** Last SGR emitted by c(); repeated colors are skipped (every byte costs line time). raw() forgets it. */
+  private cur = "";
+  private emit(s: string) { for (let i = 0; i < s.length; i++) this.out.push(s.charCodeAt(i) & 0xff); return this; }
   /** Text in Unicode; box/block characters are encoded to CP437. */
   t(s: string) { for (const b of encode(s)) this.out.push(b); return this; }
-  raw(s: string) { for (let i = 0; i < s.length; i++) this.out.push(s.charCodeAt(i) & 0xff); return this; }
-  bytes(b: ArrayLike<number>) { for (let i = 0; i < b.length; i++) this.out.push(b[i]); return this; }
+  raw(s: string) { this.cur = ""; return this.emit(s); }
+  bytes(b: ArrayLike<number>) { this.cur = ""; for (let i = 0; i < b.length; i++) this.out.push(b[i]); return this; }
   /** Set colors: fg 0-15, bg 0-7 (bg 8-15 sets the blink/iCE bit). */
   c(fg: number, bg = 0) {
     let s = `${ESC}0`;
@@ -17,15 +20,17 @@ export class Ansi {
     if (bg & 8) s += ";5";
     s += `;3${ANSI_VGA[fg & 7]}`;
     if (bg & 7) s += `;4${ANSI_VGA[bg & 7]}`;
-    return this.raw(s + "m");
+    s += "m";
+    if (s === this.cur) return this;
+    this.emit(s); this.cur = s; return this;
   }
   /** Shorthand: colored text. */
   k(fg: number, s: string, bg = 0) { return this.c(fg, bg).t(s); }
   reset() { return this.raw(`${ESC}0m`); }
   cls() { return this.raw(`${ESC}0m${ESC}2J`); }
-  at(row: number, col: number) { return this.raw(`${ESC}${row};${col}H`); }
-  eol() { return this.raw(`${ESC}K`); }
-  nl(n = 1) { for (let i = 0; i < n; i++) this.raw("\r\n"); return this; }
+  at(row: number, col: number) { return this.emit(`${ESC}${row};${col}H`); }
+  eol() { return this.emit(`${ESC}K`); }
+  nl(n = 1) { for (let i = 0; i < n; i++) this.emit("\r\n"); return this; }
   rep(ch: string, n: number) { return this.t(ch.repeat(Math.max(0, n))); }
   /** Hotkey in brackets: [X]label */
   hot(key: string, label: string, kc = 15, bc = 5, lc = 3) {
