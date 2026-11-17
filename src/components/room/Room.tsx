@@ -5,7 +5,7 @@ import floppiesImg from "@/assets/room/floppies.webp";
 import pizzaImg from "@/assets/room/pizza.webp";
 import printoutImg from "@/assets/room/printout.webp";
 import lampImg from "@/assets/room/lamp.webp";
-import { CLOCK, JACK, LAMP, MODEM, MONITOR, STAGE_H, WINDOW } from "./layout";
+import { CLOCK, JACK, LAMP, MODEM, MONITOR, NOTE2, STAGE_H, STAIRS, WINDOW } from "./layout";
 import { PcCase } from "./PcCase";
 import { Modem } from "./Modem";
 import { Keyboard } from "./Keyboard";
@@ -105,6 +105,7 @@ export function Room(p: RoomProps) {
             <img src={wallImg} alt="" className="wall" draggable={false} />
             <div className="window" style={box(WINDOW)}><Rain still={p.reduced} /></div>
             <div className="jack" style={box(JACK)} aria-hidden />
+            <div className="stairs" style={box(STAIRS)} aria-hidden><i /><i /><i /><i /><i /></div>
           </div>
           {/* desk + machines */}
           <div ref={L(1)} className="layer layer-mid">
@@ -126,6 +127,7 @@ export function Room(p: RoomProps) {
           </div>
           {/* foreground props */}
           <div ref={L(2)} className="layer layer-front">
+            <div className="note2" style={box(NOTE2)} aria-label="A second sticky note, half under the keyboard">call 555-0113</div>
             <Keyboard />
             <img src={floppiesImg} alt="" className="prop" style={box({ x: -1.5, y: 48.6, w: 17 })} loading="lazy" draggable={false} />
             <img src={printoutImg} alt="" className="prop printout" style={box({ x: 70, y: 51.2, w: 22 })} loading="lazy" draggable={false} />

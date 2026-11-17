@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Monitor } from "./Monitor";
+import { ContextBar } from "./ContextBar";
+import type { KeyHint } from "@/bbs/io";
 import { Room } from "@/components/room/Room";
 import { EscapeHatch } from "@/components/room/EscapeHatch";
 import { DEFAULTS, brightnessGain, contrastGain, loadRoom, saveRoom, type RoomSettings } from "@/components/room/settings";
@@ -25,6 +27,9 @@ export function Computer({ deepLink }: Props) {
   const [cfg, setCfg] = useState<RoomSettings>(DEFAULTS);
   const [osReduced, setOsReduced] = useState(false);
   const [leaned, setLeaned] = useState(false);
+  /** null until the client knows: "room" on desktops, "tube" (bezel to bezel + touch keys) on phones. */
+  const [layout, setLayout] = useState<"room" | "tube" | null>(null);
+  const [hints, setHints] = useState<KeyHint[]>([]);
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
   const reduced = cfg.reducedMotion ?? osReduced;
@@ -40,12 +45,15 @@ export function Computer({ deepLink }: Props) {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setOsReduced(mq.matches);
     const narrow = window.innerWidth < 900 || window.innerHeight > window.innerWidth;
+    const touch = window.matchMedia("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 820;
+    setLayout(touch || window.innerWidth < 640 ? "tube" : "room");
     setLeaned(s.lean ?? narrow);
     audio.setMix({ muted: s.muted, modemVolume: s.modemVolume });
     void import("@/data/net").then((n) => n.count("landed"));
   }, []);
 
   useEffect(() => {
+    if (!layout) return;
     let disposed = false;
     let cleanup = () => {};
     void (async () => {
@@ -57,7 +65,11 @@ export function Computer({ deepLink }: Props) {
       const c = cfgRef.current;
       engine.crt.brightness = brightnessGain(c.brightness);
       engine.crt.contrast = contrastGain(c.contrast);
-      const unsubs = [m.powered.subscribe(setPowered), m.tube.subscribe(setTube), m.turbo.subscribe(setTurbo)];
+      const unsubs = [m.powered.subscribe(setPowered), m.tube.subscribe(setTube), m.turbo.subscribe(setTurbo), m.hints.subscribe(setHints)];
+      const orient = () => m.setPortrait(window.innerHeight > window.innerWidth);
+      orient();
+      window.addEventListener("resize", orient);
+      unsubs.push(() => window.removeEventListener("resize", orient));
       const down = (e: KeyboardEvent) => {
         if (e.key === "`" && !e.ctrlKey && !e.altKey) { e.preventDefault(); toggleLean(); return; }
         if ((e.target as HTMLElement)?.closest?.(".hatch")) return;
@@ -71,7 +83,25 @@ export function Computer({ deepLink }: Props) {
     })();
     return () => { disposed = true; cleanup(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [layout]);
+
+  // touch: tap a text row (lightbars, phone book), swipe to scroll finished art
+  const touchStart = useRef<{ x: number; y: number; t: number } | null>(null);
+  const onTubePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => { touchStart.current = { x: e.clientX, y: e.clientY, t: Date.now() }; };
+  const onTubePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const m = machine.current, st = touchStart.current; touchStart.current = null;
+    if (!m || !st) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const dy = e.clientY - st.y;
+    const rows = m.engine.term.rows;
+    if (Math.abs(dy) > 24) { // swipe: one line per ~row height dragged
+      const n = Math.min(rows, Math.max(1, Math.round(Math.abs(dy) / (r.height / rows))));
+      for (let i = 0; i < n; i++) m.pressHint({ label: "", key: dy > 0 ? "ArrowUp" : "ArrowDown" });
+      return;
+    }
+    const row = Math.floor(((e.clientY - r.top) / r.height) * rows) + 1;
+    m.tap(row);
+  };
 
   useEffect(() => { if (machine.current) machine.current.engine.crt.reducedMotion = reduced; }, [reduced, powered]);
 
@@ -104,6 +134,36 @@ export function Computer({ deepLink }: Props) {
     </Monitor>
   );
 
+  const hatch = (
+      <EscapeHatch
+      muted={cfg.muted}
+      reduced={reduced}
+      lamp={cfg.lamp}
+      onMute={() => { const v = !cfg.muted; update({ muted: v }); audio.setMix({ muted: v }); }}
+      onReduced={() => update({ reducedMotion: !reduced })}
+      onLamp={toggleLamp}
+      onSkip={() => { audio.unlock(); void navigate({ to: "/dial/$number/$year/$pack/$file", params: { number: "555-0142", year: "1994", pack: HOUSE_PACK, file: "CRWL-LGO.ANS" } }); }}
+    />
+  );
+
+  if (!layout) return <main className="room" aria-busy="true"><h1 className="sr-only">Dial-Up: a 486 in a dark basement</h1></main>;
+
+  if (layout === "tube") return (
+    <main className={`tube-only ${reduced ? "reduce" : ""}`}>
+      <h1 className="sr-only">Dial-Up: a 1992 PC calling The Crawlspace BBS</h1>
+      <div className="tube-frame">
+        <canvas ref={canvas} className="monitor-screen" aria-label="CRT screen" onPointerDown={onTubePointerDown} onPointerUp={onTubePointerUp} />
+      </div>
+      <ContextBar
+        hints={hints} powered={powered}
+        onPower={() => machine.current?.pressPcPower()}
+        onKey={(h) => machine.current?.pressHint(h)}
+        onText={(t) => machine.current?.typeText(t)}
+      />
+      {hatch}
+    </main>
+  );
+
   return (
     <Room
       monitor={monitor}
@@ -120,15 +180,7 @@ export function Computer({ deepLink }: Props) {
       onModemVolume={(v) => { update({ modemVolume: v }); audio.setMix({ modemVolume: v }); }}
       onLean={lean}
     >
-      <EscapeHatch
-        muted={cfg.muted}
-        reduced={reduced}
-        lamp={cfg.lamp}
-        onMute={() => { const v = !cfg.muted; update({ muted: v }); audio.setMix({ muted: v }); }}
-        onReduced={() => update({ reducedMotion: !reduced })}
-        onLamp={toggleLamp}
-        onSkip={() => { audio.unlock(); void navigate({ to: "/dial/$number/$year/$pack/$file", params: { number: "555-0142", year: "1994", pack: HOUSE_PACK, file: "CRWL-LGO.ANS" } }); }}
-      />
+      {hatch}
     </Room>
   );
 }

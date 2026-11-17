@@ -34,6 +34,8 @@ function Credits() {
       <p>Kestrel, Telewire, Corvid, Nitewatch and Zapp are invented. The Crawlspace BBS, its sysop Static and its callers are fictional.</p>
       <h2>Takedown requests</h2>
       <p>If you made a piece shown here and want it removed, write to sysop@ (placeholder address).</p>
+      <h2>Plain gallery</h2>
+      <p>Prefer the art without the dark room, sound or CRT effects? The <Link to="/gallery">plain gallery</Link> lists every piece with its credits as text.</p>
       <p><Link to="/">Back to the basement</Link></p>
     </main>
   );

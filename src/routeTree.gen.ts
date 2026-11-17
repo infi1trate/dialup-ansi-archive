@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CreditsRouteImport } from './routes/credits'
+import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as LabRouteImport } from './routes/lab'
 import { Route as ApiPublicCardRouteImport } from './routes/api/public/card'
 import { Route as ApiPublicNetRouteImport } from './routes/api/public/net'
+import { Route as GalleryYearPackRouteImport } from './routes/gallery_.$year.$pack'
 import { Route as ApiPublicArchiveJsonRouteImport } from './routes/api/public/archive.json'
 import { Route as ApiPublicArchiveRawRouteImport } from './routes/api/public/archive.raw'
 import { Route as DialNumberYearPackFileRouteImport } from './routes/dial.$number.$year.$pack.$file'
@@ -26,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const CreditsRoute = CreditsRouteImport.update({
   id: '/credits',
   path: '/credits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryRoute = GalleryRouteImport.update({
+  id: '/gallery',
+  path: '/gallery',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabRoute = LabRouteImport.update({
@@ -41,6 +48,11 @@ const ApiPublicCardRoute = ApiPublicCardRouteImport.update({
 const ApiPublicNetRoute = ApiPublicNetRouteImport.update({
   id: '/api/public/net',
   path: '/api/public/net',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryYearPackRoute = GalleryYearPackRouteImport.update({
+  id: '/gallery_/$year/$pack',
+  path: '/gallery/$year/$pack',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicArchiveJsonRoute = ApiPublicArchiveJsonRouteImport.update({
@@ -62,9 +74,11 @@ const DialNumberYearPackFileRoute = DialNumberYearPackFileRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
+  '/gallery': typeof GalleryRoute
   '/lab': typeof LabRoute
   '/api/public/card': typeof ApiPublicCardRoute
   '/api/public/net': typeof ApiPublicNetRoute
+  '/gallery/$year/$pack': typeof GalleryYearPackRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
   '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
@@ -72,9 +86,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
+  '/gallery': typeof GalleryRoute
   '/lab': typeof LabRoute
   '/api/public/card': typeof ApiPublicCardRoute
   '/api/public/net': typeof ApiPublicNetRoute
+  '/gallery/$year/$pack': typeof GalleryYearPackRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
   '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
@@ -83,9 +99,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
+  '/gallery': typeof GalleryRoute
   '/lab': typeof LabRoute
   '/api/public/card': typeof ApiPublicCardRoute
   '/api/public/net': typeof ApiPublicNetRoute
+  '/gallery_/$year/$pack': typeof GalleryYearPackRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
   '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
@@ -95,9 +113,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/credits'
+    | '/gallery'
     | '/lab'
     | '/api/public/card'
     | '/api/public/net'
+    | '/gallery/$year/$pack'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
     | '/dial/$number/$year/$pack/$file'
@@ -105,9 +125,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/credits'
+    | '/gallery'
     | '/lab'
     | '/api/public/card'
     | '/api/public/net'
+    | '/gallery/$year/$pack'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
     | '/dial/$number/$year/$pack/$file'
@@ -115,9 +137,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/credits'
+    | '/gallery'
     | '/lab'
     | '/api/public/card'
     | '/api/public/net'
+    | '/gallery_/$year/$pack'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
     | '/dial/$number/$year/$pack/$file'
@@ -126,9 +150,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreditsRoute: typeof CreditsRoute
+  GalleryRoute: typeof GalleryRoute
   LabRoute: typeof LabRoute
   ApiPublicCardRoute: typeof ApiPublicCardRoute
   ApiPublicNetRoute: typeof ApiPublicNetRoute
+  GalleryYearPackRoute: typeof GalleryYearPackRoute
   ApiPublicArchiveJsonRoute: typeof ApiPublicArchiveJsonRoute
   ApiPublicArchiveRawRoute: typeof ApiPublicArchiveRawRoute
   DialNumberYearPackFileRoute: typeof DialNumberYearPackFileRoute
@@ -150,6 +176,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreditsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gallery': {
+      id: '/gallery'
+      path: '/gallery'
+      fullPath: '/gallery'
+      preLoaderRoute: typeof GalleryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lab': {
       id: '/lab'
       path: '/lab'
@@ -169,6 +202,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/net'
       fullPath: '/api/public/net'
       preLoaderRoute: typeof ApiPublicNetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery_/$year/$pack': {
+      id: '/gallery_/$year/$pack'
+      path: '/gallery/$year/$pack'
+      fullPath: '/gallery/$year/$pack'
+      preLoaderRoute: typeof GalleryYearPackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/archive/json': {
@@ -198,9 +238,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreditsRoute: CreditsRoute,
+  GalleryRoute: GalleryRoute,
   LabRoute: LabRoute,
   ApiPublicCardRoute: ApiPublicCardRoute,
   ApiPublicNetRoute: ApiPublicNetRoute,
+  GalleryYearPackRoute: GalleryYearPackRoute,
   ApiPublicArchiveJsonRoute: ApiPublicArchiveJsonRoute,
   ApiPublicArchiveRawRoute: ApiPublicArchiveRawRoute,
   DialNumberYearPackFileRoute: DialNumberYearPackFileRoute,

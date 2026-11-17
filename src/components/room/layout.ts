@@ -8,6 +8,10 @@ export const CLOCK = { x: 2.6, y: 45.6, w: 9.6, h: 4.0 };
 export const LAMP = { x: -3.2, y: 17.8, w: 22.5, h: 30 };
 export const WINDOW = { x: 0.4, y: 0.2, w: 13.4, h: 10.6 };
 export const JACK = { x: 97.4, y: 37.5, w: 1.5, h: 2.2 };
+/** Second sticky note, half under the keyboard's back edge. */
+export const NOTE2 = { x: 60.5, y: 51.4, w: 6.2 };
+/** Bottom of the basement stairs, top right of the shot: the source of the stair creak. */
+export const STAIRS = { x: 84, y: 0, w: 16, h: 22 };
 export const KEYBOARD = { x: 21, y: 53.9, w: 52, h: 9 };
 
 /** Front-panel parts of the case, in % of the case box. */

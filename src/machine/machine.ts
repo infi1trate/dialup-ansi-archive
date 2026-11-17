@@ -81,6 +81,11 @@ export class Machine {
     }
     this.keys.push({ key: h.key, ch: h.ch ? h.ch.charCodeAt(0) : null, ctrl: false, alt: false });
   }
+  /** A tap on a text row of the tube (1-based). Programs that list things treat it like select/Enter. */
+  tap(row: number) {
+    if (!this.powered.value) return;
+    this.keys.push({ key: "Tap", ch: null, ctrl: false, alt: false, tapRow: row });
+  }
   /** Characters typed into the hidden input that summons the phone's keyboard. */
   typeText(ch: string) {
     if (!this.powered.value) return;

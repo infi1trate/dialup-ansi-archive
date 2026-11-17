@@ -18,6 +18,7 @@ export function EscapeHatch(p: Props) {
           <li><button type="button" onClick={act(p.onSkip)}>Skip to art</button></li>
           <li><button type="button" aria-pressed={p.reduced} onClick={act(p.onReduced)}>Reduced motion: {p.reduced ? "on" : "off"}</button></li>
           <li><button type="button" aria-pressed={p.lamp} onClick={act(p.onLamp)}>Lamp: {p.lamp ? "on" : "off"}</button></li>
+          <li><Link to="/gallery">Plain gallery</Link></li>
           <li><Link to="/credits">Credits</Link></li>
         </ul>
       )}
