@@ -62,6 +62,12 @@ export interface HostIO {
     rows(): number;
     /** A piece is on screen (TELEWIRE shows "turn your phone" in portrait). */
     artOpen(on: boolean): void;
+    /** TELEWIRE writes a received block to disk (HDD LED, seek sound). */
+    disk(): void;
+    /** TELEWIRE stores a finished download in C:\DOWNLOAD. */
+    saveDownload(f: { name: string; bytes: Uint8Array; pack: string; year: number; file: string; artists: string[]; groups: string[] }): Promise<{ name: string; dropped: string[] } | null>;
+    /** Shell out to KPLAY (local program) and come back when it stops. */
+    kplay(name: string, bytes: Uint8Array): Promise<void>;
   };
   speed: number;
   node: number;

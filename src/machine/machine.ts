@@ -2,7 +2,9 @@
 // Local programs (BIOS, DOS, TELEWIRE) draw straight to the terminal; the board only through the modem.
 import { Ansi, a, box, center, pad, rpad } from "@/bbs/ansi";
 import { DIRECTORY, boardAt, normalizeNumber, phoneBook, type DeepLink, type DirEntry, type HostIO, type KeyHint } from "@/bbs/io";
-import { runBoard } from "@/bbs/board";
+import { localView, runBoard } from "@/bbs/board";
+import * as drive from "./drive";
+import { kplay, MUSIC, starfield, type LocalEnv } from "./programs";
 import { count } from "@/data/net";
 import { audio } from "@/audio/bus";
 import { Engine } from "./engine";
@@ -44,6 +46,8 @@ export class Machine {
   private skipping = false;
   private cwd = "C:\\";
   private deepLink: (DeepLink & { number: string }) | null = null;
+  /** Set before powerOn for a wrong URL: TELEWIRE dials it, gets NO CARRIER, drops to DOS. */
+  lostAt: string | null = null;
   private timeTimer: ReturnType<typeof setInterval> | null = null;
   private boardOverlay: Terminal | null = null;
   private artOpen = false;
@@ -158,6 +162,45 @@ export class Machine {
   // ── helpers ────────────────────────────────────────────────────
   out(x: Ansi | string) { this.engine.local(typeof x === "string" ? a().t(x).build() : x.build()); }
   private key(): Promise<Key> { return this.keys.next(); }
+  private localEnv(): LocalEnv {
+    return { out: (x) => this.out(x), nextOr: (p) => this.keys.nextOr(p), reduced: () => this.engine.crt.reducedMotion };
+  }
+  static IDLE_MS = 180_000;
+  /** Next key at DOS or in the directory; after 3 idle minutes the starfield runs until a key. Returns null if it ran. */
+  private async idleKey(g: number): Promise<Key | null> {
+    const k = await this.keys.nextOr(this.sleep(Machine.IDLE_MS));
+    this.alive(g);
+    if (k) return k;
+    const prev = this.state.value;
+    this.hints.set([{ label: "WAKE", key: "Enter" }]);
+    this.engine.term.cursorVisible = false;
+    await starfield(this.localEnv());
+    this.alive(g);
+    this.engine.term.cursorVisible = true;
+    this.state.set(prev);
+    return null;
+  }
+  /** A HostIO for local programs (VIEW): output goes straight to the screen, instantly. */
+  private localIO(): HostIO {
+    const term = this.engine.term;
+    return {
+      send: (b) => this.engine.local(b), key: () => this.keys.next(), keyOrDrain: () => this.keys.nextOr(Promise.resolve()),
+      keyTimeout: (ms) => this.keys.nextOr(this.sleep(ms)), hint: (k) => this.hints.set(k), drain: async () => {}, flush: () => {},
+      pause: () => {}, resume: () => {}, isPaused: () => false, clearOutput: () => {},
+      client: {
+        setMode: (m) => { term.setMode(m); term.reset(); }, scroll: (d) => term.scrollView(d),
+        scrollTo: (w) => term.scrollViewTo(w === "top" ? term.scrollbackLines : 0), markTop: () => {},
+        overlay: (bytes) => {
+          if (!bytes) this.boardOverlay = null;
+          else { const ov = new Terminal({ cols: 80 }, { masked: true }); ov.feed(bytes); this.boardOverlay = ov; }
+          this.applyOverlay();
+        },
+        artOpen: (on) => { this.artOpen = on; this.applyOverlay(); }, rows: () => term.rows,
+        disk: () => audio.emit("diskSeek"), saveDownload: async () => null, kplay: async () => {},
+      },
+      speed: 28800, node: 0, entry: DIRECTORY[0], profile: this.profile, save: () => saveProfile(this.profile), timeLeftMs: () => 3600_000,
+    };
+  }
 
   /** Skippable wait: Esc or Space skip (and keep skipping the rest of this phase). */
   private async wait(ms: number) {
@@ -178,13 +221,49 @@ export class Machine {
         const entry = boardAt(this.deepLink!.number) ?? DIRECTORY[0];
         await this.call(entry, g, true);
         await this.comm(g);
+      } else if (this.lostAt) {
+        const path = this.lostAt.slice(0, 60); this.lostAt = null;
+        this.state.set("dos");
+        await this.sleep(700); this.alive(g);
+        this.out(a().reset().cls().k(15, "TELEWIRE v2.1").k(7, " — terminal mode").nl(2).k(7, "ATZ").nl().k(7, "OK").nl());
+        this.out(a().k(7, `ATDT ${path}`).nl());
+        audio.emit("offHook");
+        await this.wait(1400); this.alive(g);
+        this.out(a().nl().k(15, "NO CARRIER").nl(2));
+        audio.emit("hangup");
+        this.out(a().k(7, "TELEWIRE: nobody answers at that number. It may have been disconnected.").nl()
+          .k(8, "(error 404: the page you dialed is not in service)").nl(2).k(7, "TELEWIRE v2.1 · line closed.").nl(2));
+        this.skipping = false;
+        await this.dos(g, false);
       } else {
         await this.boot(g);
         await this.dos(g, true);
       }
     } catch (e) {
-      if (!(e instanceof Aborted)) { console.error(e); this.out(a().reset().nl().k(12, "General failure reading drive C").nl()); }
+      if (!(e instanceof Aborted)) { console.error(e); await this.fatal(g, e); }
     }
+  }
+
+  /** An unexpected error: a period-style fatal line on the CRT, then R reboots (power cycle). */
+  private async fatal(g: number, e: unknown) {
+    try {
+      const msg = String((e as Error)?.message ?? e).replace(/[^\x20-\x7e]/g, "?").slice(0, 60).toUpperCase();
+      this.engine.term.overlay = null; this.boardOverlay = null; this.artOpen = false;
+      this.engine.term.setMode({ cols: 80, ice: false, ninePixel: true }); this.engine.term.reset();
+      this.engine.modem.clear();
+      this.out(a().reset().cls().nl().k(15, "Kestrel DOS 5.0").nl(2)
+        .k(12, "EXCEPTION 0D AT 0142:1A2B  General Protection Fault").nl()
+        .k(7, msg).nl(2).k(7, "The system has been halted.").nl()
+        .k(7, "Press ").k(15, "R").k(7, " to reboot, or cycle the power switch.").nl());
+      audio.emit("beep");
+      this.hints.set([hk("R", "R reboot")]);
+      for (;;) {
+        const k = await this.key(); this.alive(g);
+        if (k.ch !== null && String.fromCharCode(k.ch).toUpperCase() === "R") break;
+      }
+      this.powerOff();
+      setTimeout(() => this.powerOn(), 1200);
+    } catch { /* power went off while halted */ }
   }
 
   // ── BIOS ───────────────────────────────────────────────────────
@@ -258,7 +337,8 @@ export class Machine {
   private async readLine(g: number, max: number, cancelable = false): Promise<string | null> {
     let s = "";
     for (;;) {
-      const k = await this.key(); this.alive(g);
+      const k = await this.idleKey(g);
+      if (!k) { this.out(a().reset().cls().k(7, `${this.cwd}>${s}`)); continue; }
       if (k.key === "Enter") { this.out(a().nl()); return s; }
       if (k.key === "Backspace") { if (s) { s = s.slice(0, -1); this.out(a().raw("\b \b")); } continue; }
       if (k.key === "Escape" && cancelable) return null;
@@ -282,6 +362,7 @@ export class Machine {
       case "HELP": case "/?":
         p("Kestrel DOS 5.0 commands:", 15);
         p("  DIR   CLS   VER   DATE   TIME   TYPE <file>   CD <dir>   MEM");
+        p("  VIEW <file>  view a download    KPLAY <file>  play a module    DEL <file>");
         p("  DIAL  start TELEWIRE and the dialing directory");
         p("  WARDIAL  scan an exchange for carriers (don't tell the phone company)");
         p("  (and some things Kestrel won't tell you)", 8); return;
@@ -292,11 +373,12 @@ export class Machine {
         if (!arg) { p(this.cwd); return; }
         const t = arg === ".." || arg === "\\" ? "C:\\" : arg.replace(/^C:\\?/, "").replace(/\\$/, "");
         if (t === "C:\\") { this.cwd = "C:\\"; return; }
-        if (["TELEWIRE", "GAMES", "DOS"].includes(t) && this.cwd === "C:\\") { this.cwd = `C:\\${t}`; return; }
+        if (["TELEWIRE", "GAMES", "DOS", "DOWNLOAD"].includes(t) && this.cwd === "C:\\") { this.cwd = `C:\\${t}`; return; }
         p("Invalid directory"); return;
       }
       case "DIR": {
-        const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["WARDIAL", "EXE", "21504"], ["DOS", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
+        if (/^(C:)?\\?DOWNLOAD\\?$/.test(arg) || (!arg && this.cwd === "C:\\DOWNLOAD")) { await this.dirDownload(); return; }
+        const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["WARDIAL", "EXE", "21504"], ["VIEW", "COM", "8812"], ["KPLAY", "EXE", "61440"], ["DOS", "<DIR>", ""], ["DOWNLOAD", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
           : this.cwd.endsWith("TELEWIRE") ? [["TELEWIRE", "EXE", "184320"], ["TELEWIRE", "DIR", "1024"], ["CAPTURE", "LOG", "0"]]
           : this.cwd.endsWith("GAMES") ? [["DIG", "EXE", "34012"], ["TETRA", "EXE", "41210"]]
           : [["HIMEM", "SYS", "11552"], ["KSMOUSE", "SYS", "32158"], ["EDIT", "COM", "413"]];
@@ -314,6 +396,27 @@ export class Machine {
         if (!d || this.cwd !== "C:\\") { p("File not found"); return; }
         d.forEach((l) => p(l)); return;
       }
+      case "VIEW": case "KPLAY": case "DEL": case "ERASE": {
+        const name = arg.replace(/^(C:)?\\?(DOWNLOAD\\)?/, "");
+        if (!name) { p(cmd === "DEL" || cmd === "ERASE" ? "Required parameter missing" : `usage: ${cmd} <file>   (files live in C:\\DOWNLOAD)`); return; }
+        if (cmd === "DEL" || cmd === "ERASE") { audio.emit("diskSeek"); p((await drive.del(name)) ? "" : "File not found"); return; }
+        const f = await drive.get(name);
+        if (!f) { p("File not found"); p("Downloaded files live in C:\\DOWNLOAD. Type DIR C:\\DOWNLOAD.", 8); return; }
+        audio.emit("diskSeek");
+        if (cmd === "KPLAY" || MUSIC.test(f.name)) {
+          if (!MUSIC.test(f.name)) { p("KPLAY: not a module (MOD, S3M, XM, IT)"); return; }
+          this.engine.term.cursorVisible = false;
+          await kplay(this.localEnv(), f.name, f.bytes); this.alive(g);
+        } else {
+          this.engine.term.cursorVisible = false;
+          try { await localView(this.localIO(), f); } finally { this.alive(g); }
+          this.engine.term.setMode({ cols: 80, ice: false, ninePixel: true }); this.engine.term.reset();
+        }
+        this.engine.term.cursorVisible = true;
+        this.hints.set([]);
+        this.out(a().reset().cls());
+        return;
+      }
       case "DIAL": case "TELEWIRE": case "EXIT": return "comm";
       case "WARDIAL": if (this.cwd !== "C:\\") { p("Bad command or file name"); return; } await this.wardial(g); return;
       case "XYZZY": p("Nothing happens."); return;
@@ -324,6 +427,21 @@ export class Machine {
       default: p("Bad command or file name");
     }
     void g;
+  }
+
+  private async dirDownload() {
+    const p = (t: string, c = 7) => this.out(a().k(c, t).nl());
+    const fs = await drive.list();
+    p(""); p(" Volume in drive C is KESTREL"); p(" Directory of C:\\DOWNLOAD"); p("");
+    p(`${pad(".", 13)}${pad("<DIR>", 10)}`);
+    for (const f of fs) {
+      const [n, e = ""] = f.name.split(".");
+      const d = new Date(f.at);
+      p(`${pad(n, 9)}${pad(e, 4)}${rpad(String(f.bytes.length), 10)}  ${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}-93  ${pad(f.pack, 12)}`, MUSIC.test(f.name) ? 10 : 7);
+    }
+    p(`${rpad(String(fs.length), 9)} file(s)   ${rpad(String(drive.DRIVE_CAP - drive.used(fs)), 12)} bytes free in DOWNLOAD`);
+    p(fs.length ? "VIEW <file> shows it · KPLAY <file> plays music · DEL <file> erases" : "Nothing yet. Press D on a file in a BBS pack to download it.", 8);
+    p("");
   }
 
   // ── WARDIAL.EXE ───────────────────────────────────────────────
@@ -392,7 +510,8 @@ export class Machine {
       sel = Math.min(sel, book.length - 1);
       this.hints.set([...NAV, hk("S", "S setup"), hk("M", "M dial #")]);
       this.out(this.dirScreen(sel));
-      const k = await this.key(); this.alive(g);
+      const k = await this.idleKey(g);
+      if (!k) continue;
       const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
       if (k.key === "ArrowUp") sel = (sel + book.length - 1) % book.length;
       else if (k.key === "ArrowDown") sel = (sel + 1) % book.length;
@@ -533,6 +652,9 @@ export class Machine {
         },
         artOpen: (on) => { this.artOpen = on; this.applyOverlay(); },
         rows: () => term.rows,
+        disk: () => audio.emit("diskSeek"),
+        saveDownload: (f) => { audio.emit("diskSeek"); return drive.put(f); },
+        kplay: async (name, bytes) => { term.setMode({ cols: 80, ice: false, ninePixel: true }); term.reset(); await kplay(this.localEnv(), name, bytes); },
       },
       speed, node, entry, profile: this.profile,
       save: () => saveProfile(this.profile),

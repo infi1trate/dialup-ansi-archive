@@ -235,6 +235,34 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       await bump(str(b.step, 20));
       return { ok: true };
     }
+    case "doorTurn": {
+      // one turn = one floor attempt; 10 per caller (or guest device) per day
+      const th = await tokenHash(b.token);
+      await limit([th, ip], "door", 40, 600);
+      const c = await callerByToken(th);
+      const viewer = c ? "c:" + c.id : "t:" + th;
+      const { data } = await s.from("door_turns").select("turns").eq("viewer", viewer).eq("day", today()).maybeSingle();
+      const used = data?.turns ?? 0;
+      if (b.take !== true) return { left: Math.max(0, 10 - used) };
+      if (used >= 10) return { ok: false, left: 0 };
+      await s.from("door_turns").upsert({ viewer, day: today(), turns: used + 1 });
+      return { ok: true, left: 9 - used };
+    }
+    case "doorScore": {
+      const th = await tokenHash(b.token);
+      await limit([th, ip], "doorScore", 6, 600);
+      const c = await callerByToken(th);
+      if (!c || c.banned) return { ok: false };
+      const score = Math.floor(Number(b.score)), floor = Math.floor(Number(b.floor));
+      if (!(score >= 0 && score <= 20000 && floor >= 0 && floor <= 5)) throw new NetError(400, "bad score");
+      await s.from("door_scores").insert({ caller_id: c.id, handle: c.handle, score, floor });
+      return { ok: true };
+    }
+    case "doorTop": {
+      await limit([ip], "read", 120, 600);
+      const { data } = await s.from("door_scores").select("handle, score, floor, created_at").order("score", { ascending: false }).limit(10);
+      return { top: data ?? [] };
+    }
     case "sysop": return sysop(b, ip);
   }
   throw new NetError(400, "unknown action");

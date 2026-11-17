@@ -12,12 +12,12 @@ import type { DeepLink } from "@/bbs/io";
 // literal, not imported: the house pack (and the terminal it pulls in) must stay out of the first frame
 const HOUSE_PACK = "crawl-01";
 
-interface Props { deepLink?: DeepLink & { number: string } }
+interface Props { deepLink?: DeepLink & { number: string }; /** a wrong URL: dial it, get NO CARRIER, land at DOS */ lost?: string }
 
 export const SKIP_TO_ART = `/dial/555-0142/1994/${HOUSE_PACK}/CRWL-LGO.ANS`;
 
 /** The Kestrel 486 in its basement. All canvas/WebGL/audio/storage work starts in effects only. */
-export function Computer({ deepLink }: Props) {
+export function Computer({ deepLink, lost }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const machine = useRef<Machine | null>(null);
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ export function Computer({ deepLink }: Props) {
     const touch = window.matchMedia("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 820;
     setLayout(touch || window.innerWidth < 640 ? "tube" : "room");
     setLeaned(s.lean ?? narrow);
-    audio.setMix({ muted: s.muted, modemVolume: s.modemVolume });
+    audio.setMix({ muted: s.muted, modemVolume: s.modemVolume, musicVolume: s.musicVolume });
     void import("@/data/net").then((n) => n.count("landed"));
   }, []);
 
@@ -66,7 +66,8 @@ export function Computer({ deepLink }: Props) {
       const c = cfgRef.current;
       engine.crt.brightness = brightnessGain(c.brightness);
       engine.crt.contrast = contrastGain(c.contrast);
-      const unsubs = [m.powered.subscribe(setPowered), m.tube.subscribe(setTube), m.turbo.subscribe(setTurbo), m.hints.subscribe(setHints)];
+      if (c.turbo) m.toggleTurbo(); // the turbo button stays where you left it
+      const unsubs = [m.powered.subscribe(setPowered), m.tube.subscribe(setTube), m.turbo.subscribe((t) => { setTurbo(t); if (t !== cfgRef.current.turbo) update({ turbo: t }); }), m.hints.subscribe(setHints)];
       const orient = () => m.setPortrait(window.innerHeight > window.innerWidth);
       orient();
       window.addEventListener("resize", orient);
@@ -80,6 +81,7 @@ export function Computer({ deepLink }: Props) {
       window.addEventListener("keydown", down);
       window.addEventListener("keyup", up);
       if (deepLink) m.powerOn(deepLink);
+      else if (lost) { m.lostAt = lost; m.powerOn(); }
       cleanup = () => { unsubs.forEach((u) => u()); window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); m.powerOff(); engine.destroy(); };
     })();
     return () => { disposed = true; cleanup(); };
@@ -174,6 +176,8 @@ export function Computer({ deepLink }: Props) {
       leaned={leaned}
       reduced={reduced}
       modemVolume={cfg.modemVolume}
+      musicVolume={cfg.musicVolume}
+      onMusicVolume={(v) => { update({ musicVolume: v }); audio.setMix({ musicVolume: v }); }}
       getState={getState}
       onPcPower={() => machine.current?.pressPcPower()}
       onTurbo={() => machine.current?.toggleTurbo()}

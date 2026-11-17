@@ -107,6 +107,51 @@ export type Database = {
         }
         Relationships: []
       }
+      door_scores: {
+        Row: {
+          caller_id: string
+          created_at: string
+          floor: number
+          handle: string
+          id: number
+          score: number
+        }
+        Insert: {
+          caller_id: string
+          created_at?: string
+          floor: number
+          handle: string
+          id?: never
+          score: number
+        }
+        Update: {
+          caller_id?: string
+          created_at?: string
+          floor?: number
+          handle?: string
+          id?: never
+          score?: number
+        }
+        Relationships: []
+      }
+      door_turns: {
+        Row: {
+          day: string
+          turns: number
+          viewer: string
+        }
+        Insert: {
+          day: string
+          turns?: number
+          viewer: string
+        }
+        Update: {
+          day?: string
+          turns?: number
+          viewer?: string
+        }
+        Relationships: []
+      }
       flags: {
         Row: {
           file: string

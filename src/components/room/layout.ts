@@ -12,6 +12,11 @@ export const JACK = { x: 97.4, y: 37.5, w: 1.5, h: 2.2 };
 export const NOTE2 = { x: 60.5, y: 51.4, w: 6.2 };
 /** Bottom of the basement stairs, top right of the shot: the source of the stair creak. */
 export const STAIRS = { x: 84, y: 0, w: 16, h: 22 };
+/** Desk speakers, either side of the monitor. */
+export const SPEAKER_L = { x: 10.6, y: 38.6, w: 6.4, h: 11.4 };
+export const SPEAKER_R = { x: 76.2, y: 39.6, w: 6.4, h: 11.4 };
+/** Speaker power LED, % of the left speaker box. */
+export const SPEAKER_LED = { x: 50, y: 88 };
 export const KEYBOARD = { x: 21, y: 53.9, w: 52, h: 9 };
 
 /** Front-panel parts of the case, in % of the case box. */

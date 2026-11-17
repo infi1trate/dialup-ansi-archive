@@ -12,7 +12,7 @@ export function useRoomLive({ root, getState, reduced }: Opts) {
   useEffect(() => {
     const el = root.current; if (!el) return;
     const led = (n: string) => el.querySelector<HTMLElement>(`[data-led="${n}"]`);
-    const leds = Object.fromEntries(["HS", "AA", "CD", "OH", "RD", "SD", "TR", "MR", "hdd"].map((n) => [n, led(n)])) as Record<string, HTMLElement | null>;
+    const leds = Object.fromEntries(["HS", "AA", "CD", "OH", "RD", "SD", "TR", "MR", "hdd", "spk"].map((n) => [n, led(n)])) as Record<string, HTMLElement | null>;
     const set = (n: string, on: boolean) => { const l = leds[n]; if (l && l.classList.contains("is-on") !== on) l.classList.toggle("is-on", on); };
     let oh = false, cd = false, hs = false, rdUntil = 0, sdUntil = 0, hddUntil = 0, pc = audio.status.pc;
     const offs = [
@@ -20,7 +20,7 @@ export function useRoomLive({ root, getState, reduced }: Opts) {
       audio.on("connect", (bps) => { cd = true; hs = bps >= 14400; }),
       audio.on("hangup", () => { oh = false; cd = false; hs = false; }),
       audio.on("powerOn", () => { pc = true; }),
-      audio.on("powerOff", () => { pc = false; oh = cd = hs = false; }),
+      audio.on("powerOff", () => { pc = false; oh = cd = hs = false; audio.musicOn = false; }),
       audio.on("byteFlow", () => { rdUntil = performance.now() + 300; }),
       audio.on("keyDown", () => { if (cd) sdUntil = performance.now() + 70; }),
       audio.on("diskSeek", () => { if (pc) hddUntil = performance.now() + 160 + Math.random() * 360; }),
@@ -39,6 +39,7 @@ export function useRoomLive({ root, getState, reduced }: Opts) {
       set("RD", pc && cd && now < rdUntil && Math.random() < 0.6);
       set("SD", pc && now < sdUntil);
       set("hdd", pc && now < hddUntil && Math.random() < 0.7);
+      set("spk", pc && audio.musicOn);
       if (now - lastLight < 100) return;
       lastLight = now;
       for (let i = 0; i < 3; i++) cur[i] += (tgt[i] - cur[i]) * 0.45;

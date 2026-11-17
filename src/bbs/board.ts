@@ -1,5 +1,5 @@
 // THE CRAWLSPACE BBS — the virtual host. Writes bytes, reads keys. Nothing else.
-import { Ansi, a, bigText, box, center, pad, rpad, shadeBar } from "./ansi";
+import { Ansi, a, bigText, box, center, chromeText, pad, rpad, shadeBar, stairwell } from "./ansi";
 import { ATTIC_UNLOCK, type HostIO, type DeepLink, type KeyHint } from "./io";
 import type { Key } from "@/machine/keyboard";
 import { Aborted } from "@/machine/keyboard";
@@ -13,6 +13,9 @@ export { modeFor } from "@/term/prepare";
 import { ANSI_VGA, type TermMode } from "@/term/terminal";
 import { artViewed, net, newSessionId, setLiveSession, timeAgo, type CallerInfo } from "@/data/net";
 import { checkHandle, checkOneliner } from "@/lib/filter";
+import { doorMenu } from "./door";
+import { sysopChat } from "./chat";
+import { MUSIC } from "@/machine/programs";
 
 const SYSOP = "Static";
 /** VOID//NODE's new-user password. It is printed at the end of the Crawlspace credits screen. */
@@ -82,7 +85,12 @@ function pipes(x: Ansi, s: string, base = 7) {
   return x.reset();
 }
 
-class Board {
+/** Static answers the nth page of a call when n is a multiple of 4, and always on the first page after 20 files. */
+export function sysopAnswers(pageNo: number, filesSeen: number, chattedAfter20: boolean) {
+  return (filesSeen >= 20 && !chattedAfter20) || pageNo % 4 === 0;
+}
+
+export class Board {
   user = "Guest";
   guest = true;
   online = true;
@@ -257,21 +265,28 @@ class Board {
   logo(x: Ansi) {
     x.cls();
     if (this.sk === VOID_SKIN) {
-      x.at(1, 1).k(8, "▒".repeat(79));
-      bigText(x, 5, 22, "VOID", [12, 4, 4], 8);
-      x.at(9, 47).k(7, "//").k(15, "NODE");
-      x.at(13, 1).k(8, "░".repeat(79));
-      x.at(14, 1).k(8, center("no sysop. no tagline. no mercy.", 79));
-      x.at(15, 1).k(4, center(`node 0 · ${this.io.entry.number} · you were never here`, 79));
+      // VOID//NODE: red chrome that bleeds down into static
+      x.at(1, 1); for (let c = 0; c < 79; c++) x.k(c % 7 === 3 ? 4 : 8, "▀");
+      chromeText(x, 4, 12, "VOID", [15, 7, 12, 4, 4, 0], 4);
+      x.at(5, 38).k(8, "//").at(6, 38).k(7, "//");
+      chromeText(x, 4, 42, "NODE", [7, 7, 8, 0, 8, 0], 0);
+      const drip = [13, 16, 21, 26, 29, 33];
+      for (let r = 0; r < 4; r++) for (const c of drip) if ((c * 7 + r * 3) % 5 < 4 - r) x.at(7 + r, c).k(r ? 4 : 12, ["▓", "▒", "░", "·"][r]);
+      x.at(12, 1).k(8, "░".repeat(79));
+      x.at(13, 1).k(8, center("no sysop. no tagline. no mercy.", 79));
+      x.at(14, 1).k(4, center(`node 0 · ${this.io.entry.number} · you were never here`, 79));
       return x;
     }
     x.at(1, 1); shadeBar(x, 79, 1);
-    x.at(3, 34).k(8, "· t h e ·");
-    bigText(x, 5, 10, "CRAWLSPACE", [11, 3, 1], 8);
-    bigText(x, 9, 31, "BBS", [13, 5, 5], 8);
-    x.at(13, 1); shadeBar(x, 79, 5);
-    x.at(14, 1).k(7, center("Running on a 486 under the stairs since 1991", 79));
-    x.at(15, 1).k(3, center(`sysop: ${SYSOP}  ·  ${this.io.entry.name}  ·  ${this.io.entry.number}`, 79));
+    x.at(3, 1).k(8, center("· t h e ·", 79));
+    chromeText(x, 4, 10, "CRAWLSPACE", [15, 7, 11, 11, 3, 1], 1);
+    chromeText(x, 8, 12, "BBS", [15, 13, 13, 5, 5, 1], 5);
+    x.at(11, 12).k(5, "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀").at(12, 12).k(8, "est. 1991 · node 1");
+    stairwell(x, 7, 50);
+    x.at(13, 50).k(8, "  (the 486 is under there)");
+    x.at(14, 1); shadeBar(x, 79, 5);
+    x.at(15, 1).k(7, center("Running on a 486 under the stairs since 1991", 79));
+    x.at(16, 1).k(3, center(`sysop: ${SYSOP}  ·  ${this.io.entry.name}  ·  ${this.io.entry.number}`, 79));
     return x;
   }
 
@@ -476,18 +491,34 @@ class Board {
   menuScreen() {
     const x = a().cls();
     const v = this.sk === VOID_SKIN;
-    if (v) { x.at(1, 1).k(8, "▒".repeat(79)); bigText(x, 3, 22, "VOID", [12, 4, 4], 8); x.at(5, 47).k(7, "//").k(15, "NODE"); }
-    else { x.at(1, 1); shadeBar(x, 79, 1); bigText(x, 3, 10, "CRAWLSPACE", [11, 3, 1], 8); }
-    x.at(6, 64).k(this.sk.b, "main menu");
-    box(x, 8, 8, 64, 11, v ? 8 : 5);
-    const left: [string, string][] = [["F", v ? "iles (most viewed)" : "iles"], ["A", "nimations"], ["B", "ulletins"], ["O", "neliners"], ["W", "ho's online"]];
-    const right: [string, string][] = [["U", "ser list"], ["P", "age sysop"], ["D", "oors"], ["C", "redits"], ["G", "oodbye"]];
+    if (v) {
+      x.at(1, 1).k(8, "▀".repeat(79));
+      chromeText(x, 2, 6, "VOID", [15, 7, 12, 4, 4, 0], 4);
+      x.at(3, 32).k(8, "//").k(7, "NODE");
+      x.at(4, 32).k(4, "most viewed first. that's all.");
+    } else {
+      x.at(1, 1); shadeBar(x, 79, 1);
+      chromeText(x, 2, 4, "CRAWLSPACE", [15, 7, 11, 11, 3, 1], 1);
+      x.at(3, 66).k(13, "▄▄▄").at(4, 63).k(13, "▄▄▄").k(5, "███");
+      x.at(2, 69).k(6, "▄▄▄").k(8, "▓").at(3, 69).k(8, "▓▓▓▓").at(4, 69).k(8, "▓▓▓▓");
+    }
+    x.at(6, 1).k(this.sk.line, "─".repeat(60)).k(this.sk.b, " main menu ").k(this.sk.line, "─".repeat(8));
+    box(x, 7, 4, 72, 12, v ? 8 : 5);
+    const items: [string, string, string][] = [
+      ["F", v ? "iles" : "iles", v ? "most viewed" : "the archive"], ["U", "ser list", "who calls here"],
+      ["A", "nimations", "art that moves"], ["P", "age sysop", "he might answer"],
+      ["B", "ulletins", "news, top 10"], ["D", "oors", "BASEMENT CRAWL"],
+      ["O", "neliners", "the wall"], ["C", "redits", "who made what"],
+      ["W", "ho's online", "nodes 1-8"], ["G", "oodbye", "hang up"],
+    ];
     const [h1, h2, h3] = this.sk.hot;
-    left.forEach(([k, l], n) => x.at(9 + n * 2, 14).hot(k, l, h1, h2, h3));
-    right.forEach(([k, l], n) => x.at(9 + n * 2, 44).hot(k, l, h1, h2, h3));
-    x.at(19, 1).k(7, center(this.io.entry.blurb, 79));
-    this.status(x, 21);
-    x.at(23, 4).k(this.sk.b, "Main").k(8, " ► ").k(this.sk.a, "Command").k(v ? 4 : 5, ": ").c(15);
+    items.forEach(([k, l, d], n) => {
+      const col = n % 2 ? 42 : 8, row = 8 + Math.floor(n / 2) * 2;
+      x.at(row, col).hot(k, pad(l, 12), h1, h2, h3).k(8, pad(d, 16));
+    });
+    x.at(18, 6).k(v ? 8 : 5, "░▒▓").k(7, ` ${pad(this.io.entry.blurb, 30)}`);
+    this.status(x, 20);
+    x.at(22, 4).k(this.sk.b, "Main").k(8, " ► ").k(this.sk.a, "Command").k(v ? 4 : 5, ": ").c(15);
     return x;
   }
 
@@ -658,28 +689,37 @@ class Board {
     await this.anyKey(18);
   }
 
+  private pages = 0;
+  /** Static answers every fourth page, and always on the first page after 20 files. */
   async pageSysop() {
+    this.pages++;
+    const p = this.io.profile;
+    const after20 = this.filesSeen >= 20 && !p.chatAfter20;
+    const answers = sysopAnswers(this.pages, this.filesSeen, !!p.chatAfter20);
     const x = this.header(a(), "Page sysop");
     x.at(6, 6).k(11, `Paging ${SYSOP}`);
     this.send(x);
-    for (let i = 0; i < 5; i++) { this.send(a().k(15, " .").raw("\x07")); await this.io.drain(); await new Promise((r) => setTimeout(r, 500)); }
+    for (let i = 0; i < 5; i++) { this.send(a().k(15, " .").raw("\x07")); await this.io.drain(); await sleep(answers && i === 2 ? 300 : 500); if (answers && i === 2) break; }
+    if (answers) {
+      if (after20) { p.chatAfter20 = true; this.io.save(); }
+      this.setDoing("chatting with the sysop");
+      this.send(a().at(8, 6).k(14, "*** SYSOP BREAKING IN ***").raw("\x07"));
+      await this.io.drain(); await sleep(900);
+      await sysopChat(this.io, (y) => this.send(y), (k) => this.hint(k), this.user, this.sk !== VOID_SKIN && !p.voidUnlocked);
+      return;
+    }
     const y = a();
     box(y, 9, 10, 60, 7, 13, "NO ANSWER");
     y.at(11, 13).k(15, `${SYSOP} is asleep under the stairs, next to the 486.`);
     y.at(12, 13).k(7, "He set the chat flag to \"only for emergencies\" in 1992.");
-    y.at(13, 13).k(7, "Try leaving a oneliner. Or yelling down the stairs.");
+    y.at(13, 13).k(7, "Try leaving a oneliner. Or paging again. And again.");
     this.send(y);
     await this.anyKey(18);
   }
 
   async doors() {
-    const x = this.header(a(), "Doors");
-    box(x, 7, 12, 56, 7, 6, "UNDER CONSTRUCTION");
-    x.at(9, 15).k(14, "The sysop is still installing them.");
-    x.at(10, 15).k(7, "LORD, TradeWars and the trivia door are on floppies");
-    x.at(11, 15).k(7, "somewhere in a shoebox. Patience, caller.");
-    this.send(x);
-    await this.anyKey(16);
+    this.setDoing("in a door: BASEMENT CRAWL");
+    await doorMenu({ io: this.io, send: (y) => this.send(y), user: this.user, guest: this.guest, hint: (k) => this.hint(k) });
   }
 
   async credits() {
@@ -715,12 +755,17 @@ class Board {
 
   async goodbye() {
     const x = a().cls();
-    x.at(3, 1); shadeBar(x, 79, 5);
-    bigText(x, 6, 18, "SEE YA", [13, 5, 1], 8);
-    x.at(11, 1); shadeBar(x, 79, 1);
+    const v = this.sk === VOID_SKIN;
+    x.at(1, 1); shadeBar(x, 79, v ? 4 : 5);
+    chromeText(x, 4, 6, "SEE YA", v ? [7, 7, 12, 4, 4, 0] : [15, 13, 13, 5, 5, 1], v ? 4 : 5);
+    x.at(8, 6).k(8, "...the line is yours again");
+    if (!v) stairwell(x, 3, 50, 13);
+    else x.at(5, 50).k(4, "the void says nothing back.");
+    x.at(11, 1); shadeBar(x, 79, v ? 8 : 1);
     x.at(13, 1).k(15, center(`Thanks for calling, ${this.user}.`, 79));
-    x.at(15, 1).k(3, center(QUOTES[Math.floor(Math.random() * QUOTES.length)], 79));
-    x.at(18, 1).k(8, center("The Crawlspace BBS · 555-0142 · call again after midnight", 79)).at(20, 1).reset();
+    const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    x.at(15, 1).k(3, center(q.length > 77 ? q.slice(0, 77) : q, 79));
+    x.at(18, 1).k(8, center(v ? "VOID//NODE · 555-01?3 · forget this number" : "The Crawlspace BBS · 555-0142 · call again after midnight", 79)).at(20, 1).reset();
     this.send(x);
     await this.io.drain();
     await new Promise((r) => setTimeout(r, 900));
@@ -871,17 +916,25 @@ class Board {
         lines.forEach((l, n) => { x.at(4 + n, 3).reset(); x.bytes(l); x.reset(); });
       } else x.at(5, 4).k(8, "(no FILE_ID.DIZ in this pack)");
       x.at(14, 3).k(13, pad("File", 14) + rpad("Size", 8) + "  " + pad("Artist", 26) + rpad(`@${this.io.speed}`, 9)).at(15, 3).k(5, "─".repeat(64));
-      x.at(23, 4).eol().k(8, "ENTER view · ESC back · dim files are not viewable on this terminal");
+      x.at(23, 4).eol().k(8, "ENTER view · ").k(7, "D").k(8, " download · ").k(7, "P").k(8, " play music · ESC back · dim = not viewable");
       this.status(x);
       this.send(x);
       const items = pack.files.map((f) => ({
         text: `${pad(f.name, 14)}${rpad(f.size != null ? String(f.size) : "?", 8)}  ${pad(f.artists.join(", ") || "—", 26)}${rpad(this.estimate(f.size), 8)}`,
-        color: /\.(ans|ice|bin)$/i.test(f.name) ? 11 : 3, dim: !f.viewable,
+        color: MUSIC.test(f.name) ? 10 : /\.(ans|ice|bin|xb)$/i.test(f.name) ? 11 : 3, dim: !f.viewable && !MUSIC.test(f.name),
       }));
-      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx });
+      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx, hotkeys: "DP" });
       if (!r) return;
       idx = r.index;
       const f = pack.files[r.index];
+      const music = MUSIC.test(f.name);
+      if (r.key === "D" || r.key === "P" || (music && !r.key)) {
+        const play = music && r.key !== "D";
+        if (r.key === "P" && !music) { this.send(a().at(23, 4).eol().k(12, `${f.name}: that's not music. Try D to download it.`)); await sleep(1200); continue; }
+        const bytes = await this.download(pack, f);
+        if (bytes && play) { await this.io.drain(); await this.io.client.kplay(f.name, bytes); }
+        continue;
+      }
       if (!f.viewable) {
         this.send(a().at(23, 4).eol().k(12, `${f.name}: not viewable on this terminal.`));
         await new Promise((res) => setTimeout(res, 900));
@@ -892,14 +945,63 @@ class Board {
   }
 
   // ── viewer ─────────────────────────────────────────────────────
-  async viewer(pack: PackInfo, files: PackFile[], idx: number, opts: { animation?: boolean } = {}) {
+  /** ZMODEM-style receive, metered by the modem: the transfer screen plus invisible filler bytes add up to the file size. */
+  async download(pack: PackInfo, f: PackFile): Promise<Uint8Array | null> {
+    const io = this.io;
+    this.setDoing(`downloading ${f.name}`.slice(0, 40));
+    this.send(a().at(23, 4).eol().k(8, "░▒▓ ").k(11, `retrieving ${f.name}...`).k(8, " ▓▒░"));
+    let bytes: Uint8Array;
+    try { bytes = await getFile(pack.name, f.name); } catch (e) { await this.errorScreen(`${f.name}: ${(e as Error).message}`); return null; }
+    await io.drain();
+    const total = bytes.length, cps = Math.round(io.speed / 10);
+    const x = a();
+    box(x, 7, 12, 56, 11, 11, "TELEWIRE · ZMODEM RECEIVE");
+    x.at(9, 15).k(7, "File     ").k(15, pad(f.name, 20)).k(7, "  from ").k(14, pack.name.slice(0, 14));
+    x.at(10, 15).k(7, "Bytes    ").k(15, `${total}`);
+    x.at(11, 15).k(7, "Rate     ").k(15, `${cps} cps`).k(8, ` at ${io.speed} bps`);
+    x.at(15, 15).k(8, "ENTER finish now · ESC abort");
+    this.send(x);
+    this.hint([{ label: "ENTER finish", key: "Enter" }, { label: "ESC abort", key: "Escape" }]);
+    const STEPS = 40, bar = 46;
+    const filler = "\x1b[?0h"; // a mode-set the terminal ignores: line time without ink
+    let aborted = false, done = 0;
+    for (let i = 1; i <= STEPS && !aborted; i++) {
+      const target = Math.round((total * i) / STEPS);
+      const chunk = target - done; done = target;
+      const left = Math.ceil((total - done) / cps);
+      const prog = a().at(12, 15).k(7, "Received ").k(15, rpad(String(done), 8)).k(7, "  left ").k(15, `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`)
+        .at(13, 15).k(11, "█".repeat(Math.round((bar * i) / STEPS))).k(8, "░".repeat(bar - Math.round((bar * i) / STEPS)));
+      const padLen = Math.max(0, chunk - prog.length);
+      this.send(a().raw(filler.repeat(Math.floor(padLen / filler.length))));
+      this.send(prog);
+      for (;;) {
+        const k = await io.keyOrDrain();
+        if (k === null) break;
+        if (k.key === "Escape") { aborted = true; io.clearOutput(); break; }
+        if (k.key === "Enter") io.flush();
+      }
+      if (!aborted) io.client.disk();
+    }
+    if (aborted) {
+      this.send(a().at(15, 15).eol().k(12, "Transfer aborted by receiver.").at(15, 67).k(11, "║"));
+      await io.drain(); await sleep(1200); return null;
+    }
+    const saved = await io.client.saveDownload({ name: f.name, bytes, pack: pack.name, year: pack.year, file: f.name, artists: f.artists, groups: pack.groups });
+    const y = a().at(15, 15).eol().k(10, saved ? `Saved as C:\\DOWNLOAD\\${saved.name}` : "Disk error: file not saved.").at(15, 67).k(11, "║");
+    if (saved?.dropped.length) y.at(16, 15).k(8, pad(`disk full: deleted ${saved.dropped.join(", ")}`, 50));
+    this.send(y.raw("\x07"));
+    await io.drain(); await sleep(1300);
+    return bytes;
+  }
+
+  async viewer(pack: PackInfo, files: PackFile[], idx: number, opts: { animation?: boolean; local?: Uint8Array } = {}) {
     const io = this.io;
     const restore = () => { io.client.overlay(null); io.client.setMode({ cols: 80, ice: false, ninePixel: true }); };
     for (;;) {
       const f = files[idx];
       this.send(a().cls().at(12, 1).k(8, center(`░▒▓ retrieving ${f.name} from the stacks ▓▒░`, 79)));
       let bytes: Uint8Array;
-      try { bytes = await getFile(pack.name, f.name); } catch (e) { restore(); await this.errorScreen(`${f.name}: ${(e as Error).message}`); return; }
+      try { bytes = opts.local ?? await getFile(pack.name, f.name); } catch (e) { restore(); await this.errorScreen(`${f.name}: ${(e as Error).message}`); return; }
       await io.drain();
       let prep: Prepared;
       try { prep = prepareArt(f.name, bytes); } catch (e) { restore(); await this.errorScreen(`${f.name}: ${(e as Error).message}`); return; }
@@ -910,17 +1012,16 @@ class Board {
       io.send(stream);
       const seen = `${pack.name}/${f.name}`;
       const before = maxSpeed(io.profile);
-      if (!io.profile.filesSeen.includes(seen)) { io.profile.filesSeen.push(seen); io.save(); }
-      this.setDoing(`viewing ${f.name}`.slice(0, 40));
-      artViewed();
-      if (this.online) void net("view", { pack: pack.name, file: f.name }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
+      if (!opts.local && !io.profile.filesSeen.includes(seen)) { io.profile.filesSeen.push(seen); io.save(); }
+      if (!opts.local) { this.setDoing(`viewing ${f.name}`.slice(0, 40)); artViewed(); }
+      if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
       const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
       const unlocked = maxSpeed(io.profile) !== before ? maxSpeed(io.profile) : 0;
       let finished = false, info = false;
       const viewHints = (done: boolean) => this.hint([
         ...(done ? [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "PGUP", key: "PageUp" }, { label: "PGDN", key: "PageDown" }]
           : [{ label: "SPACE pause", key: " " }, ...(opts.animation ? [] : [{ label: "ENTER finish", key: "Enter" }])]),
-        hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), hk("R", "R report"), { label: "ESC back", key: "Escape" },
+        hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), ...(opts.local ? [] : [hk("R", "R report")]), { label: "ESC back", key: "Escape" },
       ]);
       viewHints(false);
       io.client.artOpen(true);
@@ -937,7 +1038,7 @@ class Board {
           io.clearOutput(); io.resume(); restore(); io.client.artOpen(false); return;
         }
         if (c === "I") { info = !info; showInfo(); continue; }
-        if (c === "R") { await this.report(pack, f); showInfo(); viewHints(finished); continue; }
+        if (c === "R" && !opts.local) { await this.report(pack, f); showInfo(); viewHints(finished); continue; }
         if (c === "N" && idx < files.length - 1) { next = 1; break; }
         if (c === "P" && idx > 0) { next = -1; break; }
         const rows = io.client.rows();
@@ -1138,6 +1239,15 @@ function infoPanel(pack: PackInfo, f: PackFile, s: Sauce | null, size: number, m
   if (unlocked) x.at(R + 12, C + 3).k(10, pad(`Your modem can now do ${unlocked}! (TELEWIRE: S)`, W - 6));
   x.at(R + 14, C + 3).k(8, "SPC pause · ENTER finish · N/P next/prev · R report · ESC");
   return x.build();
+}
+
+/** VIEW.COM: the board's viewer, run locally on a downloaded file (instant, no modem, no message base). */
+export async function localView(io: HostIO, f: { name: string; bytes: Uint8Array; pack: string; year: number; artists: string[]; groups: string[] }) {
+  const b = new Board(io);
+  b.online = false;
+  const pack: PackInfo = { name: f.pack, year: f.year, groups: f.groups, files: [], fileId: null };
+  const pf: PackFile = { name: f.name, artists: f.artists, size: f.bytes.length, viewable: true };
+  await b.viewer(pack, [pf], 0, { local: f.bytes });
 }
 
 export async function runBoard(io: HostIO) {

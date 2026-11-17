@@ -1,16 +1,9 @@
-# Pass 4 roadmap
-- [x] A1 rate limit check-before-record + test
-- [x] A2 SKIPPED by owner: list test rows in STATUS owner to-do; no approval tools this pass
-- [x] A3 who's online 15s refresh
-- [x] A4 share card scale wide
-- [x] A5 debug flags busy/time; drive flows in browser
-- [x] A6 backend down fallback
-- [x] A7 prod build + code split
-- [x] A8 parser check vs ~40 real files; PabloDraw 24-bit etc
-- [x] A9 blink <3Hz; reduced motion steady blink
-- [x] B XBin, BIN 160, ADF, IDF; The Attic 555-0199
-- [x] C Animations area
-- [x] D VOID//NODE, sticky note 2, DIZ hint, manual dial M, WARDIAL.EXE
-- [x] E mobile tube view, io.hint keycap bar, hidden input, tap/swipe
-- [x] F /gallery
-- [x] STATUS.md
+# Pass 5 roadmap
+- [ ] A downloads: D in pack list, ZMODEM screen, IndexedDB C:\DOWNLOAD (3 MB cap), DOS DIR/VIEW/DEL
+- [ ] B tracker music: KPLAY via libopenmpt (chiptune3), speakers + knob, credits
+- [ ] C BASEMENT CRAWL door + high scores + 10 turns/day
+- [ ] D sysop chat (every 4th page, first page after 20 files)
+- [ ] E screensaver, NO CARRIER 404, crash screen, title/favicon/noindex
+- [ ] F polish screens, logos, settings persistence
+- [ ] G screenshots as base64 JPEGs
+- [ ] STATUS.md

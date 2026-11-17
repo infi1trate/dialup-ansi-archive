@@ -10,6 +10,8 @@ export interface Profile {
   /** Reached VOID//NODE: 28800 unlocked at once. */
   voidUnlocked?: boolean;
   wardialed?: boolean;
+  /** Static's guaranteed chat after 20 files has happened. */
+  chatAfter20?: boolean;
 }
 
 const KEY = "dialup.profile.v1";

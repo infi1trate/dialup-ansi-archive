@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CASE, CASE_PARTS, CLOCK, MODEM, MODEM_LEDS, MODEM_LED_Y, inBox, modemLedX } from "./layout";
+import { CASE, CASE_PARTS, CLOCK, MODEM, SPEAKER_L, SPEAKER_LED, MODEM_LEDS, MODEM_LED_Y, inBox, modemLedX } from "./layout";
 import { SevenSeg } from "./SevenSeg";
 import { speedDisplay } from "@/audio/tables";
 
@@ -25,6 +25,7 @@ export function Emissive({ powered, turbo }: { powered: boolean; turbo: boolean 
       <span className={`pc-speed ${powered ? "is-on" : ""}`} style={{ ...at(disp), width: `${(CASE.w * CASE_PARTS.display.w) / 100}cqw`, height: `${(CASE.h * CASE_PARTS.display.h) / 100}cqw` }}>
         <SevenSeg value={powered ? speedDisplay(turbo) : "  "} className="seg-red" />
       </span>
+      <span data-led="spk" className="led led-green led-speaker" style={at(inBox(SPEAKER_L, SPEAKER_LED.x, SPEAKER_LED.y))} />
       {MODEM_LEDS.map((l, i) => <span key={l} data-led={l} className="led led-red led-modem" style={at(inBox(MODEM, modemLedX(i), MODEM_LED_Y))} />)}
       <span className="clock-face" style={{ left: `${CLOCK.x + CLOCK.w * 0.16}cqw`, top: `${CLOCK.y + CLOCK.h * 0.2}cqw`, width: `${CLOCK.w * 0.68}cqw`, height: `${CLOCK.h * 0.5}cqw` }}>
         <SevenSeg value={time} className="seg-red seg-clock" />

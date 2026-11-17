@@ -8,6 +8,13 @@
       "when": 1794924593713,
       "tag": "0000_callers_and_board_traces",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794931471574,
+      "tag": "0001_door_game",
+      "breakpoints": true
     }
   ]
 }

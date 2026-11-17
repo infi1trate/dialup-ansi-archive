@@ -8,6 +8,7 @@ import lampImg from "@/assets/room/lamp.webp";
 import { CLOCK, JACK, LAMP, MODEM, MONITOR, NOTE2, STAGE_H, STAIRS, WINDOW } from "./layout";
 import { PcCase } from "./PcCase";
 import { Modem } from "./Modem";
+import { Speakers } from "./Speakers";
 import { Keyboard } from "./Keyboard";
 import { Emissive } from "./Emissive";
 import { Rain } from "./Rain";
@@ -21,6 +22,8 @@ export interface RoomProps {
   leaned: boolean;
   reduced: boolean;
   modemVolume: number;
+  musicVolume: number;
+  onMusicVolume: (v: number) => void;
   getState: () => string;
   onPcPower: () => void;
   onTurbo: () => void;
@@ -120,6 +123,7 @@ export function Room(p: RoomProps) {
             </svg>
             <img src={pizzaImg} alt="" className="prop" style={box({ x: 86, y: 37.2, w: 19 })} loading="lazy" draggable={false} />
             <img src={lampImg} alt="Desk lamp" data-touch className="prop lamp" style={box(LAMP)} loading="lazy" draggable={false} onMouseDown={noFocus} onClick={p.onLamp} />
+            <Speakers volume={p.musicVolume} onVolume={p.onMusicVolume} />
             <div className="clock" style={box(CLOCK)} aria-hidden><span className="clock-brand">NITEWATCH</span></div>
             <PcCase powered={p.powered} turbo={p.turbo} onPower={p.onPcPower} onTurbo={p.onTurbo} />
             <div className="monitor-mount" style={{ left: `${MONITOR.x}cqw`, top: `${MONITOR.bottom}cqw`, width: `${MONITOR.w}cqw`, ["--mon-w" as string]: `${MONITOR.w}cqw` }}>{p.monitor}</div>

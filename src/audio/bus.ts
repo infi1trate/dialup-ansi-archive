@@ -5,10 +5,12 @@ export interface AudioEvents {
   diskSeek: void; floppySeek: void; offHook: void; dialDigit: string; ring: void; busy: void;
   handshakeStart: number; connect: number; hangup: void; byteFlow: number;
   monitorOn: void; monitorOff: void; lampToggle: boolean; mix: void; stairCreak: void;
+  /** Tracker output node to wire into the desk speakers; music = speakers playing or not. */
+  musicSource: AudioNode; music: boolean;
 }
 type Handler<T> = (payload: T) => void;
 
-export interface Mix { muted: boolean; modemVolume: number }
+export interface Mix { muted: boolean; modemVolume: number; musicVolume: number }
 
 class AudioBus {
   private handlers: Record<string, Handler<any>[]> = {};
@@ -16,7 +18,9 @@ class AudioBus {
   private loading = false;
   /** What is physically running right now, so a late-starting engine can catch up. */
   status = { pc: false, tube: false };
-  mix: Mix = { muted: false, modemVolume: 0.6 };
+  mix: Mix = { muted: false, modemVolume: 0.6, musicVolume: 0.6 };
+  musicOn = false;
+  musicNode: AudioNode | null = null;
 
   on<K extends keyof AudioEvents>(name: K, fn: Handler<AudioEvents[K]>) {
     (this.handlers[name] ??= []).push(fn);
@@ -28,6 +32,8 @@ class AudioBus {
     if (name === "powerOff") this.status.pc = false;
     if (name === "monitorOn") this.status.tube = true;
     if (name === "monitorOff") this.status.tube = false;
+    if (name === "music") this.musicOn = !!payload[0];
+    if (name === "musicSource") this.musicNode = payload[0] as AudioNode;
     for (const fn of this.handlers[name] ?? []) fn(payload[0]);
   }
 

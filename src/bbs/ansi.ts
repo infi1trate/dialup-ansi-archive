@@ -108,3 +108,46 @@ export function shadeBar(x: Ansi, width: number, fg: number) {
   }
   return x;
 }
+
+/**
+ * Chrome block letters: 6 pixel rows packed into 3 text rows with two-color half blocks, so each pixel row
+ * gets its own color (a vertical gradient). Where both halves are lit the lower color is the background, so it must be 1-7
+ * to show (bright or black lower colors fall back to a solid block in the upper color).
+ * A ░ shadow trails each stroke. Returns the width in columns.
+ */
+export function chromeText(x: Ansi, row: number, col: number, text: string, ramp: [number, number, number, number, number, number], shadow = 8) {
+  const px: boolean[][] = Array.from({ length: 6 }, () => []);
+  for (const ch of text.toUpperCase()) {
+    const g = GLYPHS[ch] ?? GLYPHS[" "];
+    for (let r = 0; r < 6; r++) { for (const p of g[r]) px[r].push(p === "#"); px[r].push(false); }
+  }
+  const w = px[0].length;
+  for (let tr = 0; tr < 3; tr++) {
+    x.at(row + tr, col);
+    const ct = ramp[tr * 2], cb = ramp[tr * 2 + 1];
+    for (let c = 0; c < w; c++) {
+      const top = px[tr * 2][c], bot = px[tr * 2 + 1][c];
+      if (top && bot) { if (cb === ct || cb >= 8 || cb === 0) x.c(ct).t("█"); else x.c(ct, cb).t("▀"); }
+      else if (top) x.c(ct).t("▀");
+      else if (bot) x.c(cb).t("▄");
+      else if (c > 0 && (px[tr * 2][c - 1] || px[tr * 2 + 1][c - 1])) x.c(shadow).t("░");
+      else x.c(7).t(" ");
+    }
+  }
+  return x.reset(), w;
+}
+
+/** The basement stairwell, 24 x 7, top-left at (row, col): bare bulb, the 486 glowing on its desk, stairs going up. */
+export function stairwell(x: Ansi, row: number, col: number, screen = 11) {
+  const L: [number, string][][] = [
+    [[8, "──┬──"], [0, "              "], [6, "  ▄▄▄"]],
+    [[8, "  │  "], [0, "           "], [6, "▄▄▄█"], [8, "▓▓▓▓"]],
+    [[14, "  ☼  "], [0, "        "], [6, "▄▄▄█"], [8, "▓▓▓▓▓▓▓"]],
+    [[0, " "], [7, "▄▄▄▄"], [0, "     "], [6, "▄▄▄█"], [8, "▓▓▓▓▓▓▓▓▓▓"]],
+    [[0, " "], [7, "█"], [screen, "▒▒"], [7, "█"], [0, "  "], [6, "▄▄▄█"], [8, "▓▓▓▓▓▓▓▓▓▓▓▓▓"]],
+    [[0, " "], [6, "▀██▀▀▀▀"], [6, "█"], [8, "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓"]],
+    [[8, "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀"]],
+  ];
+  L.forEach((segs, i) => { x.at(row + i, col); for (const [c, s] of segs) x.k(c, s); });
+  return x.reset();
+}

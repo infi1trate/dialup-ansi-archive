@@ -7,7 +7,7 @@ type B = typeof Bus;
 type Src = AudioScheduledSourceNode;
 
 /** Pan positions of the objects in the shot (-1 left .. 1 right). */
-const PAN = { window: -0.72, lamp: -0.7, pc: 0, monitor: -0.04, keyboard: 0.02, modem: 0.62 };
+const PAN = { window: -0.72, lamp: -0.7, pc: 0, monitor: -0.04, keyboard: 0.02, modem: 0.62, speakerL: -0.42, speakerR: 0.36 };
 
 let started = false;
 export function startSynth(ctx: AudioContext, bus: B) {
@@ -22,7 +22,7 @@ class Synth {
   master: GainNode;
   buses: Record<"room" | "pc" | "monitor" | "keyboard" | "modem", GainNode>;
   white: AudioBuffer; pink: AudioBuffer; brown: AudioBuffer; crackle: AudioBuffer;
-  modemIn: GainNode; modemVol: GainNode;
+  modemIn: GainNode; modemVol: GainNode; musicVol: GainNode;
   line: Src[] = [];
   fan: GainNode | null = null;
   hdd: { osc: OscillatorNode[]; gain: GainNode } | null = null;
@@ -62,6 +62,15 @@ class Synth {
     this.modemVol = c.createGain();
     this.modemIn.connect(shaper).connect(hp1).connect(hp2).connect(lp1).connect(lp2).connect(peak).connect(this.modemVol).connect(this.buses.modem);
 
+    // desk speakers: two small cones flanking the monitor; split L/R and pan each to its box
+    this.musicVol = c.createGain();
+    const mhp = this.biquad("highpass", 140, 0.8), mlp = this.biquad("lowpass", 7500, 0.7), mpk = this.biquad("peaking", 2600, 1.1); mpk.gain.value = 4;
+    const split = c.createChannelSplitter(2);
+    this.musicVol.connect(mhp).connect(mpk).connect(mlp).connect(split);
+    const spk = (ch: number, pan: number) => { const g = c.createGain(); const p = c.createStereoPanner(); p.pan.value = pan; split.connect(g, ch); g.connect(p); p.connect(this.master); p.connect(verb); };
+    spk(0, PAN.speakerL); spk(1, PAN.speakerR);
+    bus.on("musicSource", (n) => n.connect(this.musicVol));
+    if (bus.musicNode) bus.musicNode.connect(this.musicVol);
     this.applyMix();
     bus.on("mix", () => this.applyMix());
     bus.on("powerOn", () => this.pcOn());
@@ -144,6 +153,7 @@ class Synth {
     const m = this.bus.mix, t = this.now;
     this.master.gain.setTargetAtTime(m.muted ? 0 : 0.9, t, 0.03);
     this.modemVol.gain.setTargetAtTime(m.modemVolume * m.modemVolume * 1.6, t, 0.03);
+    this.musicVol.gain.setTargetAtTime(m.musicVolume * m.musicVolume * 1.4, t, 0.03);
   }
 
   // ── room ───────────────────────────────────────────────────────
