@@ -13,13 +13,13 @@ export function isAllowedJsonPath(p: string) {
   return JSON_PATH.test(p) && p.length < 200;
 }
 
-async function cacheKey(prefix: string, id: string) {
+export async function cacheKey(prefix: string, id: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id));
   const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   return `${prefix}/${hex}`;
 }
 
-async function cached(key: string, fetcher: () => Promise<Uint8Array>): Promise<Uint8Array> {
+export async function cached(key: string, fetcher: () => Promise<Uint8Array>): Promise<Uint8Array> {
   const existing = inflight.get(key);
   if (existing) return existing;
   const p = (async () => {

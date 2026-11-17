@@ -11,10 +11,13 @@ export const Route = createFileRoute("/api/public/archive/raw")({
         if (!/^[A-Za-z0-9._\-]{1,80}$/.test(pack) || !file || file.length > 120 || file.includes("/"))
           return new Response("bad request", { status: 400 });
         const { getRawFile } = await import("@/server/archive-proxy");
+        const { hiddenFiles } = await import("@/server/net");
+        if ((await hiddenFiles(pack).catch(() => new Set<string>())).has(file.toLowerCase()))
+          return new Response("this file has been taken down", { status: 410 });
         try {
           const bytes = await getRawFile(pack, file);
           return new Response(bytes as unknown as BodyInit, {
-            headers: { "content-type": "application/octet-stream", "cache-control": "public, max-age=31536000, immutable" },
+            headers: { "content-type": "application/octet-stream", "cache-control": "public, max-age=3600" },
           });
         } catch (e) {
           return new Response(String(e), { status: 502 });

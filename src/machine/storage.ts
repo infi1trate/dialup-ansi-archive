@@ -5,6 +5,8 @@ export interface Profile {
   handle: string | null; password: string | null; city: string; joke: string;
   lastCall: Record<string, string>; filesSeen: string[]; speed: Speed; fastBoot: boolean;
   calls: number;
+  /** Distinct files viewed as counted by the message base (survives device changes). */
+  serverFiles?: number;
 }
 
 const KEY = "dialup.profile.v1";
@@ -23,9 +25,9 @@ export function saveProfile(p: Profile) {
   try { window.localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage full or blocked */ }
 }
 
-/** Highest speed the caller has unlocked: 14400 after 5 files, 28800 after 15. */
+/** Highest speed the caller has unlocked: 14400 after 5 files, 28800 after 15 (local or server count). */
 export function maxSpeed(p: Profile): Speed {
-  const n = p.filesSeen.length;
+  const n = Math.max(p.filesSeen.length, p.serverFiles ?? 0);
   return n >= 15 ? 28800 : n >= 5 ? 14400 : 9600;
 }
 export function allowedSpeeds(p: Profile): Speed[] {

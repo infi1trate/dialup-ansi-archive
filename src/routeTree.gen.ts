@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as LabRouteImport } from './routes/lab'
+import { Route as ApiPublicCardRouteImport } from './routes/api/public/card'
+import { Route as ApiPublicNetRouteImport } from './routes/api/public/net'
 import { Route as ApiPublicArchiveJsonRouteImport } from './routes/api/public/archive.json'
 import { Route as ApiPublicArchiveRawRouteImport } from './routes/api/public/archive.raw'
 import { Route as DialNumberYearPackFileRouteImport } from './routes/dial.$number.$year.$pack.$file'
@@ -29,6 +31,16 @@ const CreditsRoute = CreditsRouteImport.update({
 const LabRoute = LabRouteImport.update({
   id: '/lab',
   path: '/lab',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCardRoute = ApiPublicCardRouteImport.update({
+  id: '/api/public/card',
+  path: '/api/public/card',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicNetRoute = ApiPublicNetRouteImport.update({
+  id: '/api/public/net',
+  path: '/api/public/net',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicArchiveJsonRoute = ApiPublicArchiveJsonRouteImport.update({
@@ -51,6 +63,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
   '/lab': typeof LabRoute
+  '/api/public/card': typeof ApiPublicCardRoute
+  '/api/public/net': typeof ApiPublicNetRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
   '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
@@ -59,6 +73,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
   '/lab': typeof LabRoute
+  '/api/public/card': typeof ApiPublicCardRoute
+  '/api/public/net': typeof ApiPublicNetRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
   '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
@@ -68,6 +84,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/credits': typeof CreditsRoute
   '/lab': typeof LabRoute
+  '/api/public/card': typeof ApiPublicCardRoute
+  '/api/public/net': typeof ApiPublicNetRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
   '/dial/$number/$year/$pack/$file': typeof DialNumberYearPackFileRoute
@@ -78,6 +96,8 @@ export interface FileRouteTypes {
     | '/'
     | '/credits'
     | '/lab'
+    | '/api/public/card'
+    | '/api/public/net'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
     | '/dial/$number/$year/$pack/$file'
@@ -86,6 +106,8 @@ export interface FileRouteTypes {
     | '/'
     | '/credits'
     | '/lab'
+    | '/api/public/card'
+    | '/api/public/net'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
     | '/dial/$number/$year/$pack/$file'
@@ -94,6 +116,8 @@ export interface FileRouteTypes {
     | '/'
     | '/credits'
     | '/lab'
+    | '/api/public/card'
+    | '/api/public/net'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
     | '/dial/$number/$year/$pack/$file'
@@ -103,6 +127,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreditsRoute: typeof CreditsRoute
   LabRoute: typeof LabRoute
+  ApiPublicCardRoute: typeof ApiPublicCardRoute
+  ApiPublicNetRoute: typeof ApiPublicNetRoute
   ApiPublicArchiveJsonRoute: typeof ApiPublicArchiveJsonRoute
   ApiPublicArchiveRawRoute: typeof ApiPublicArchiveRawRoute
   DialNumberYearPackFileRoute: typeof DialNumberYearPackFileRoute
@@ -129,6 +155,20 @@ declare module '@tanstack/react-router' {
       path: '/lab'
       fullPath: '/lab'
       preLoaderRoute: typeof LabRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/card': {
+      id: '/api/public/card'
+      path: '/api/public/card'
+      fullPath: '/api/public/card'
+      preLoaderRoute: typeof ApiPublicCardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/net': {
+      id: '/api/public/net'
+      path: '/api/public/net'
+      fullPath: '/api/public/net'
+      preLoaderRoute: typeof ApiPublicNetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/archive/json': {
@@ -159,6 +199,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreditsRoute: CreditsRoute,
   LabRoute: LabRoute,
+  ApiPublicCardRoute: ApiPublicCardRoute,
+  ApiPublicNetRoute: ApiPublicNetRoute,
   ApiPublicArchiveJsonRoute: ApiPublicArchiveJsonRoute,
   ApiPublicArchiveRawRoute: ApiPublicArchiveRawRoute,
   DialNumberYearPackFileRoute: DialNumberYearPackFileRoute,

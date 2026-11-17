@@ -3,6 +3,7 @@
 import { Ansi, a, box, center, pad, rpad } from "@/bbs/ansi";
 import { DIRECTORY, type DeepLink, type DirEntry, type HostIO } from "@/bbs/io";
 import { runBoard } from "@/bbs/board";
+import { count } from "@/data/net";
 import { audio } from "@/audio/bus";
 import { Engine } from "./engine";
 import { Aborted, KeyQueue, toKey, type Key } from "./keyboard";
@@ -78,6 +79,7 @@ export class Machine {
     this.engine.modem.clear();
     this.engine.powerOn();
     audio.emit("powerOn");
+    count("powered_on");
     this.callsThisPower = 0;
     void this.run(this.gen);
   }
@@ -335,6 +337,7 @@ export class Machine {
   private async call(entry: DirEntry, g: number, express: boolean) {
     const speed = allowedSpeeds(this.profile).includes(this.profile.speed) ? this.profile.speed : 9600;
     this.state.set("dialing");
+    count("dialed");
     this.skipping = false;
     const t = express ? 0.25 : 1;
     this.out(a().reset().cls().k(15, "TELEWIRE v2.1").k(7, " — terminal mode").nl(2));
@@ -373,6 +376,7 @@ export class Machine {
     await this.wait(handshakeMs(speed) * t); this.alive(g);
     this.out(a().k(15, `CONNECT ${speed}`).nl(2));
     audio.emit("connect", speed);
+    count("connected");
     this.engine.modem.bps = speed;
     await this.session(entry, speed, g);
   }

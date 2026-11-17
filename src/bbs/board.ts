@@ -9,6 +9,8 @@ import { HOUSE_PACK } from "@/data/housepack";
 import type { PackFile, PackInfo, PackSummary, Page } from "@/data/types";
 import { parseSauce, sauceDate, type Sauce } from "@/term/sauce";
 import { ANSI_VGA, type TermMode } from "@/term/terminal";
+import { artViewed, net, newSessionId, setLiveSession, timeAgo, type CallerInfo } from "@/data/net";
+import { checkHandle, checkOneliner } from "@/lib/filter";
 
 const SYSOP = "Static";
 const QUOTES = [
@@ -43,13 +45,91 @@ const BULLETINS = [
     "", "Set your speed in TELEWIRE's modem setup (press S at the directory)." ] },
   { title: "Takedown policy", body: [
     "All art on this board belongs to its artists. If you made something",
-    "here and want it gone, write the sysop: sysop@ (placeholder address).", ] },
+    "here and want it gone, write the sysop: sysop@ (placeholder address).",
+    "", "Or press R while viewing it and pick 3. Static hides it from the list." ] },
+  { title: "What this board stores", body: [
+    "If you apply for a handle, the message base keeps: your handle, city,",
+    "number of calls, how many files you've viewed and your modem speed.",
+    "It keeps your oneliners, your logons (handle, city, speed, time),",
+    "which files you viewed (one count per caller) and any reports you file.",
+    "",
+    "It does NOT keep: email, real names, passwords, cookies, or your raw",
+    "network address. Your machine makes a random token; the board stores",
+    "only a scrambled fingerprint (SHA-256) of it, and a scrambled fingerprint",
+    "of your network address to slow down spammers. A transfer phrase, if you",
+    "set one, is stored as a salted slow hash. Daily totals are just numbers.",
+    "Guests leave nothing but a logon and their view counts." ] },
 ];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Draw text with BBS pipe color codes |01-|15. */
+function pipes(x: Ansi, s: string, base = 7) {
+  let c = base;
+  for (const part of s.split(/(\|(?:0[1-9]|1[0-5]))/)) {
+    const m = /^\|(\d\d)$/.exec(part);
+    if (m) c = +m[1]; else if (part) x.k(c, part);
+  }
+  return x.reset();
+}
 
 class Board {
   user = "Guest";
   guest = true;
-  constructor(private io: HostIO) {}
+  online = true;
+  node: number;
+  caller: CallerInfo | null = null;
+  private session = newSessionId();
+  private doing = "logging on";
+  private lastBeat = 0;
+  private beatTimer: ReturnType<typeof setInterval> | null = null;
+  constructor(private io: HostIO) { this.node = io.node; }
+
+  // ── presence ───────────────────────────────────────────────────
+  async beat(doing?: string) {
+    if (doing) this.doing = doing;
+    this.lastBeat = Date.now();
+    const r = await net("beat", { session: this.session, doing: this.doing, speed: this.io.speed, guest: this.guest });
+    if (r?.online) { const me = r.online.findIndex((o: any) => o.me); if (me >= 0) this.node = me + 1; }
+    return r;
+  }
+  setDoing(d: string) {
+    if (d === this.doing) return;
+    this.doing = d;
+    if (this.online && this.beatTimer && Date.now() - this.lastBeat > 4000) void this.beat();
+  }
+  startPresence() {
+    if (!this.online || this.beatTimer) return;
+    setLiveSession(this.session);
+    void this.beat();
+    this.beatTimer = setInterval(() => void this.beat(), 60_000);
+  }
+  stopPresence() {
+    if (!this.beatTimer) return;
+    clearInterval(this.beatTimer); this.beatTimer = null;
+    setLiveSession(null);
+    void net("leave", { session: this.session });
+  }
+  offlineNote(x: Ansi, row: number) {
+    return x.at(row, 4).k(12, "░ the message base is offline ░").k(8, " this is the printout Static taped up");
+  }
+  become(c: CallerInfo) {
+    this.user = c.handle; this.guest = false; this.caller = c;
+    Object.assign(this.io.profile, { handle: c.handle, city: c.city, serverFiles: c.files });
+    this.io.save();
+  }
+  async suspended(): Promise<never> {
+    const x = a().cls();
+    box(x, 8, 14, 52, 7, 12, "ACCOUNT SUSPENDED");
+    x.at(10, 17).k(15, "Static has pulled your access to this board.");
+    x.at(11, 17).k(7, "Guests can still look around. Call back as GUEST.");
+    this.send(x);
+    await this.io.drain(); await sleep(2500);
+    throw new Aborted("hangup");
+  }
+  async ask(row: number, label: string, max: number, mask = false) {
+    this.send(a().at(row, 4).eol().k(13, label).k(5, ": "));
+    return this.input(max, { mask });
+  }
 
   // ── output helpers ─────────────────────────────────────────────
   send(x: Ansi | Uint8Array) { this.io.send(x instanceof Ansi ? x.build() : x); }
@@ -91,7 +171,7 @@ class Board {
 
   status(x: Ansi, row = 24) {
     const left = Math.max(0, Math.ceil(this.io.timeLeftMs() / 60000));
-    x.at(row, 1).c(15, 1).t(pad(` ${this.user}`, 26)).c(11, 1).t(pad(`node ${this.io.node}`, 12))
+    x.at(row, 1).c(15, 1).t(pad(` ${this.user}`, 26)).c(11, 1).t(pad(`node ${this.node}`, 12))
       .c(14, 1).t(pad(`${this.io.speed} bps`, 14)).c(15, 1).t(rpad(`time left: ${left} min `, 27)).reset();
     return x;
   }
@@ -165,66 +245,148 @@ class Board {
   async login(): Promise<void> {
     this.send(this.logo(a()).at(17, 1));
     const p = this.io.profile;
+    const hello = await net("hello");
+    this.online = !!hello && !hello.error;
+    const known: CallerInfo | null = hello?.caller ?? null;
+    if (known?.banned) await this.suspended();
     for (let tries = 0; ; tries++) {
-      this.send(a().at(17, 1).raw("\x1b[J").at(17, 4).k(7, "Enter your handle, ").k(15, "NEW").k(7, " to apply, or ").k(15, "GUEST").k(7, " to look around.")
-        .at(19, 4).k(13, "Handle").k(5, ": "));
+      const x = a().at(17, 1).raw("\x1b[J");
+      if (known) x.at(17, 4).k(7, "Welcome back, ").k(15, known.handle).k(7, ". ENTER logs you in, or type ").k(15, "NEW").k(7, " or ").k(15, "GUEST").k(7, ".");
+      else x.at(17, 4).k(7, "Enter your handle, ").k(15, "NEW").k(7, " to apply, or ").k(15, "GUEST").k(7, " to look around.");
+      if (!this.online) this.offlineNote(x, 23);
+      x.at(19, 4).k(13, "Handle").k(5, ": ");
+      this.send(x);
       const h = await this.input(20);
-      if (!h) continue;
+      if (!h) { if (known) return this.become(known); continue; }
       if (h.toUpperCase() === "GUEST") { this.user = "Guest"; this.guest = true; return; }
       if (h.toUpperCase() === "NEW") { await this.newUser(); return; }
+      if (known && h.toLowerCase() === known.handle.toLowerCase()) return this.become(known);
+      if (this.online) {
+        if (await this.transfer(h)) return;
+        if (tries > 6) throw new Aborted("hangup");
+        await sleep(1200);
+        continue;
+      }
+      // offline: accounts kept on this machine only
       if (p.handle && h.toLowerCase() === p.handle.toLowerCase()) {
         for (let pt = 0; pt < 3; pt++) {
-          this.send(a().at(20, 4).eol().k(13, "Password").k(5, ": "));
-          const pw = await this.input(16, { mask: true });
+          const pw = await this.ask(20, "Transfer phrase", 32, true);
           if (pw === (p.password ?? "")) { this.user = p.handle; this.guest = false; return; }
-          this.send(a().at(22, 4).eol().k(12, "Wrong password.").raw("\x07"));
+          this.send(a().at(22, 4).eol().k(12, "Wrong phrase.").raw("\x07"));
         }
         this.send(a().at(22, 4).eol().k(12, "Too many tries. Static's modem hangs up on you."));
         await this.io.drain();
         throw new Aborted("hangup");
       }
-      this.send(a().at(22, 4).eol().k(14, `No caller named "${h}". Type NEW to apply.`));
+      this.send(a().at(22, 4).eol().k(14, `No caller named "${h}" on this machine. Type NEW to apply.`));
       if (tries > 6) throw new Aborted("hangup");
     }
   }
 
+  /** A handle from another machine: prove it with the transfer phrase. */
+  async transfer(h: string): Promise<boolean> {
+    this.send(a().at(20, 4).eol().k(8, `Calling from a new machine? Type the transfer phrase for "${h.slice(0, 16)}".`));
+    for (let pt = 0; pt < 3; pt++) {
+      const ph = await this.ask(21, "Transfer phrase", 32, true);
+      if (!ph) { this.send(a().at(20, 1).raw("\x1b[J")); return false; }
+      this.send(a().at(22, 4).eol().k(8, "checking the user base..."));
+      const r = await net("transfer", { handle: h, phrase: ph });
+      if (r?.ok) {
+        this.become(r.caller);
+        this.send(a().at(22, 4).eol().k(10, "Phrase accepted. This machine knows you now."));
+        await this.io.drain(); await sleep(900);
+        return true;
+      }
+      const why = !r ? "The message base didn't answer." : r.status === 429 ? "Too many tries. Wait ten minutes."
+        : r.why === "nouser" ? `No caller named "${h.slice(0, 16)}". Type NEW to apply.` : r.why === "nophrase" ? "That caller never set a transfer phrase."
+        : r.why === "banned" ? "That account is suspended." : "Wrong transfer phrase.";
+      this.send(a().at(22, 4).eol().k(12, why).raw(r?.why === "wrong" ? "\x07" : ""));
+      if (r?.why !== "wrong") return false;
+    }
+    this.send(a().at(22, 4).eol().k(12, "Three strikes. Static's modem hangs up on you."));
+    await this.io.drain();
+    throw new Aborted("hangup");
+  }
+
   async newUser() {
     const x = this.header(a(), "New caller application");
-    box(x, 5, 6, 68, 5, 12, "READ THIS");
-    x.at(6, 9).k(15, "Do NOT use a real password here.").at(7, 9).k(7, "This board keeps your account in this browser only, in plain text.")
-      .at(8, 9).k(7, "Make something up. Write it on a sticky note like it's 1992.");
+    box(x, 5, 6, 68, 6, 12, "READ THIS");
+    x.at(6, 9).k(15, "Do NOT reuse a real password anywhere on this board.")
+      .at(7, 9).k(7, "Your handle lives on the board; this machine remembers you.")
+      .at(8, 9).k(7, "A transfer phrase lets you log in from another machine. Optional.")
+      .at(9, 9).k(7, "Make it up. Write it on a sticky note like it's 1992.");
+    if (!this.online) this.offlineNote(x, 22);
     this.send(x);
-    let handle = "";
-    while (!handle) {
-      this.send(a().at(11, 6).eol().k(11, "Handle (no real names)").k(5, ": "));
-      handle = await this.input(20);
-      if (["NEW", "GUEST", "SYSOP", "STATIC"].includes(handle.toUpperCase())) { this.send(a().at(12, 6).k(12, "That one's taken.")); handle = ""; }
+    for (;;) {
+      let handle = "";
+      while (!handle) {
+        handle = await this.ask(12, "Handle (no real names)", 16);
+        if (!handle) continue;
+        const v = checkHandle(handle);
+        let why = v.ok ? "" : v.why;
+        if (v.ok && this.online) {
+          const r = await net("check", { handle });
+          if (!r) this.online = false; else if (!r.ok) why = r.why || r.error || "Try another.";
+        }
+        if (why) { this.send(a().at(13, 6).eol().k(12, why)); handle = ""; }
+        else this.send(a().at(13, 6).eol());
+      }
+      const city = await this.ask(13, "City", 24);
+      const joke = await this.ask(14, "What's the best sound a modem makes?", 30);
+      this.send(a().at(15, 4).eol().k(8, "Transfer phrase: optional, 4+ characters. ENTER to skip."));
+      const phrase = await this.ask(16, "Transfer phrase", 32, true);
+      if (this.online) {
+        this.send(a().at(18, 6).eol().k(8, "writing you into the user base..."));
+        const r = await net("claim", { handle, city, phrase });
+        if (r?.ok) {
+          this.become(r.caller);
+          Object.assign(this.io.profile, { joke, password: null }); this.io.save();
+        } else if (r) {
+          this.send(a().at(18, 6).eol().k(12, r.why || r.error || "The application was refused.").at(12, 1).raw("\x1b[J"));
+          await sleep(1500);
+          this.send(a().at(18, 6).eol());
+          continue;
+        } else this.online = false;
+      }
+      if (!this.online) {
+        Object.assign(this.io.profile, { handle, city, joke, password: phrase });
+        this.io.save();
+        this.user = handle; this.guest = false;
+      }
+      this.send(a().at(18, 6).eol().k(10, `Welcome aboard, ${handle}. Validation pending (Static is asleep).`));
+      if (joke) this.send(a().at(19, 6).k(8, `Noted: "${joke.slice(0, 50)}". Bold choice.`));
+      if (!this.online) this.send(a().at(20, 6).k(12, "Saved on this machine only until the message base is back."));
+      await this.anyKey(21);
+      return;
     }
-    this.send(a().at(12, 6).eol().k(11, "City").k(5, ": "));
-    const city = await this.input(24);
-    this.send(a().at(13, 6).k(11, "What's the best sound a modem makes?").k(5, ": "));
-    const joke = await this.input(30);
-    this.send(a().at(14, 6).k(11, "Password (fake!)").k(5, ": "));
-    const pw = await this.input(16, { mask: true });
-    Object.assign(this.io.profile, { handle, city, joke, password: pw });
-    this.io.save();
-    this.user = handle; this.guest = false;
-    this.send(a().at(16, 6).k(10, `Welcome aboard, ${handle}. Validation pending (Static is asleep).`));
-    if (joke) this.send(a().at(17, 6).k(8, `Noted: "${joke.slice(0, 50)}". Bold choice.`));
-    await this.anyKey(19);
+  }
+
+  async logon() {
+    if (this.online) {
+      const r = await net("logon", { speed: this.io.speed, guest: this.guest });
+      if (!r || r.error) this.online = !!r;
+      else if (r.banned) await this.suspended();
+      else if (r.caller) { this.caller = r.caller; this.io.profile.serverFiles = r.caller.files; this.io.save(); }
+    }
+    this.startPresence();
   }
 
   // ── logon parade ───────────────────────────────────────────────
   async lastCallers() {
     const x = this.header(a(), "Last 10 callers", this.io.entry.number);
-    x.at(5, 4).k(13, pad("#", 4)).k(13, pad("Handle", 22)).k(13, pad("From", 20)).k(13, pad("Node", 7)).k(13, "Time");
-    x.at(6, 4).k(5, "─".repeat(62));
-    const list = [[this.user, this.guest ? "somewhere" : this.io.profile.city || "parts unknown", "now"], ...CALLERS];
-    list.slice(0, 8).forEach((c, n) => {
-      x.at(7 + n, 4).k(8, pad(String(n + 1).padStart(2, "0"), 4)).k(n === 0 ? 15 : 11, pad(c[0], 22)).k(3, pad(c[1], 20)).k(7, pad(String((n % 2) + 1), 7)).k(9, c[2]);
+    x.at(5, 4).k(13, pad("#", 4)).k(13, pad("Handle", 20)).k(13, pad("From", 20)).k(13, pad("Speed", 9)).k(13, "When");
+    x.at(6, 4).k(5, "─".repeat(66));
+    const r = this.online ? await net("callers") : null;
+    const real: string[][] = (r?.callers ?? []).map((c: any) => [c.handle, c.city || "parts unknown", String(c.speed), timeAgo(c.created_at)]);
+    const seeded = CALLERS.map((c, n) => [c[0], c[1], n % 3 ? "2400" : "9600", c[2]]);
+    const list = [...real, ...seeded].slice(0, 10);
+    list.forEach((c, n) => {
+      const mine = n < real.length && !this.guest && c[0].toLowerCase() === this.user.toLowerCase();
+      x.at(7 + n, 4).k(8, pad(String(n + 1).padStart(2, "0"), 4)).k(mine ? 15 : n < real.length ? 11 : 3, pad(c[0], 20)).k(3, pad(c[1], 20)).k(14, pad(c[2], 9)).k(9, c[3]);
     });
+    if (!r?.callers) this.offlineNote(x, 18);
     this.send(x);
-    await this.anyKey(17);
+    await this.anyKey(20);
   }
 
   async news() {
@@ -242,13 +404,38 @@ class Board {
   }
 
   async oneliners() {
-    const x = this.header(a(), "Oneliners wall");
-    ONELINERS.forEach(([h, t], n) => {
-      x.at(5 + n * 2, 4).k(8, "░▒▓").k(n % 2 ? 13 : 11, pad(h, 14)).k(7, t);
-    });
-    x.at(18, 4).k(8, "(The wall is read-only until Static finishes the multi-node patch.)");
-    this.send(x);
-    await this.anyKey(20);
+    this.setDoing("reading the oneliners");
+    for (;;) {
+      const r = this.online ? await net("oneliners") : null;
+      const list: string[][] = r?.oneliners ? r.oneliners.map((o: any) => [o.handle, o.body]) : ONELINERS;
+      const x = this.header(a(), "Oneliners wall", r?.oneliners ? `latest ${list.length}` : "");
+      list.slice(-15).forEach(([h, t], n) => { x.at(5 + n, 3).k(8, "░▒").k(n % 2 ? 13 : 11, pad(h, 17)); pipes(x, t); });
+      if (!list.length) x.at(6, 6).k(8, "The wall is bare. Be the first.");
+      const canPost = !!r?.oneliners && !this.guest;
+      if (!r?.oneliners) this.offlineNote(x, 21);
+      else if (this.guest) x.at(21, 4).k(8, "Guests can read the wall. Apply with NEW to write on it.");
+      else x.at(21, 4).k(5, "[").k(15, "A").k(5, "]").k(13, "dd a oneliner").k(8, "   ·   colors: |01-|15   ·   any other key continues");
+      this.send(x);
+      const k = await this.key();
+      this.io.clearOutput();
+      if (canPost && k.ch !== null && String.fromCharCode(k.ch).toUpperCase() === "A") { await this.addOneliner(); continue; }
+      return;
+    }
+  }
+
+  async addOneliner() {
+    const body = await this.ask(22, ">", 70);
+    if (!body) return;
+    const v = checkOneliner(body);
+    let msg: [number, string];
+    if (!v.ok) msg = [12, v.why];
+    else {
+      const r = await net("post", { body: v.value });
+      msg = !r ? [12, "The message base is offline. Your line fell on the floor."]
+        : r.ok ? [10, "Scrawled on the wall."] : [12, r.why || r.error || "Rejected."];
+    }
+    this.send(a().at(23, 4).eol().k(msg[0], msg[1]));
+    await this.io.drain(); await sleep(1400);
   }
 
   // ── main menu ──────────────────────────────────────────────────
@@ -270,6 +457,7 @@ class Board {
 
   async mainMenu(): Promise<"bye"> {
     for (;;) {
+      this.setDoing("at the main menu");
       this.send(this.menuScreen());
       const k = await this.key();
       const c = (k.ch !== null ? String.fromCharCode(k.ch) : "").toUpperCase();
@@ -286,6 +474,7 @@ class Board {
         case "D": await this.doors(); break;
         case "C": await this.credits(); break;
         case "G": if (await this.confirmBye()) return "bye"; break;
+        case "!": this.io.clearOutput(); await this.sysopConsole(); break;
       }
     }
   }
@@ -294,11 +483,13 @@ class Board {
     for (;;) {
       const x = this.header(a(), "Bulletins");
       BULLETINS.forEach((b, n) => x.at(6 + n * 2, 6).hot(String(n + 1), "  " + b.title, 15, 5, 11));
-      x.at(14, 6).k(8, "Pick a number, or ESC to go back: ");
+      x.at(6 + BULLETINS.length * 2, 6).hot(String(BULLETINS.length + 1), "  Top 10 downloads", 15, 5, 11);
+      x.at(8 + BULLETINS.length * 2, 6).k(8, "Pick a number, or ESC to go back: ");
       this.send(x);
       const k = await this.key();
       if (k.key === "Escape" || k.key === "Enter") return;
       const n = k.ch !== null ? k.ch - 49 : -1;
+      if (n === BULLETINS.length) { await this.topFiles(); continue; }
       const b = BULLETINS[n];
       if (!b) continue;
       const y = this.header(a(), `Bulletin #${n + 1}`);
@@ -309,14 +500,98 @@ class Board {
     }
   }
 
+  async topFiles() {
+    const x = this.header(a(), "Top 10 downloads");
+    x.at(5, 4).k(13, pad("#", 4)).k(13, pad("File", 18)).k(13, pad("Pack", 22)).k(13, "Callers");
+    x.at(6, 4).k(5, "─".repeat(56));
+    const r = this.online ? await net("top") : null;
+    const top: any[] = r?.top ?? [];
+    top.forEach((t, n) => x.at(7 + n, 4).k(8, pad(String(n + 1).padStart(2, "0"), 4)).k(11, pad(t.file, 18)).k(3, pad(String(t.pack).toUpperCase(), 22)).k(14, String(t.views)));
+    if (!r) this.offlineNote(x, 18);
+    else if (!top.length) x.at(8, 6).k(8, "Nobody has downloaded anything yet. Go on, be first.");
+    else x.at(18, 4).k(8, "One count per caller per file. Pack names are what you type in F.");
+    this.send(x);
+    await this.anyKey(20);
+  }
+
   async whosOnline() {
     const x = this.header(a(), "Who's online");
-    x.at(6, 6).k(13, pad("Node", 8)).k(13, pad("Caller", 22)).k(13, pad("Speed", 10)).k(13, "Doing");
-    x.at(7, 6).k(5, "─".repeat(60));
-    x.at(8, 6).k(15, pad("1", 8)).k(11, pad(this.user, 22)).k(14, pad(String(this.io.speed), 10)).k(7, "Reading who's online");
-    x.at(9, 6).k(15, pad("2", 8)).k(8, pad("—", 22)).k(8, pad("—", 10)).k(8, "Waiting for caller...");
+    x.at(5, 4).k(13, pad("Node", 6)).k(13, pad("Caller", 18)).k(13, pad("From", 16)).k(13, pad("Speed", 8)).k(13, "Doing");
+    x.at(6, 4).k(5, "─".repeat(72));
+    const r = this.online ? await this.beat("reading who's online") : null;
+    const list: any[] = r?.online ?? [{ handle: this.guest ? null : this.user, city: this.io.profile.city, speed: this.io.speed, doing: "reading who's online", me: true }];
+    for (let n = 0; n < 8; n++) {
+      const o = list[n];
+      const y = x.at(7 + n, 4).k(15, pad(String(n + 1), 6));
+      if (!o) { y.k(8, pad("—", 18)).k(8, pad("", 16)).k(8, pad("", 8)).k(8, "waiting for caller..."); continue; }
+      y.k(o.me ? 15 : 11, pad(o.handle || "Guest", 18)).k(3, pad(o.city || "—", 16)).k(14, pad(String(o.speed), 8)).k(7, String(o.doing).slice(0, 26));
+    }
+    if (!r) this.offlineNote(x, 17);
+    else if (!list.some((o) => !o.me)) x.at(17, 4).k(13, "Nobody else is on. Just you, the hum of the 486 and Static snoring.");
+    else x.at(17, 4).k(8, `${list.length} caller${list.length > 1 ? "s" : ""} on line. Static's phone bill weeps.`);
     this.send(x);
-    await this.anyKey(13);
+    await this.anyKey(19);
+  }
+
+  // ── sysop console (hidden: ! at the main menu) ─────────────────
+  async sysopConsole() {
+    const x = this.header(a(), "Sysop console");
+    x.at(6, 6).k(8, "Authorized personnel only. That means Static.");
+    this.send(x);
+    const key = await this.ask(8, "Sysop key", 64, true);
+    if (!key) return;
+    const r = await net("sysop", { key, op: "auth" });
+    const fail = (title: string, line: string) => {
+      const y = a(); box(y, 11, 14, 52, 5, 12, title); y.at(13, 17).k(15, pad(line, 46)).raw("\x07"); this.send(y);
+      return this.anyKey(18);
+    };
+    if (!r) return fail("OFFLINE", "The message base is offline.");
+    if (r.disabled) return fail("CONSOLE DISABLED", "Console disabled. Static pulled the key switch.");
+    if (!r.ok) return fail("ACCESS DENIED", r.status === 429 ? "Too many tries. The console is sulking." : "Wrong key. A dog growls under the stairs.");
+    const op = (o: string, arg = "") => net("sysop", { key, op: o, arg });
+    for (;;) {
+      const m = this.header(a(), "Sysop console", "node 0");
+      const items: [string, string][] = [["1", " list oneliners"], ["2", " hide a oneliner"], ["3", " ban a handle"], ["4", " list reports"], ["5", " hide a file"], ["6", " unhide a file"], ["7", " counters, 14 days"], ["Q", "uit console"]];
+      items.forEach(([k, l], n) => m.at(5 + n * 2, 8).hot(k, l, 15, 12, 14));
+      m.at(22, 4).k(12, "Sysop").k(8, " ▸ ").k(14, "Command").k(5, ": ");
+      this.send(m);
+      const k = await this.key();
+      this.io.clearOutput();
+      const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : k.key === "Escape" ? "Q" : "";
+      if (c === "Q") return;
+      const result = async (p: Promise<any>) => {
+        const res = await p;
+        this.send(a().at(23, 4).eol().k(res?.ok ? 10 : 12, res?.ok ? "Done." : "No such thing, or the base didn't answer."));
+        await this.io.drain(); await sleep(1100);
+      };
+      if (c === "1" || c === "4") {
+        const res = await op(c === "1" ? "oneliners" : "reports");
+        const y = this.header(a(), c === "1" ? "Oneliners (all)" : "Reports");
+        const why = ["", "offensive", "renders wrong", "takedown"];
+        (res?.rows ?? []).forEach((o: any, n: number) => {
+          if (c === "1") y.at(5 + n, 3).k(o.hidden ? 8 : 14, pad(`#${o.id}`, 7)).k(o.hidden ? 8 : 11, pad(o.handle, 17)).k(o.hidden ? 8 : 7, pad(o.body, 52));
+          else y.at(5 + n, 3).k(11, pad(`${o.pack}/${o.file}`, 34)).k(12, pad(why[o.reason], 15)).k(3, pad(o.handle || "guest", 17)).k(8, timeAgo(o.created_at));
+        });
+        if (!res?.rows?.length) y.at(6, 6).k(8, "(nothing)");
+        this.send(y); await this.anyKey(21);
+      } else if (c === "2") { const id = await this.ask(23, "Oneliner #", 10); if (id) await result(op("hideOneliner", id.replace("#", ""))); }
+      else if (c === "3") { const h = await this.ask(23, "Ban handle", 16); if (h) await result(op("ban", h)); }
+      else if (c === "5" || c === "6") { const f = await this.ask(23, "pack/FILE", 70); if (f) await result(op(c === "5" ? "hide" : "unhide", f)); }
+      else if (c === "7") {
+        const res = await op("counters");
+        const steps = ["landed", "powered_on", "dialed", "connected", "logged_in", "first_art", "third_art", "called_back"];
+        const heads = ["land", "power", "dial", "conn", "login", "art1", "art3", "back"];
+        const y = this.header(a(), "Daily counters", "last 14 days");
+        y.at(5, 3).k(13, pad("day", 12)); heads.forEach((h) => y.k(13, rpad(h, 8)));
+        y.at(6, 3).k(5, "─".repeat(76));
+        for (let d = 13; d >= 0; d--) {
+          const day = new Date(Date.now() - d * 86400_000).toISOString().slice(0, 10);
+          const row = y.at(7 + (13 - d), 3).k(7, pad(day, 12));
+          steps.forEach((st) => { const v = (res?.rows ?? []).find((r: any) => r.day === day && r.step === st)?.count ?? 0; row.k(v ? 15 : 8, rpad(String(v), 8)); });
+        }
+        this.send(y); await this.anyKey(22);
+      }
+    }
   }
 
   async userList() {
@@ -411,6 +686,7 @@ class Board {
 
   // ── file areas ─────────────────────────────────────────────────
   async files() {
+    this.setDoing("browsing the file areas");
     const mode = this.io.entry.mode;
     if (mode === "year1993") return this.yearPacks(1993);
     if (mode === "groups") return this.groupList();
@@ -574,9 +850,13 @@ class Board {
       const seen = `${pack.name}/${f.name}`;
       const before = maxSpeed(io.profile);
       if (!io.profile.filesSeen.includes(seen)) { io.profile.filesSeen.push(seen); io.save(); }
+      this.setDoing(`viewing ${f.name}`.slice(0, 40));
+      artViewed();
+      if (this.online) void net("view", { pack: pack.name, file: f.name }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
+      const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
       const unlocked = maxSpeed(io.profile) !== before ? maxSpeed(io.profile) : 0;
       let finished = false, info = false;
-      const showInfo = () => io.client.overlay(info ? infoPanel(pack, f, art.sauce, bytes.length, mode, unlocked) : null);
+      const showInfo = () => io.client.overlay(info ? infoPanel(pack, f, art.sauce, bytes.length, mode, unlocked, url) : null);
       let next = 0;
       while (!next) {
         const k = finished ? await io.key() : await io.keyOrDrain();
@@ -589,6 +869,7 @@ class Board {
           io.clearOutput(); io.resume(); restore(); return;
         }
         if (c === "I") { info = !info; showInfo(); continue; }
+        if (c === "R") { await this.report(pack, f); showInfo(); continue; }
         if (c === "N" && idx < files.length - 1) { next = 1; break; }
         if (c === "P" && idx > 0) { next = -1; break; }
         const rows = io.client.rows();
@@ -606,10 +887,29 @@ class Board {
     }
   }
 
+  async report(pack: PackInfo, f: PackFile) {
+    const io = this.io;
+    const panel = (lines: [number, string][]) => {
+      const x = a(); box(x, 8, 20, 42, lines.length + 4, 12, "REPORT THIS FILE");
+      lines.forEach(([c, t], n) => x.at(10 + n, 24).k(c, pad(t, 35)));
+      io.client.overlay(x.build());
+    };
+    panel([[15, f.name], [7, ""], [11, "1  offensive"], [11, "2  renders wrong"], [11, "3  I made this, please remove"], [8, "ESC  never mind"]]);
+    const k = await io.key();
+    const n = k.ch !== null ? k.ch - 48 : 0;
+    if (n >= 1 && n <= 3) {
+      const r = await net("report", { pack: pack.name, file: f.name, reason: n });
+      panel([[15, f.name], [7, ""], r?.ok ? [10, "Filed. Static reads these on Sundays."] : r?.status === 429 ? [12, "You've filed plenty. Try later."] : [12, "Message base offline. Not filed."]]);
+      await sleep(1500);
+    }
+    io.client.overlay(null);
+  }
+
   async run(): Promise<void> {
     try {
       if (this.io.deepLink) return await this.runDeepLink(this.io.deepLink);
       await this.login();
+      await this.logon();
       await this.lastCallers();
       await this.news();
       await this.oneliners();
@@ -618,12 +918,16 @@ class Board {
     } catch (e) {
       if (e instanceof Aborted && e.reason === "timeup") { await this.timesUp(); return; }
       throw e;
-    }
+    } finally { this.stopPresence(); }
   }
 
   async runDeepLink(dl: DeepLink) {
     const p = this.io.profile;
-    if (p.handle) { this.user = p.handle; this.guest = false; }
+    const hello = await net("hello");
+    this.online = !!hello && !hello.error;
+    if (hello?.caller && !hello.caller.banned) this.become(hello.caller);
+    else if (!this.online && p.handle) { this.user = p.handle; this.guest = false; }
+    await this.logon();
     this.send(a().cls().at(12, 1).k(11, center(`Welcome back, ${this.user}. Express login to ${dl.pack.toUpperCase()}...`, 79)));
     await this.io.drain();
     await this.packScreen({ name: dl.pack, year: dl.year, groups: [] }, dl.file);
@@ -702,11 +1006,11 @@ export function binToAnsi(b: Uint8Array, cols: number): Uint8Array {
   return new Uint8Array(out);
 }
 
-function infoPanel(pack: PackInfo, f: PackFile, s: Sauce | null, size: number, mode: TermMode, unlocked: number) {
+function infoPanel(pack: PackInfo, f: PackFile, s: Sauce | null, size: number, mode: TermMode, unlocked: number, url: string) {
   const x = a();
-  const W = 52, R = 6, C = 15;
-  box(x, R, C, W, 14, 11, "FILE INFO");
-  const row = (n: number, label: string, val: string, vc = 15) => x.at(R + 1 + n, C + 3).k(3, pad(label, 9)).k(vc, pad(val || "—", W - 14));
+  const W = 70, R = 4, C = 6, V = W - 14;
+  box(x, R, C, W, 17, 11, "FILE INFO");
+  const row = (n: number, label: string, val: string, vc = 15) => x.at(R + 1 + n, C + 3).k(3, pad(label, 9)).k(vc, pad(val || "—", V));
   row(1, "Title", s?.title || f.name);
   row(2, "Artist", s?.author || f.artists.join(", "));
   row(3, "Group", s?.group || pack.groups.join(", "));
@@ -715,8 +1019,10 @@ function infoPanel(pack: PackInfo, f: PackFile, s: Sauce | null, size: number, m
   row(6, "Font", `${s?.tInfoS || "IBM VGA"} · ${mode.ninePixel ? "9px" : "8px"}${mode.ice ? " · iCE" : ""}`);
   row(7, "Size", `${size} bytes · ${mode.cols} cols${s ? "" : " · no SAUCE"}`);
   row(8, "File", f.name, 7);
-  if (unlocked) x.at(R + 10, C + 3).k(10, pad(`Your modem can now do ${unlocked}! (TELEWIRE: S)`, W - 6));
-  x.at(R + 12, C + 3).k(8, "SPC pause ENTER finish N/P next/prev ESC");
+  row(9, "Phone #", url.slice(0, V), 14);
+  if (url.length > V) row(10, "", url.slice(V, V * 2), 14);
+  if (unlocked) x.at(R + 12, C + 3).k(10, pad(`Your modem can now do ${unlocked}! (TELEWIRE: S)`, W - 6));
+  x.at(R + 14, C + 3).k(8, "SPC pause · ENTER finish · N/P next/prev · R report · ESC");
   return x.build();
 }
 

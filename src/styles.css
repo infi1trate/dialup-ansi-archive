@@ -272,7 +272,7 @@
   .room.reduce .cam { transition-duration: 1ms; }
   .stage {
     position: relative; width: max(100vw, calc(100vh * 16 / 9)); container-type: inline-size;
-    overflow: hidden; flex: none;
+    overflow: clip; flex: none;
   }
   .layer { position: absolute; inset: -1.2cqw; will-change: transform; }
   .layer > * { position: absolute; }
@@ -298,7 +298,7 @@
 
   /* monitor in the room */
   .monitor-mount { transform: translateY(-100%); z-index: 2; }
-  .monitor-mount .monitor-case { --w: 50cqw; box-shadow: 0 1cqw 2cqw oklch(0 0 0 / 0.75), inset 0 0.25cqw 0 oklch(1 0 0 / 0.3), inset 0 -0.6cqw 1.2cqw oklch(0.4 0.04 80 / 0.35); padding-bottom: calc(var(--w) * 0.012); }
+  .monitor-mount .monitor-case { --w: var(--mon-w, 50cqw); box-shadow: 0 1cqw 2cqw oklch(0 0 0 / 0.75), inset 0 0.25cqw 0 oklch(1 0 0 / 0.3), inset 0 -0.6cqw 1.2cqw oklch(0.4 0.04 80 / 0.35); padding-bottom: calc(var(--w) * 0.012); }
   .monitor-mount .monitor-screen { cursor: zoom-in; }
   .room.leaned .monitor-screen { cursor: default; }
   .room.leaned .stage { cursor: zoom-out; }
@@ -321,9 +321,9 @@
   .monitor-knob { transform: rotate(var(--rot, 0deg)); }
 
   .sticky-note {
-    position: absolute; right: calc(var(--w) * -0.06); top: calc(var(--w) * 0.1); width: calc(var(--w) * 0.16); padding: calc(var(--w) * 0.012) calc(var(--w) * 0.012) calc(var(--w) * 0.02);
+    position: absolute; left: calc(100% - var(--w) * 0.035); top: calc(var(--w) * 0.12); width: calc(var(--w) * 0.13); transform-origin: 0 0; padding: calc(var(--w) * 0.012) calc(var(--w) * 0.012) calc(var(--w) * 0.02);
     background: linear-gradient(170deg, oklch(0.9 0.14 98), oklch(0.83 0.15 92)); color: oklch(0.25 0.04 260);
-    font-family: "Nanum Pen Script", cursive; font-size: calc(var(--w) * 0.024); line-height: 1.02; transform: rotate(5deg);
+    font-family: "Nanum Pen Script", cursive; font-size: calc(var(--w) * 0.02); line-height: 1.02; transform: rotate(4deg);
     box-shadow: 0.15cqw 0.4cqw 0.6cqw oklch(0 0 0 / 0.55); clip-path: polygon(0 0, 100% 0, 100% 92%, 94% 100%, 0 100%);
   }
   .sticky-note p { margin: 0; }

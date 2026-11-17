@@ -41,6 +41,7 @@ export function Computer({ deepLink }: Props) {
     const narrow = window.innerWidth < 900 || window.innerHeight > window.innerWidth;
     setLeaned(s.lean ?? narrow);
     audio.setMix({ muted: s.muted, modemVolume: s.modemVolume });
+    void import("@/data/net").then((n) => n.count("landed"));
   }, []);
 
   useEffect(() => {

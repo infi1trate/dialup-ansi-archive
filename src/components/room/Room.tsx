@@ -109,7 +109,7 @@ export function Room(p: RoomProps) {
           {/* desk + machines */}
           <div ref={L(1)} className="layer layer-mid">
             <img src={deskImg} alt="" className="desk" draggable={false} />
-            <svg className="cables" viewBox="0 0 1000 562.5" preserveAspectRatio="none" aria-hidden>
+            <svg className="cables" style={{ transform: "translateY(2.4cqw)" }} viewBox="0 0 1000 562.5" preserveAspectRatio="none" aria-hidden>
               <path d="M792 495 C 860 470, 930 450, 958 400 S 978 385, 982 386" className="cord-coil" />
               <path d="M792 495 C 860 470, 930 450, 958 400 S 978 385, 982 386" className="cord" />
               <path d="M770 520 C 790 560, 760 600, 720 600" className="cable" />
@@ -121,7 +121,7 @@ export function Room(p: RoomProps) {
             <img src={lampImg} alt="Desk lamp" data-touch className="prop lamp" style={box(LAMP)} loading="lazy" draggable={false} onMouseDown={noFocus} onClick={p.onLamp} />
             <div className="clock" style={box(CLOCK)} aria-hidden><span className="clock-brand">NITEWATCH</span></div>
             <PcCase powered={p.powered} turbo={p.turbo} onPower={p.onPcPower} onTurbo={p.onTurbo} />
-            <div className="monitor-mount" style={{ left: `${MONITOR.x}cqw`, top: `${MONITOR.bottom}cqw`, width: `${MONITOR.w}cqw` }}>{p.monitor}</div>
+            <div className="monitor-mount" style={{ left: `${MONITOR.x}cqw`, top: `${MONITOR.bottom}cqw`, width: `${MONITOR.w}cqw`, ["--mon-w" as string]: `${MONITOR.w}cqw` }}>{p.monitor}</div>
             <Modem volume={p.modemVolume} onVolume={p.onModemVolume} />
           </div>
           {/* foreground props */}

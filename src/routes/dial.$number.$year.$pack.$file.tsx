@@ -1,17 +1,28 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Computer } from "@/components/machine/Computer";
+import { getShareMeta } from "@/server/share.functions";
 
 export const Route = createFileRoute("/dial/$number/$year/$pack/$file")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.file} from ${params.pack} — Dial-Up` },
-      { name: "description", content: `Dial ${params.number} and watch ${params.file} (${params.pack}, ${params.year}) stream in at modem speed.` },
-      { property: "og:title", content: `${params.file} · ${params.pack} — Dial-Up` },
-      { property: "og:description", content: `ANSI art from ${params.year}, sent byte by byte over a simulated modem.` },
+  loader: async ({ params }) => {
+    try { return await getShareMeta({ data: { pack: params.pack, file: params.file, year: params.year } }); }
+    catch { return { line: `${params.file} (${params.pack}, ${params.year})`, card: null as string | null }; }
+  },
+  head: ({ params, loaderData }) => {
+    const line = loaderData?.line ?? `${params.file} (${params.pack}, ${params.year})`;
+    const desc = `Dial ${params.number} and watch it stream in at modem speed on The Crawlspace BBS.`;
+    const meta = [
+      { title: `${line} — Dial-Up` },
+      { name: "description", content: desc },
+      { property: "og:title", content: line },
+      { property: "og:description", content: desc },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+      { name: "twitter:title", content: line },
+      { name: "twitter:description", content: desc },
+    ];
+    if (loaderData?.card) meta.push({ property: "og:image", content: loaderData.card }, { name: "twitter:image", content: loaderData.card });
+    return { meta };
+  },
   component: DeepLinkPage,
 });
 

@@ -1,14 +1,14 @@
 // Positions of everything in the shot, in cqw of the 16:9 stage (stage = 100 x 56.25).
 // Objects and their emissive parts (LEDs, digits) share these numbers so they line up.
 export const STAGE_H = 56.25;
-export const MONITOR = { x: 22, w: 50, bottom: 46.2 };
-export const CASE = { x: 18.5, y: 46, w: 57, h: 7 };
-export const MODEM = { x: 78.5, y: 48.2, w: 16.5, h: 3.6 };
+export const MONITOR = { x: 18.5, w: 57, bottom: 49 };
+export const CASE = { x: 16, y: 48.8, w: 62, h: 5.6 };
+export const MODEM = { x: 80.5, y: 50.6, w: 16, h: 3.5 };
 export const CLOCK = { x: 2.6, y: 45.6, w: 9.6, h: 4.0 };
 export const LAMP = { x: -3.2, y: 17.8, w: 22.5, h: 30 };
 export const WINDOW = { x: 0.4, y: 0.2, w: 13.4, h: 10.6 };
 export const JACK = { x: 97.4, y: 37.5, w: 1.5, h: 2.2 };
-export const KEYBOARD = { x: 22, y: 53.3, w: 50, h: 9 };
+export const KEYBOARD = { x: 21, y: 53.9, w: 52, h: 9 };
 
 /** Front-panel parts of the case, in % of the case box. */
 export const CASE_PARTS = {

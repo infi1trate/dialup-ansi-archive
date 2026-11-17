@@ -14,13 +14,275 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      call_log: {
+        Row: {
+          caller_id: string | null
+          city: string
+          created_at: string
+          handle: string | null
+          id: string
+          speed: number
+          token_hash: string
+        }
+        Insert: {
+          caller_id?: string | null
+          city?: string
+          created_at?: string
+          handle?: string | null
+          id?: string
+          speed?: number
+          token_hash: string
+        }
+        Update: {
+          caller_id?: string | null
+          city?: string
+          created_at?: string
+          handle?: string | null
+          id?: string
+          speed?: number
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      callers: {
+        Row: {
+          banned: boolean
+          calls: number
+          city: string
+          created_at: string
+          files_viewed: number
+          handle: string
+          handle_lower: string
+          id: string
+          last_call_at: string | null
+          phrase_hash: string | null
+          speed_unlocked: number
+          token_hashes: string[]
+        }
+        Insert: {
+          banned?: boolean
+          calls?: number
+          city?: string
+          created_at?: string
+          files_viewed?: number
+          handle: string
+          handle_lower: string
+          id?: string
+          last_call_at?: string | null
+          phrase_hash?: string | null
+          speed_unlocked?: number
+          token_hashes?: string[]
+        }
+        Update: {
+          banned?: boolean
+          calls?: number
+          city?: string
+          created_at?: string
+          files_viewed?: number
+          handle?: string
+          handle_lower?: string
+          id?: string
+          last_call_at?: string | null
+          phrase_hash?: string | null
+          speed_unlocked?: number
+          token_hashes?: string[]
+        }
+        Relationships: []
+      }
+      daily_counters: {
+        Row: {
+          count: number
+          day: string
+          step: string
+        }
+        Insert: {
+          count?: number
+          day: string
+          step: string
+        }
+        Update: {
+          count?: number
+          day?: string
+          step?: string
+        }
+        Relationships: []
+      }
+      flags: {
+        Row: {
+          file: string
+          hidden: boolean
+          pack: string
+          updated_at: string
+        }
+        Insert: {
+          file: string
+          hidden?: boolean
+          pack: string
+          updated_at?: string
+        }
+        Update: {
+          file?: string
+          hidden?: boolean
+          pack?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      oneliners: {
+        Row: {
+          body: string
+          caller_id: string
+          created_at: string
+          handle: string
+          hidden: boolean
+          id: number
+          ip_hash: string
+          token_hash: string
+        }
+        Insert: {
+          body: string
+          caller_id: string
+          created_at?: string
+          handle: string
+          hidden?: boolean
+          id?: never
+          ip_hash: string
+          token_hash: string
+        }
+        Update: {
+          body?: string
+          caller_id?: string
+          created_at?: string
+          handle?: string
+          hidden?: boolean
+          id?: never
+          ip_hash?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      presence: {
+        Row: {
+          city: string
+          doing: string
+          handle: string | null
+          session_id: string
+          speed: number
+          started_at: string
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          city?: string
+          doing?: string
+          handle?: string | null
+          session_id: string
+          speed?: number
+          started_at?: string
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          doing?: string
+          handle?: string | null
+          session_id?: string
+          speed?: number
+          started_at?: string
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rate_hits: {
+        Row: {
+          action: string
+          at: string
+          id: number
+          key: string
+        }
+        Insert: {
+          action: string
+          at?: string
+          id?: never
+          key: string
+        }
+        Update: {
+          action?: string
+          at?: string
+          id?: never
+          key?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          created_at: string
+          file: string
+          handle: string | null
+          id: number
+          ip_hash: string
+          pack: string
+          reason: number
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          file: string
+          handle?: string | null
+          id?: never
+          ip_hash: string
+          pack: string
+          reason: number
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          file?: string
+          handle?: string | null
+          id?: never
+          ip_hash?: string
+          pack?: string
+          reason?: number
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      views: {
+        Row: {
+          created_at: string
+          file: string
+          pack: string
+          viewer: string
+        }
+        Insert: {
+          created_at?: string
+          file: string
+          pack: string
+          viewer: string
+        }
+        Update: {
+          created_at?: string
+          file?: string
+          pack?: string
+          viewer?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      bump_counter: { Args: { _step: string }; Returns: undefined }
+      top_files: {
+        Args: { _limit: number }
+        Returns: {
+          file: string
+          pack: string
+          views: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
