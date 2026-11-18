@@ -77,6 +77,14 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        {/* Load screen: inline styles so it paints before CSS/JS. Removed on mount below. */}
+        <div id="boot-splash" role="status" aria-label="Loading" style={{ position: "fixed", inset: 0, zIndex: 9999, display: "grid", placeItems: "center", background: "rgb(16,15,13)", color: "rgb(120,118,104)", fontFamily: "monospace", fontSize: "14px", letterSpacing: "0.35em" }}>
+          <span>
+            DIAL-UP
+            <span className="boot-cursor" style={{ display: "inline-block", width: "0.6em", height: "1em", marginLeft: "0.35em", verticalAlign: "-0.15em", background: "currentColor", animation: "boot-blink 1.06s steps(1) infinite" }} />
+          </span>
+          <style>{`@keyframes boot-blink { 50% { opacity: 0 } } @media (prefers-reduced-motion: reduce) { .boot-cursor { animation: none } }`}</style>
+        </div>
         {children}
         <Scripts />
       </body>
@@ -86,6 +94,10 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    document.getElementById("boot-splash")?.remove();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
