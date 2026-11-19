@@ -10,6 +10,8 @@ export interface RoomProps {
  monitor: ReactNode; controls?: ReactNode; powered: boolean; turbo: boolean; lamp: boolean; leaned: boolean; reduced: boolean;
  modemVolume: number; musicVolume: number; onMusicVolume:(v:number)=>void; getState:()=>string;
  onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode; recording?:boolean; onDegauss?:()=>void;
+ /** Visitor toys: hotspots render only once they are live (see useToys). */
+ toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void };
 }
 export const NOTE = ['PWR ON.','ENTER = dial.','login: GUEST','ENTER skips anything.','I = who made it.','Then kill the lamp.'];
 export function Room(p: RoomProps) {
@@ -43,6 +45,7 @@ export function Room(p: RoomProps) {
  {p.controls}
  {hotspot('lamp','Desk lamp',p.onLamp)}
  {p.onDegauss&&hotspot('monitor_degauss','Degauss button',p.onDegauss)}
+ {p.toys?.live&&hotspot('floppy',p.toys.floppyIn?'Eject floppy':'Floppy drive',p.toys.onFloppySlot)}
  {hotspot('sticky_note','Sticky note',()=>setNote(1))}
  {hotspot('cork_note','Pinned paper',()=>setNote(2),'secret-paper')}
  {hotspot('pc_buttons',p.powered?'PC power off':'PC power on',p.onPcPower)}

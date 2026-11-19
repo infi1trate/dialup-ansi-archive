@@ -315,7 +315,7 @@
 
 /* Locked photographic plates: no synthetic room lighting or room grain. */
 :root { --photo-black: oklch(0 0 0); --photo-highlight: oklch(1 0 0); --note-paper: oklch(.86 .12 95); --note-ink: oklch(.22 .03 260); --modem-red: oklch(.62 .24 28); --drive-amber: oklch(.78 .18 65); }
-.photo-room { position: fixed; inset: 0; overflow: hidden; background: var(--photo-black); user-select: none; --lamp-level: 1; --screen-opacity: 0; --reflection: .35; --screen-tint: rgb(0 0 0); }
+.photo-room { position: fixed; inset: 0; overflow: clip; background: var(--photo-black); user-select: none; --lamp-level: 1; --screen-opacity: 0; --reflection: .35; --screen-tint: rgb(0 0 0); }
 .plate-stage { position:absolute; left:0; top:0; width:2560px; height:1440px; transform-origin:0 0; transition:transform 420ms ease-in-out; will-change:transform; isolation:isolate; }
 .reduce .plate-stage { transition:none; }
 .room-plate { position:absolute; inset:0; width:100%; height:100%; max-width:none; pointer-events:none; }
@@ -340,6 +340,13 @@
 .note-closeup { position:fixed; inset:0; z-index:25; display:grid; place-items:center; background:oklch(0 0 0 / .65); cursor:pointer; }
 .paper-enlarged { background:var(--note-paper); color:var(--note-ink); padding:30px 36px; width:310px; min-height:310px; font-family:'Nanum Pen Script',cursive; font-size:30px; line-height:1.15; transform:rotate(-4deg); filter:brightness(var(--paper-light)); }
 .paper-enlarged p { margin:0; }
+.floppy-photo { position:relative; width:min(94vw, 150vh); aspect-ratio:16/9; container-type:inline-size; cursor:default; box-shadow:0 30px 80px oklch(0 0 0 / .6); }
+.floppy-photo img { display:block; width:100%; height:100%; }
+.floppy-photo.is-dark img, .floppy-photo.is-dark .floppy-label { filter:brightness(.42) saturate(.55); }
+.floppy-photo.is-dark::after { content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse at 50% -10%, oklch(.6 .08 240 / .22), transparent 70%); mix-blend-mode:screen; }
+.floppy-label { position:absolute; display:flex; flex-direction:column; justify-content:center; padding:0 0 0 .9cqw; font-family:'Nanum Pen Script',cursive; font-size:3.3cqw; line-height:1; color:var(--note-ink); mix-blend-mode:multiply; opacity:.88; pointer-events:none; }
+.floppy-disk { border-radius:1.2cqw; }
+@media (hover:hover) and (pointer:fine) { .floppy-disk:hover::after { opacity:.06; } }
 .photo-room .ctxbar { position:fixed; bottom:48px; left:0; right:0; z-index:15; }
 .photo-room .plate-controls, .photo-room .plate-monitor-power { z-index:4; }
 .reduce .plate-loading span { animation:none; }

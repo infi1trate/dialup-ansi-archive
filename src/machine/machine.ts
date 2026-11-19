@@ -16,6 +16,9 @@ import { Signal, currentBoardName, tapeArmRequest, tapeState } from "./signals";
 import { handshakeMs, DTMF_OFF_MS, DTMF_ON_MS } from "@/audio/tables";
 import { Terminal } from "@/term/terminal";
 import { DegaussCoil } from "@/lib/degauss";
+import { dirA, fileA, NOT_READY, OWNER, type DiskId, type FloppyFile } from "./floppy";
+import { bricks } from "./bricks";
+import { floppyDisk } from "./signals";
 import type { Speed } from "@/modem/modem";
 import { net } from "@/data/net";
 import type { Postcard } from "@/lib/postcard";
@@ -36,6 +39,9 @@ export function parseDebug(search: string): { busy: boolean; minutes: number | n
 const NAV: KeyHint[] = [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "ENTER", key: "Enter" }, { label: "ESC", key: "Escape" }];
 const hk = (c: string, label = c): KeyHint => ({ label, key: c, ch: c });
 const CAPTURE = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "PageUp", "PageDown", "Backspace", "Tab", "Home", "End", "Enter", "Escape", "F1", "F3", "F5"]);
+
+/** DOS commands that never touch the current drive. */
+const DRIVE_FREE = ["", "C:", "CLS", "VER", "DATE", "TIME", "HELP", "/?", "MEM", "MENU", "DIAL", "TELEWIRE", "EXIT"];
 
 export class Machine {
   state = new Signal<MachineState>("off");
@@ -208,7 +214,7 @@ export class Machine {
   out(x: Ansi | string) { this.engine.local(typeof x === "string" ? a().t(x).build() : x.build()); }
   private key(): Promise<Key> { return this.keys.next(); }
   private localEnv(): LocalEnv {
-    return { out: (x) => this.out(x), nextOr: (p) => this.keys.nextOr(p), reduced: () => this.engine.crt.reducedMotion, preserveMode:()=>{const t=this.engine.term,m={cols:t.cols,rows:t.rows,ice:t.ice,ninePixel:t.ninePixel,font:t.font,palette:t.palette};t.setMode({cols:80,rows:25,ice:false,ninePixel:true,font:null,palette:null});t.reset();return ()=>{t.setMode(m);t.reset();};} };
+    return { out: (x) => this.out(x), nextOr: (p) => this.keys.nextOr(p), reduced: () => this.engine.crt.reducedMotion, hint: (k) => this.hints.set(k), preserveMode:()=>{const t=this.engine.term,m={cols:t.cols,rows:t.rows,ice:t.ice,ninePixel:t.ninePixel,font:t.font,palette:t.palette};t.setMode({cols:80,rows:25,ice:false,ninePixel:true,font:null,palette:null});t.reset();return ()=>{t.setMode(m);t.reset();};} };
   }
   static IDLE_MS = 45_000;
   private saver: Saver = (() => { try { const v = localStorage.getItem("dialup.saver"); return SAVERS.includes(v as Saver) ? v as Saver : "starfield"; } catch { return "starfield"; } })();
@@ -474,7 +480,7 @@ export class Machine {
     }
   }
   private async programMenu(g: number) {
-    for (;;) { const fs=await installed(); const x=a().cls();box(x,2,4,72,21,11,"GAMES / PROGRAMS");x.at(5,8).k(15,"0 BASEMENT CRAWL");fs.slice(0,9).forEach((f,i)=>x.at(7+i,8).k(11,`${i+1} ${drive.dosName(f.name)}`));x.at(21,8).k(8,"Number starts / ESC menu");this.out(x);const k=await this.key();if(k.key==="Escape")return;const n=(k.ch??0)-48;if(n===0)await doorMenu({io:this.localIO(),send:y=>this.out(y),user:"GUEST",guest:true,hint:h=>this.hints.set(h)});else if(fs[n-1])await runRelease(this.localEnv(),drive.dosName(fs[n-1].name).replace(".EXE",""));this.alive(g);}
+    for (;;) { const fs=await installed(); const x=a().cls();box(x,2,4,72,21,11,"GAMES / PROGRAMS");x.at(5,8).k(15,"0 BASEMENT CRAWL");fs.slice(0,9).forEach((f,i)=>x.at(7+i,8).k(11,`${i+1} ${drive.dosName(f.name)}`));if(floppyDisk.value===1)x.at(18,8).k(14,"B BRICKS.EXE").k(8,"  (drive A:)");x.at(21,8).k(8,floppyDisk.value===1?"Number or B starts / ESC menu":"Number starts / ESC menu");this.out(x);this.hints.set([hk("0"),...fs.slice(0,9).map((_,i)=>hk(String(i+1))),...(floppyDisk.value===1?[hk("B")]:[]),{label:"ESC",key:"Escape"}]);const k=await this.key();if(k.key==="Escape")return;if(floppyDisk.value===1&&(k.ch===66||k.ch===98)){audio.emit("floppySeek");this.engine.term.cursorVisible=false;try{await bricks(this.localEnv());}finally{this.engine.term.cursorVisible=true;}this.alive(g);continue;}const n=(k.ch??0)-48;if(n===0)await doorMenu({io:this.localIO(),send:y=>this.out(y),user:"GUEST",guest:true,hint:h=>this.hints.set(h)});else if(fs[n-1])await runRelease(this.localEnv(),drive.dosName(fs[n-1].name).replace(".EXE",""));this.alive(g);}
   }
   private async downloadMenu(g: number) {
     let sel = 0;
@@ -534,6 +540,58 @@ export class Machine {
     }
   }
 
+  /** Spin up drive A:; on an empty drive, the classic Abort, Retry, Fail? until a disk reads or the caller gives up. */
+  private async readA(g: number): Promise<DiskId | null> {
+    for (;;) {
+      audio.emit("floppySeek"); await new Promise((r) => setTimeout(r, 380)); this.alive(g);
+      if (floppyDisk.value) return floppyDisk.value;
+      this.out(a().nl().k(7, NOT_READY[0]).nl().k(7, NOT_READY[1] + " "));
+      for (;;) {
+        const k = await this.key(); this.alive(g);
+        const c = k.ch ? String.fromCharCode(k.ch).toUpperCase() : k.key === "Escape" ? "A" : "";
+        if (c !== "A" && c !== "R" && c !== "F") continue;
+        this.out(a().k(7, c).nl());
+        if (c === "R") break;
+        if (this.cwd.startsWith("A:")) this.cwd = "C:\\";
+        return null;
+      }
+    }
+  }
+  private async viewLocalFile(f: { name: string; bytes: Uint8Array; pack: string; year: number; artists: string[]; groups: string[] }, g: number) {
+    this.engine.term.cursorVisible = false;
+    try { await localView(this.localIO(), f); } finally { this.alive(g); }
+    this.engine.term.setMode({ cols: 80, ice: false, ninePixel: true }); this.engine.term.reset();
+    this.engine.term.cursorVisible = true; this.hints.set([]); this.out(a().reset().cls());
+  }
+  /** Kestrel DOS on drive A: works like C: (DIR, CD, TYPE, VIEW, run by name) against the inserted floppy. */
+  private async driveA(cmd: string, arg: string, g: number) {
+    const p = (t: string, c = 7) => this.out(a().k(c, t).nl());
+    const disk = await this.readA(g);
+    if (!disk) return;
+    const asFile = (f: FloppyFile) => ({ name: f.name, bytes: f.bytes, pack: `A:\\ (${OWNER})`, year: 1993, artists: [OWNER], groups: [] as string[] });
+    const named = (s: string) => s.replace(/^A:\\?/, "");
+    if (cmd === "A:" || cmd === "A:\\") { this.cwd = "A:\\"; return; }
+    const program = cmd.startsWith("A:") ? named(cmd) : cmd === "RUN" ? named(arg) : cmd;
+    const run = fileA(disk, program);
+    if (run && (run.kind === "exe" || run.kind === "com") && !["DIR", "TYPE", "VIEW", "CD", "CHDIR", "DEL", "ERASE"].includes(cmd)) {
+      if (run.name === "BRICKS.EXE") { this.engine.term.cursorVisible = false; try { await bricks(this.localEnv()); } finally { this.alive(g); this.engine.term.cursorVisible = true; } return; }
+      this.out(a().reset().bytes(run.bytes)); return;
+    }
+    switch (cmd) {
+      case "DIR": (dirA(disk) ?? []).forEach((l) => p(l)); return;
+      case "CD": case "CHDIR": if (!arg) { p(this.cwd); return; } if (/^(A:)?\\$|^\.\.$/.test(arg)) { this.cwd = "A:\\"; return; } p("Invalid directory"); return;
+      case "TYPE": case "VIEW": {
+        const f = fileA(disk, named(arg));
+        if (!f) { p("File not found"); return; }
+        if (f.kind === "ansi" || cmd === "VIEW") { await this.viewLocalFile(asFile(f), g); return; }
+        if (f.kind === "exe") { this.out(a().k(7, "MZ\u0090\u0003 \u0004 ÿÿ ¸ @ ").nl()); return; }
+        this.out(a().reset().bytes(f.bytes)); return;
+      }
+      case "DEL": case "ERASE": p("Write protect error writing drive A"); p("Abort, Retry, Fail? F", 7); return;
+      case "FORMAT": p("Use the FORMAT on this disk, if there is one. There is a label for a reason."); return;
+      default: p("Bad command or file name");
+    }
+  }
   private async dosCommand(line: string, g: number): Promise<"comm" | "menu" | void> {
     const [cmd0, ...rest] = line.split(/\s+/);
     const cmd = (cmd0 ?? "").toUpperCase();
@@ -541,6 +599,8 @@ export class Machine {
     const p = (t: string, c = 7) => this.out(a().k(c, t).nl());
     const now = new Date();
     const program=(cmd === "RUN" ? arg : cmd).replace(/\.EXE$/, "").replace(/^.*\\/, "");
+    if (cmd === "C:") { this.cwd = "C:\\"; return; }
+    if (cmd.startsWith("A:") || /^A:/.test(arg) || (this.cwd.startsWith("A:") && !DRIVE_FREE.includes(cmd))) { await this.driveA(cmd, arg, g); return; }
     if((await installed()).some(f=>drive.dosName(f.name)===program+".EXE")){await runRelease(this.localEnv(),program);return;}
     switch (cmd) {
       case "": return;
@@ -557,7 +617,7 @@ export class Machine {
          "TYPE file  read a collected NFO/DIZ or system text", "MEM        memory report",
          "WARDIAL    scan 555-0100 through 555-0199", "HELP       this list (/? )",
          "XYZZY      test the cave", "WIN        check window installation", "FORMAT     ask about formatting",
-         "DIG/TETRA  test game installation", "SYSOP      locate Static"].forEach((l) => p("  " + l)); return;
+         "A:         switch to the floppy drive (C: to return)", "DIG/TETRA  test game installation", "SYSOP      locate Static"].forEach((l) => p("  " + l)); return;
       case "MEM":
         p(""); p("    655360 bytes total conventional memory"); p("    633904 bytes available to Kestrel DOS"); p("    598016 largest executable program size");
         p("   3407872 bytes total contiguous extended memory"); p("   3407872 bytes available XMS memory"); p("           Kestrel DOS resident in High Memory Area"); p(""); return;

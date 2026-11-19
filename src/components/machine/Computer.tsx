@@ -8,6 +8,10 @@ import { ContextBar } from "./ContextBar";
 import type { KeyHint } from "@/bbs/io";
 import { Room } from "@/components/room/Room";
 import { EscapeHatch } from "@/components/room/EscapeHatch";
+import { FloppyCloseup } from "@/components/room/FloppyCloseup";
+import { useToys } from "@/components/room/useToys";
+import { loadFloppy, saveFloppy, type DiskId } from "@/machine/floppy-state";
+import { floppyDisk } from "@/machine/signals";
 import { DEFAULTS, brightnessGain, contrastGain, loadRoom, saveRoom, type RoomSettings } from "@/components/room/settings";
 import { audio } from "@/audio/bus";
 import type { Machine } from "@/machine/machine";
@@ -165,6 +169,17 @@ export function Computer({ deepLink, lost, postcard }: Props) {
   const reportCard = async () => { if (!pendingCard || reported) return; const { net } = await import("@/data/net"); await net("postcardReport", { id: pendingCard.card.id }); setReported(true); };
 
   const saveTapeFile = async (r: TapeResult) => { const { saveTape } = await import("@/machine/tape-recorder"); await saveTape(r, window.matchMedia("(pointer: coarse)").matches); };
+  const toys = useToys(getState);
+  const [floppy, setFloppyState] = useState<DiskId | null>(null);
+  const [floppyOpen, setFloppyOpen] = useState(false);
+  useEffect(() => { const d = loadFloppy(); setFloppyState(d); floppyDisk.set(d); }, []);
+  const setFloppy = useCallback((d: DiskId | null) => {
+    audio.unlock(); setFloppyOpen(false); setFloppyState(d); floppyDisk.set(d); saveFloppy(d);
+    if (!d) { audio.emit("floppyEject"); return; }
+    audio.emit("floppyInsert");
+    if (machine.current?.powered.value) [250, 620, 980, 1320].forEach((t) => setTimeout(() => audio.emit("floppySeek"), t)); // the drive reads the new disk: ~1.5 s grind, LED blinking
+  }, []);
+  const floppySlot = useCallback(() => { if (floppyDisk.value) setFloppy(null); else { audio.unlock(); setFloppyOpen(true); } }, [setFloppy]);
   const toggleLamp = () => { audio.unlock(); audio.emit("lampToggle", !cfg.lamp); update({ lamp: !cfg.lamp }); };
 
   const monitor = (
@@ -194,7 +209,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
         {tapeFile && tape !== "rec" && <li><Button variant="ghost" type="button" onClick={(e) => { void saveTapeFile(tapeFile); e.currentTarget.blur(); }}>Save tape</Button></li>}
         {tapeNote && <li className="hatch-note">{tapeNote}</li>}
       </> : null}
-      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li><li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
+      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li>{toys&&<li><Button variant="ghost" onClick={floppySlot}>{floppy?"Eject floppy":"Floppy disks"}</Button></li>}<li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
       lamp={cfg.lamp}
@@ -227,7 +242,9 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       onModemVolume={(v) => { update({ modemVolume: v }); audio.setMix({ modemVolume: v }); }}
       onLean={lean}
       onDegauss={() => machine.current?.pressDegauss()}
+      toys={{ live: toys, floppyIn: floppy !== null, onFloppySlot: floppySlot }}
     >
+      {floppyOpen && toys && <FloppyCloseup lamp={cfg.lamp} onPick={setFloppy} onClose={() => setFloppyOpen(false)} />}
       {layout === "tube" && <ContextBar hints={hints} powered={powered} onPower={() => machine.current?.pressPcPower()} onKey={h => machine.current?.pressHint(h)} onText={t => machine.current?.typeText(t)} />}
       {hatch}
     </Room>

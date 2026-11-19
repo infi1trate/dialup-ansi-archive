@@ -14,3 +14,6 @@ export const screenPictureBrightness = new Signal(0);
 export const tapeState = new Signal<"idle" | "armed" | "rec">("idle");
 export const tapeArmRequest = new Signal(0);
 export const currentBoardName = new Signal<string | null>(null);
+
+/** Which desk floppy is in drive A: (null = empty). Set by the room, read by Kestrel DOS. */
+export const floppyDisk = new Signal<1 | 2 | 3 | 4 | null>(null);

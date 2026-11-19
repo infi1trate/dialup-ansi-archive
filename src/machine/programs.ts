@@ -1,8 +1,9 @@
 // Local DOS programs that draw straight to the terminal (never through the modem): KPLAY, the screensaver.
 import { a, box, center, pad, rpad } from "@/bbs/ansi";
 import type { Key } from "./keyboard";
+import type { KeyHint } from "@/bbs/io";
 
-export interface LocalEnv { out(x: ReturnType<typeof a>): void; nextOr(p: Promise<unknown>): Promise<Key | null>; reduced(): boolean; preserveMode?():()=>void }
+export interface LocalEnv { out(x: ReturnType<typeof a>): void; nextOr(p: Promise<unknown>): Promise<Key | null>; reduced(): boolean; preserveMode?():()=>void; /** Touch keys for the context bar while a local program runs. */ hint?(keys: KeyHint[]): void }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const MUSIC = /\.(mod|s3m|xm|it)$/i;
 

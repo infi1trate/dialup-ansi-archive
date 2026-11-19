@@ -101,6 +101,8 @@ class Synth {
     bus.on("degauss", (kind) => this.degauss(kind));
     bus.on("diskSeek", () => this.diskSeek());
     bus.on("floppySeek", () => this.floppySeek());
+    bus.on("floppyInsert", () => this.floppyLatch(false));
+    bus.on("floppyEject", () => this.floppyLatch(true));
     bus.on("offHook", () => this.offHook());
     bus.on("programTone", (p) => this.tones([p.frequency], this.now, p.duration, 0.12, p.speaker === "music" ? this.musicVol : this.modemIn));
     bus.on('introMusic',(on)=>this.intro(on));
@@ -278,6 +280,12 @@ class Synth {
       this.burst(this.buses.pc, t, 0.01, rnd(300, 420), 6, rnd(0.08, 0.15));
       t += rnd(0.015, 0.06);
     }
+  }
+  /** Shutter slide and latch clack going in; the eject button's clunk and spring coming out. */
+  floppyLatch(eject: boolean) {
+    const t = this.now + 0.005, d = this.buses.pc;
+    if (eject) { this.burst(d, t, 0.03, 380, 3, 0.55); this.burst(d, t + 0.012, 0.012, 1900, 5, 0.22); this.burst(d, t + 0.07, 0.05, 2600, 2, 0.06); return; }
+    this.burst(d, t, 0.09, 3200, 1.5, 0.05); this.burst(d, t + 0.1, 0.012, 1400, 6, 0.3); this.burst(d, t + 0.105, 0.025, 300, 4, 0.35);
   }
   floppySeek() {
     let t = this.now + 0.01;

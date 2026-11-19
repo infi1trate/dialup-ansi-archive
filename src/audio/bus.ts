@@ -2,6 +2,9 @@
 // (src/audio/engine.ts) subscribes. The bus itself stays tiny so it can ship in the first frame.
 export interface AudioEvents {
   printer: boolean;
+  /** A floppy pushed into drive A: (latch clack), or ejected (clunk and spring). */
+  floppyInsert: void;
+  floppyEject: void;
   /** The monitor's degauss coil: a full cycle, the dull click of an uncharged coil, or the reduced-motion thunk. */
   degauss: "full" | "click" | "reduced";
   /** The PC's tape-drive motor while the ten-second tape records. */
