@@ -446,3 +446,8 @@
 .photo-room.is-lightning .plate-lightning { opacity:.25; }
 .plate-window-flash { position:absolute; inset:0; opacity:0; pointer-events:none; background:radial-gradient(ellipse at 50% 35%, var(--flash-white), transparent 75%); mix-blend-mode:screen; }
 .photo-room.is-lightning .plate-window-flash { opacity:.8; }
+
+/* The calendar's month page, laid onto the photographed sheet; lit like the plate it was lifted from. */
+.calendar-page { position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; filter:brightness(calc(.25 + var(--lamp-level) * .75)); }
+.calendar-page.is-turning { animation:calendar-turn .42s ease-out both; }
+@keyframes calendar-turn { from { clip-path:inset(0 0 100% 0); } to { clip-path:inset(0 0 0 0); } }

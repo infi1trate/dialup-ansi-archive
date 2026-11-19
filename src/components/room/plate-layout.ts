@@ -12,6 +12,10 @@ export const HOTSPOTS = {
   cork_note: [.947,.447,.042,.096], alarm_clock: [0,.713,.1354,.1319],
   // Blank badge at the lower left of the monitor bezel: the degauss button.
   monitor_degauss: [.3191,.6021,.0449,.0271],
+  // The beach calendar, the owl clock and the pencil cup: small life.
+  calendar: [.789,.042,.109,.424],
+  owl_clock: [.93,0,.07,.38],
+  pencil_cup: [.135,.5625,.068,.257],
   // The stack of cassettes left of the alarm clock: the mixtape.
   cassettes: [0,.626,.064,.088],
   // The instant print pinned to the cork board: the camera.

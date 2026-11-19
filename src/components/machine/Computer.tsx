@@ -22,6 +22,8 @@ import { DEFAULTS, brightnessGain, contrastGain, loadRoom, saveRoom, type RoomSe
 import { audio } from "@/audio/bus";
 import { quietHouse, setQuietHouse } from "@/lib/house";
 import { useStorm } from "@/components/room/useStorm";
+import { hootAllowed, loadFlipped, saveFlipped } from "@/lib/calendar";
+import { plates } from "@/components/room/plates";
 import type { Machine } from "@/machine/machine";
 import type { TapeResult } from "@/machine/tape-recorder";
 import type { TapeDeck } from "@/lib/tape";
@@ -257,6 +259,23 @@ export function Computer({ deepLink, lost, postcard }: Props) {
   const savePhoto = useCallback(() => { if (photo?.png) void deliverFile(photo.png, photo.name, "Dial-Up instant photo"); }, [photo]);
   const [mixtape, setMixtape] = useState("stopped");
   useEffect(() => audio.on("mixtapeState", setMixtape), []);
+  const [calPage, setCalPage] = useState<{ src: string; fresh: boolean } | null>(null);
+  const calRef = useRef(calPage); calRef.current = calPage;
+  const calSrc = useRef<{ src: string; key: string } | null>(null);
+  const showCalendar = useCallback(async (fresh: boolean) => {
+    const now = new Date(), key = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    if (calSrc.current?.key !== key) { const { renderCalendarPage } = await import("@/machine/calendar-page"); calSrc.current = { src: await renderCalendarPage(plates.on[1], now), key }; }
+    setCalPage({ src: calSrc.current.src, fresh });
+  }, []);
+  useEffect(() => { if (toys && loadFlipped() && !calRef.current) void showCalendar(false); }, [toys, showCalendar]);
+  const flipCalendar = useCallback(() => {
+    if (!toysRef.current) return;
+    void audio.whenReady().then(() => audio.emit("paperFlip"));
+    if (calRef.current) { setCalPage(null); saveFlipped(false); } else { saveFlipped(true); void showCalendar(true); }
+  }, [showCalendar]);
+  const lastHoot = useRef(-1e9);
+  const hootOwl = useCallback(() => { const now = Date.now(); if (!toysRef.current || !hootAllowed(lastHoot.current, now)) return; lastHoot.current = now; void audio.whenReady().then(() => audio.emit("hoot")); }, []);
+  const rattlePencils = useCallback(() => { if (toysRef.current) void audio.whenReady().then(() => audio.emit("pencils")); }, []);
   const playTapes = useCallback(() => { if (toysRef.current) void audio.whenReady().then(() => audio.emit("mixtape")); }, []);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -295,7 +314,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
         {tapeFile && tape !== "rec" && <li><Button variant="ghost" type="button" onClick={(e) => { void saveTapeFile(tapeFile); e.currentTarget.blur(); }}>Save tape</Button></li>}
         {tapeNote && <li className="hatch-note">{tapeNote}</li>}
       </> : null}
-      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li>{toys&&powered&&<li><Button variant="ghost" onClick={()=>void printScreen()}>Print</Button></li>}{toys&&<li><Button variant="ghost" onClick={()=>void takePhoto()}>Take a photo</Button></li>}<li><Button variant="ghost" aria-pressed={quiet} onClick={()=>{setQuietHouse(!quiet);setQuiet(!quiet);}}>Quiet house: {quiet?"on":"off"}</Button></li>{toys&&<li><Button variant="ghost" onClick={playTapes}>{mixtape==="stopped"?"Play the mixtape":`Stop the mixtape (${mixtape})`}</Button></li>}{photo?.png&&<li><Button variant="ghost" onClick={savePhoto}>Save photo</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>{savePrint();window.dispatchEvent(new Event("dialup:printout-away"));}}>Save printout</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>window.dispatchEvent(new Event("dialup:printout-away"))}>Put printout away</Button></li>}{toys&&<li><Button variant="ghost" onClick={floppySlot}>{floppy?"Eject floppy":"Floppy disks"}</Button></li>}<li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
+      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li>{toys&&powered&&<li><Button variant="ghost" onClick={()=>void printScreen()}>Print</Button></li>}{toys&&<li><Button variant="ghost" onClick={()=>void takePhoto()}>Take a photo</Button></li>}<li><Button variant="ghost" aria-pressed={quiet} onClick={()=>{setQuietHouse(!quiet);setQuiet(!quiet);}}>Quiet house: {quiet?"on":"off"}</Button></li>{toys&&<li><Button variant="ghost" onClick={flipCalendar}>{calPage?"Calendar: back to the old page":"Calendar: turn to this month"}</Button></li>}{toys&&<li><Button variant="ghost" onClick={hootOwl}>Owl clock</Button></li>}{toys&&<li><Button variant="ghost" onClick={rattlePencils}>Pencil cup</Button></li>}{toys&&<li><Button variant="ghost" onClick={playTapes}>{mixtape==="stopped"?"Play the mixtape":`Stop the mixtape (${mixtape})`}</Button></li>}{photo?.png&&<li><Button variant="ghost" onClick={savePhoto}>Save photo</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>{savePrint();window.dispatchEvent(new Event("dialup:printout-away"));}}>Save printout</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>window.dispatchEvent(new Event("dialup:printout-away"))}>Put printout away</Button></li>}{toys&&<li><Button variant="ghost" onClick={floppySlot}>{floppy?"Eject floppy":"Floppy disks"}</Button></li>}<li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
       lamp={cfg.lamp}
@@ -328,7 +347,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       onModemVolume={(v) => { update({ modemVolume: v }); audio.setMix({ modemVolume: v }); }}
       onLean={lean}
       onDegauss={() => machine.current?.pressDegauss()}
-      toys={{ live: toys, floppyIn: floppy !== null, onFloppySlot: floppySlot, onPhoto: () => void takePhoto(), onTapes: playTapes }}
+      toys={{ live: toys, floppyIn: floppy !== null, onFloppySlot: floppySlot, onPhoto: () => void takePhoto(), onTapes: playTapes, onCalendar: flipCalendar, onOwl: hootOwl, onPencils: rattlePencils }} calendarPage={calPage}
       corkPrint={corkPrint}
       storm={storm} flash={flash === "flash"}
     >

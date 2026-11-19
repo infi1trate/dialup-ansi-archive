@@ -107,6 +107,9 @@ class Synth {
     bus.on("camera", () => this.camera());
     bus.on("mixtape", () => this.mixAct(this.mix_.press()));
     bus.on("storm", (on) => this.storm(on));
+    bus.on("paperFlip", () => this.paperFlip());
+    bus.on("hoot", () => this.hoot());
+    bus.on("pencils", () => this.pencils());
     bus.on("thunder", (far) => this.thunder(far));
     bus.on("upstairs", (k) => this.upstairs(k));
     bus.on("handshakeStart", () => this.mixDuck(true));
@@ -297,6 +300,30 @@ class Synth {
       this.burst(this.buses.pc, t, 0.01, rnd(300, 420), 6, rnd(0.08, 0.15));
       t += rnd(0.015, 0.06);
     }
+  }
+  // ── small life ──
+  /** A calendar page lifted and let fall against the wall: two rustles and a soft slap, from the calendar. */
+  private paperFlip() {
+    const t = this.now + 0.02, p = this.panner(0.68); p.connect(this.buses.room);
+    const rustle = (at: number, dur: number, f: number, lvl: number) => { const s = this.buf(this.white, false, Math.random()), bp = this.biquad("bandpass", f, 0.9), g = this.gain(0); s.connect(bp).connect(g).connect(p); g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(lvl, at + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.0005, at + dur); bp.frequency.setValueAtTime(f, at); bp.frequency.linearRampToValueAtTime(f * 1.6, at + dur); this.start(s, at, at + dur + 0.05); };
+    rustle(t, 0.22, 2400, 0.09); rustle(t + 0.16, 0.3, 3200, 0.07); this.burst(p, t + 0.42, 0.05, 700, 1.2, 0.12);
+  }
+  /** One soft synthesized hoot ("hoo-hoo") from the owl clock. */
+  private hoot() {
+    const p = this.panner(0.9), lp = this.biquad("lowpass", 1400, 0.7); lp.connect(p); p.connect(this.buses.room); p.connect(this.verb);
+    [[0, 0.32, 470], [0.42, 0.5, 440]].forEach(([d, len, f]) => {
+      const t = this.now + 0.03 + d, o = this.osc("sine", f), v = this.osc("sine", 5.5), vg = this.gain(6), g = this.gain(0);
+      v.connect(vg).connect(o.frequency); o.connect(g).connect(lp);
+      o.frequency.setValueAtTime(f * 1.04, t); o.frequency.linearRampToValueAtTime(f * 0.94, t + len);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.06, t + 0.06); g.gain.setTargetAtTime(0, t + len - 0.08, 0.05);
+      o.start(t); v.start(t); o.stop(t + len + 0.3); v.stop(t + len + 0.3);
+    });
+  }
+  /** Pencils knocked about in a ceramic cup: a dozen small wooden ticks and two ceramic rings. */
+  private pencils() {
+    const p = this.panner(-0.66); p.connect(this.buses.room); const t0 = this.now + 0.02;
+    for (let i = 0; i < 12; i++) { const t = t0 + i * rnd(0.025, 0.06) + (i > 6 ? 0.08 : 0); this.burst(p, t, rnd(0.012, 0.025), rnd(1800, 3800), rnd(4, 9), rnd(0.05, 0.12) * (1 - i / 16)); }
+    [t0 + 0.03, t0 + 0.31].forEach((t) => this.burst(p, t, 0.09, rnd(2900, 3300), 30, 0.05));
   }
   // ── weather and the house ──
   private stormRain: GainNode | null = null; private stormRoar: GainNode | null = null;

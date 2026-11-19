@@ -6,7 +6,7 @@
 - [x] 4. Instant photo: flash, developing print, PNG, cork board print; g07-g09
 - [x] 5. The tapes: mixtape through the speaker, sides, ducking, WAV renders; g10 + tunes
 - [x] 6. Weather and the house: storms, line noise, upstairs phone; g11-g13
-- [ ] 7. Small life: owl, calendar month, pencil cup; g14
+- [x] 7. Small life: owl, calendar month, pencil cup; g14
 
 # Clean-up pass
 - [x] 1. House pack renamed DC-01 / DC-LOGO.ANS with aliases; logo redrawn; old wording swept; f01

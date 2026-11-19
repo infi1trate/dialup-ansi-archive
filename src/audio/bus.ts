@@ -9,6 +9,8 @@ export interface AudioEvents {
   camera: void;
   /** A click on the cassette stack: play or stop the mixtape. */
   mixtape: void;
+  /** Small life: a calendar page turning, the owl clock's hoot, pencils rattling in the cup. */
+  paperFlip: void; hoot: void; pencils: void;
   /** A storm over the house: heavier, louder rain while true. */
   storm: boolean;
   /** Thunder from the window side; 0 = close, 1 = far. */

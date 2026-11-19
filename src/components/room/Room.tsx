@@ -5,6 +5,7 @@ import { camera, fractionStyle, GLASS, HOTSPOTS } from './plate-layout';
 import { plates, plateSet } from './plates';
 import { useRoomLive } from './useRoomLive';
 import { Rain } from './Rain';
+import { CAL_PAGE, PAGE_W, PAGE_H } from '@/lib/calendar';
 import { Clock } from './Clock';
 import { CORK_PIN, CORK_PRINT, quadMatrix3d } from '@/lib/photo';
 export interface RoomProps {
@@ -12,9 +13,9 @@ export interface RoomProps {
  modemVolume: number; musicVolume: number; onMusicVolume:(v:number)=>void; getState:()=>string;
  onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode; recording?:boolean; onDegauss?:()=>void;
  /** Visitor toys: hotspots render only once they are live (see useToys). */
- toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void; onPhoto:()=>void; onTapes:()=>void };
+ toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void; onPhoto:()=>void; onTapes:()=>void; onCalendar:()=>void; onOwl:()=>void; onPencils:()=>void };
  /** The last instant print (small JPEG) laid over the photographed one on the cork board. */
- corkPrint?:string|null; flash?:boolean; storm?:{heavy:boolean;lightning:boolean};
+ corkPrint?:string|null; flash?:boolean; storm?:{heavy:boolean;lightning:boolean}; calendarPage?:{src:string;fresh:boolean}|null;
 }
 export const NOTE = ['PWR ON.','ENTER = dial.','login: GUEST','ENTER skips anything.','I = who made it.','Then kill the lamp.'];
 export function Room(p: RoomProps) {
@@ -51,6 +52,9 @@ export function Room(p: RoomProps) {
  {p.onDegauss&&hotspot('monitor_degauss','Degauss button',p.onDegauss)}
  {p.toys?.live&&hotspot('cork_photo','Instant camera',p.toys.onPhoto)}
  {p.toys?.live&&hotspot('cassettes','Cassette tapes',p.toys.onTapes)}
+ {p.toys?.live&&hotspot('calendar','Wall calendar',p.toys.onCalendar)}
+ {p.toys?.live&&hotspot('owl_clock','Owl clock',p.toys.onOwl)}
+ {p.toys?.live&&hotspot('pencil_cup','Pencil cup',p.toys.onPencils)}
  {p.toys?.live&&hotspot('floppy',p.toys.floppyIn?'Eject floppy':'Floppy drive',p.toys.onFloppySlot)}
  {hotspot('sticky_note','Sticky note',()=>setNote(1))}
  {hotspot('cork_note','Pinned paper',()=>setNote(2),'secret-paper')}
@@ -60,6 +64,7 @@ export function Room(p: RoomProps) {
  {volume('modem',p.modemVolume,p.onModemVolume)}{volume('speaker',p.musicVolume,p.onMusicVolume)}
  <div className="plate-note-writing" style={fractionStyle(HOTSPOTS.sticky_note)} aria-hidden>{NOTE.map(line=><p key={line}>{line}</p>)}</div>
  {p.corkPrint&&<CorkPrint src={p.corkPrint} large={large}/>}
+ {p.calendarPage&&<img key={p.calendarPage.src} className={`calendar-page ${p.calendarPage.fresh&&!p.reduced?'is-turning':''}`} src={p.calendarPage.src} alt="" aria-hidden data-quad={JSON.stringify(CAL_PAGE)} width={PAGE_W} height={PAGE_H} style={{width:PAGE_W,height:PAGE_H,transform:quadMatrix3d(PAGE_W,PAGE_H,CAL_PAGE).css}} draggable={false}/>}
  <div className="plate-rain" style={fractionStyle(HOTSPOTS.window)}><Rain still={p.reduced} heavy={!!p.storm?.heavy}/><span className="plate-window-flash" aria-hidden/></div>
  <Clock reduced={p.reduced}/>
  <span className={`plate-led pc-power ${p.powered?'is-on':'is-standby'}`} style={{left:'68.1%',top:'77.6%'}}/>
