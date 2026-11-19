@@ -1,3 +1,10 @@
+# Sprint E part 3
+- [x] 1. Dot-matrix bill print with ruled calls and tear-off stub; e18b
+- [ ] 2. Postcards: composer, server, /p/<id> playback, share card; e20-e27
+- [ ] 3. Ten-second tape recorder and armed dial; e28 + tape
+- [ ] 4. Share cards checked against real crawler user agents
+- [ ] 5. Counters: second-call rate, postcards, tapes, bills, promotions
+
 # Sprint E part 2
 - [x] 1. Calendar scene bulletin and daily cache; 155 tests; e12-e13 1600x900 leaned-in evidence; commit
 - [x] 2. Time bank, UTC accounting and first-device-call exemption; 160 tests; e14-e16; commit
