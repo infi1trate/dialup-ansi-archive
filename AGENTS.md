@@ -44,13 +44,12 @@ use the editor.
 - The physical alarm LED module reads visitor-local time after hydration and uses plate-fraction positioning. Why: live digits replace only the photographed display, not its desk reflection.
 - All sound is synthesized in `src/audio/engine.ts`, lazily imported on the first power/lamp click; producers only emit bus events. Telephony and handshake timings live in `src/audio/tables.ts`, shared with the machine so waits match the sound.
 - Board network features (identity, oneliners, presence, views, reports, flags, counters) go only through `POST /api/public/net` (`src/server/net.ts`), which uses the service-role client; all those tables keep RLS on with no client policies. Why: every write must be validated and rate-limited server-side, and clients never see token/IP hashes.
-- Device tokens are stored only as SHA-256 hashes; transfer phrases use PBKDF2; secrets (SYSOP_KEY, IP_HASH_SALT) are read from env inside handlers and their features degrade gracefully when missing. Why: no personal data and no default keys.
+- Device tokens are stored only as SHA-256 hashes; transfer phrases use PBKDF2; SYSOP_KEY is read from env inside its handler and the sysop feature is disabled when it is missing; IP_HASH_SALT is read from env but falls back to a built-in default salt. Why: no personal data.
 - Share-card PNGs (`/api/public/card`) are the only place art becomes an image; they reuse the terminal and VGA font and are cached in storage. Why: rule 1 exception for social previews only.
 - Binary formats (.BIN/.XB/.ADF/.IDF) are decoded in `src/term/formats.ts` into an ANSI byte stream plus a `TermMode` palette/font, via `src/term/prepare.ts`; the gallery and share cards rasterize with DOM-free `src/term/raster.ts`. Why: every surface stays on one renderer and art still arrives at modem speed.
 - Touch keys come from the board's out-of-band `io.hint(keys)`, never parsed from the byte stream; the context bar renders only those. Why: the CRT stays pure bytes.
 - `src/start.ts` loads the backend auth middleware lazily so the dark first frame ships no backend client. Why: first-load budget.
 - Write rate limits go through `src/lib/ratelimit.ts` (check before recording). Why: rejected attempts must not extend the window.
-- Downloads live in IndexedDB (`src/machine/drive.ts`, `C:\DOWNLOAD`, size-capped, oldest evicted); DOS VIEW replays them through the board viewer with a local HostIO. Why: offline reading without a server.
 - Tracker music plays only through `src/audio/kplay.ts` (lazy AudioWorklet from `public/wasm/chiptune3`) into the speaker bus in `src/audio/engine.ts`. Why: the 1.5 MB player must never touch the first load, and music needs a visible source.
 - BASEMENT CRAWL daily turns and scores go through `/api/public/net` actions (`doorTurn`, `doorScore`, `doorTop`) on RLS-locked tables. Why: same validation/rate-limit path as every board write.
 
@@ -58,7 +57,5 @@ use the editor.
 - Archive audit tools store downloaded corpus/reference output under `/tmp/dialup-audit` and use the existing proxy serially at one request per second; repository reports contain metrics, not art copies.
 
 - Board identities and chrome are configured in src/bbs/config.ts; legacy dialing IDs stay stable so saved deep links continue working.
-- Fictional programs dispatch through src/machine/releases.ts; intros emit audio-engine score events and restore their prior mode. Scored trading runs replay seeded actions server-side.
 
-- Fictional release files use canonical C:\WAREZ\<release>\<file> keys in the existing capped drive; ordinary art downloads keep flat keys. Why: DOS directories must isolate identically named DIZ files without a second storage system.
 - MAPLE RIDGE applies the reviewed allowlist at viewer, queue, quick-scan and path boundaries, not only menus. Why: saved shelves and deep links must not bypass the club promise.

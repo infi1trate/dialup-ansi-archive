@@ -1,2 +1,5 @@
 - The tape (`tape-recorder.ts`) draws inside `Engine.afterRender` and records audio only from `audio.tapStream()`. Why: WebGL is readable only right after drawing; never the microphone.
 - `/p/<id>` postcards dial through the normal `call()` at 2400 bps; storage stays service-role-only behind `/api/public/net`. Why: one moderation path, modem-delivered.
+- Downloads live in IndexedDB (`src/machine/drive.ts`, `C:\DOWNLOAD`, size-capped, oldest evicted); DOS VIEW replays them through the board viewer with a local HostIO. Why: offline reading without a server.
+- Fictional programs dispatch through src/machine/releases.ts; intros emit audio-engine score events and restore their prior mode. Scored trading runs replay seeded actions server-side.
+- Fictional release files use canonical C:\WAREZ\<release>\<file> keys in the existing capped drive; ordinary art downloads keep flat keys. Why: DOS directories must isolate identically named DIZ files without a second storage system.
