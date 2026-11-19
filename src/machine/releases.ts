@@ -4,10 +4,16 @@ import {nfoBytes,PROGRAM_IDS,releaseById} from '@/bbs/warez-catalog';
 import type {LocalEnv} from './programs';
 import * as drive from './drive';
 import {net} from '@/data/net';
+import {cracktroFrame} from './cracktro';
 export async function installed(){return (await drive.list()).filter(f=>f.pack==='fiction'&&f.file==='PROGRAM');}
 export async function runRelease(env:LocalEnv,id:string){
  const r=releaseById(id);if(!r||!PROGRAM_IDS.includes(id))return;
  const sleep=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
+ if(id==='EMBER'||id==='CHROMA'){
+  const restore=env.preserveMode?.();let frame=0;audio.emit('music',true);audio.emit('introMusic',true);
+  try{for(;;){env.out(cracktroFrame(id,frame++,env.reduced()));if(await env.nextOr(sleep(env.reduced()?250:50)))return;}}
+  finally{audio.emit('introMusic',false);audio.emit('music',false);restore?.();}
+ }
  if(id==='PATCHFOX'){const result=await net('trainer');env.out(a().cls().at(6,6).k(14,'PATCHFOX / checking BASEMENT CRAWL overlay...').at(9,6).k(10,result?.ok?'Patch applied: exactly one extra BASEMENT CRAWL attempt today.':result?.already?'Already applied today. No extra attempt added.':'Patch unavailable: apply for a handle first.').at(15,6).k(8,'Any key returns'));await env.nextOr(new Promise(()=>{}));return;}
  if(id==='NFOLOOM'){const fs=(await drive.list()).filter(f=>f.pack==='fiction'&&f.file==='NFO');let i=0;for(;;){env.out(a().bytes(nfoBytes(drive.dosName(fs[i]?.name??'').replace('.NFO','')??id)).at(23,7).k(8,'N next / P previous / ESC return'));const k=await env.nextOr(new Promise(()=>{}));if(k?.key==='Escape')return;if(k?.ch===78||k?.ch===110)i=(i+1)%Math.max(1,fs.length);if(k?.ch===80||k?.ch===112)i=(i+fs.length-1)%Math.max(1,fs.length);}}
  if(id==='TOUCHBOX'){env.out(a().cls().at(4,5).k(11,'TOUCHBOX / CORVID TONE BENCH').at(7,5).k(15,'0-9 touch tones / A 1000 Hz / B 440 Hz / C 2600 Hz').at(10,5).k(8,'Source: modem speaker. ESC return.'));for(;;){const k=await env.nextOr(new Promise(()=>{}));if(k?.key==='Escape')return;const c=k?.ch===null?'':String.fromCharCode(k?.ch??0).toUpperCase();if(/^\d$/.test(c))audio.emit('dialDigit',c);if(['A','B','C'].includes(c))audio.emit('programTone',{frequency:c==='A'?1000:c==='B'?440:2600,duration:.35,speaker:'modem'});env.out(a().at(13,5).eol().k(14,`Key ${c}`));}}

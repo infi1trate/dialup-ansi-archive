@@ -2,7 +2,7 @@
 import { a, box, center, pad, rpad } from "@/bbs/ansi";
 import type { Key } from "./keyboard";
 
-export interface LocalEnv { out(x: ReturnType<typeof a>): void; nextOr(p: Promise<unknown>): Promise<Key | null>; reduced(): boolean }
+export interface LocalEnv { out(x: ReturnType<typeof a>): void; nextOr(p: Promise<unknown>): Promise<Key | null>; reduced(): boolean; preserveMode?():()=>void }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const MUSIC = /\.(mod|s3m|xm|it)$/i;
 

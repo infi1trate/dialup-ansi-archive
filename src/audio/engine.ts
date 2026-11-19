@@ -2,6 +2,7 @@
 // power click. Subscribes to the bus; never reads machine state directly.
 import type { audio as Bus } from "./bus";
 import { BUSY, DIAL_TONE, DTMF, DTMF_OFF_MS, DTMF_ON_MS, RINGBACK, handshakeMs } from "./tables";
+import {introNote,noteFrequency,INTRO_STEP} from './intro-score';
 
 type B = typeof Bus;
 type Src = AudioScheduledSourceNode;
@@ -24,6 +25,9 @@ class Synth {
   white: AudioBuffer; pink: AudioBuffer; brown: AudioBuffer; crackle: AudioBuffer;
   modemIn: GainNode; modemVol: GainNode; musicVol: GainNode;
   line: Src[] = [];
+  private introTimer: ReturnType<typeof setInterval> | undefined;
+  private introSources: OscillatorNode[]=[];
+  private introGain: GainNode | null=null;
   fan: GainNode | null = null;
   hdd: { osc: OscillatorNode[]; gain: GainNode } | null = null;
 
@@ -84,6 +88,8 @@ class Synth {
     bus.on("floppySeek", () => this.floppySeek());
     bus.on("offHook", () => this.offHook());
     bus.on("programTone", (p) => this.tones([p.frequency], this.now, p.duration, 0.12, p.speaker === "music" ? this.musicVol : this.modemIn));
+    bus.on('introMusic',(on)=>this.intro(on));
+    bus.on('powerOff',()=>this.intro(false));
     bus.on("dialDigit", (d) => this.digit(d));
     bus.on("ring", () => this.ringback());
     bus.on("busy", () => this.busy());
@@ -98,6 +104,23 @@ class Synth {
   }
 
   // ── building blocks ────────────────────────────────────────────
+  private intro(on:boolean){
+    clearInterval(this.introTimer);this.introTimer=undefined;
+    this.introGain?.disconnect();this.introGain=null;
+    for(const source of this.introSources){try{source.stop();}catch{}}this.introSources=[];
+    if(!on)return;
+    const dest=this.gain(1);dest.connect(this.musicVol);this.introGain=dest;
+    let step=0;
+    const play=()=>{const notes=introNote(step++),t=this.now;
+      for(const [voice,note] of Object.entries(notes)){
+        const osc=this.osc(voice==='bass'?'triangle':'square',noteFrequency(note)),gain=this.gain();
+        osc.connect(gain).connect(dest);this.env(gain.gain,t,voice==='bass'?.14:.045,.004,INTRO_STEP*.8);
+        osc.start(t);osc.stop(t+INTRO_STEP);this.introSources.push(osc);
+        osc.onended=()=>{this.introSources=this.introSources.filter(s=>s!==osc);osc.disconnect();gain.disconnect();};
+      }
+    };
+    play();this.introTimer=setInterval(play,INTRO_STEP*1000);
+  }
   get now() { return this.ctx.currentTime; }
   biquad(type: BiquadFilterType, f: number, q = 1) { const b = this.ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
   gain(v = 0) { const g = this.ctx.createGain(); g.gain.value = v; return g; }

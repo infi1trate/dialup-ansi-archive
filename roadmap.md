@@ -3,7 +3,7 @@
 - [x] 2. Guest and handle favorites add/list/open/remove; tests; d13 uploaded; commit
 - [x] 3. Modem-speed contact-sheet quick scan; tests; d14 uploaded; commit
 - [x] 4. Four NFO house styles across 24 releases; tests; d15-d18 uploaded; commit
-- [ ] 5. EMBER/CHROMA logos, effects, scrollers and music; tests; d19-d21 uploaded; commit
+- [x] 5. EMBER/CHROMA logos, effects, scrollers and music; tests; d19-d21 uploaded; commit
 
 # Sprint C part 3
 - [x] Part 1: five compositions, inverse selection, directory spacing and 80x25 checks

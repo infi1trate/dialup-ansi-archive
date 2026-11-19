@@ -178,7 +178,7 @@ export class Machine {
   out(x: Ansi | string) { this.engine.local(typeof x === "string" ? a().t(x).build() : x.build()); }
   private key(): Promise<Key> { return this.keys.next(); }
   private localEnv(): LocalEnv {
-    return { out: (x) => this.out(x), nextOr: (p) => this.keys.nextOr(p), reduced: () => this.engine.crt.reducedMotion };
+    return { out: (x) => this.out(x), nextOr: (p) => this.keys.nextOr(p), reduced: () => this.engine.crt.reducedMotion, preserveMode:()=>{const t=this.engine.term,m={cols:t.cols,rows:t.rows,ice:t.ice,ninePixel:t.ninePixel,font:t.font,palette:t.palette};t.setMode({cols:80,rows:25,ice:false,ninePixel:true,font:null,palette:null});t.reset();return ()=>{t.setMode(m);t.reset();};} };
   }
   static IDLE_MS = 45_000;
   private saver: Saver = (() => { try { const v = localStorage.getItem("dialup.saver"); return SAVERS.includes(v as Saver) ? v as Saver : "starfield"; } catch { return "starfield"; } })();

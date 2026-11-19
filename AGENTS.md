@@ -58,7 +58,7 @@ use the editor.
 - Archive audit tools store downloaded corpus/reference output under `/tmp/dialup-audit` and use the existing proxy serially at one request per second; repository reports contain metrics, not art copies.
 
 - Board identities and chrome are configured in src/bbs/config.ts; legacy dialing IDs stay stable so saved deep links continue working.
-- Fictional programs dispatch through src/machine/releases.ts; scored trading runs replay seeded actions server-side to validate results before posting.
+- Fictional programs dispatch through src/machine/releases.ts; intros emit audio-engine score events and restore their prior mode. Scored trading runs replay seeded actions server-side.
 
 - Fictional release files use canonical C:\WAREZ\<release>\<file> keys in the existing capped drive; ordinary art downloads keep flat keys. Why: DOS directories must isolate identically named DIZ files without a second storage system.
 - MAPLE RIDGE applies the reviewed allowlist at viewer, queue, quick-scan and path boundaries, not only menus. Why: saved shelves and deep links must not bypass the club promise.
