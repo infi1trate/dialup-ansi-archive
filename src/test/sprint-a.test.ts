@@ -1,0 +1,25 @@
+import {afterEach,describe,expect,it} from 'vitest';
+import {loadRoom,saveRoom} from '@/components/room/settings';
+import {Machine} from '@/machine/machine';
+import {lightAlpha} from '@/components/room/useRoomLive';
+import {prepareArt} from '@/term/prepare';
+import {Terminal} from '@/term/terminal';
+import {selectedFont} from '@/term/fonts';
+import {guessWidth,legacyText} from '@/term/legacy';
+const bytes=(s:string)=>Uint8Array.from(s,c=>c.charCodeAt(0));
+afterEach(()=>localStorage.clear());
+describe('Sprint A rules',()=>{
+ it('first visit lamp is on',()=>{expect(loadRoom().lamp).toBe(true);});
+ it('returning profile defaults lamp off and respects the saved choice',()=>{localStorage.setItem('dialup.profile.v1','{}');expect(loadRoom().lamp).toBe(false);saveRoom({...loadRoom(),lamp:true});expect(loadRoom().lamp).toBe(true);});
+ it('saver starts after 45 seconds; call warns at four minutes and drops at five',()=>{expect(Machine.IDLE_MS).toBe(45000);expect(Machine.WARNING_MS).toBe(240000);expect(Machine.HANGUP_MS).toBe(300000);});
+ it('spill uses a 300 ms time constant independent of frame rate',()=>{expect(lightAlpha(300)).toBeCloseTo(1-Math.exp(-1));expect(1-(1-lightAlpha(10))**30).toBeCloseTo(lightAlpha(300));});
+ it('PCBoard and pipe codes turn into colored cells',()=>{const t=new Terminal();t.feed(legacyText(bytes('@X0CRED|02GREEN')));expect(t.cell(0,0)>>8&15).toBe(12);expect(t.cell(0,3)>>8&15).toBe(2);});
+ it('LF-only text starts the next line at column one',()=>{const t=new Terminal();t.feed(prepareArt('readme',bytes('ABC\nDEF')).stream);expect(t.cell(1,0)&255).toBe(68);});
+ it('wide physical lines infer 132 or 160 columns',()=>{expect(guessWidth(bytes(('x'.repeat(132)+'\r\n').repeat(4)))).toBe(132);expect(guessWidth(bytes(('x'.repeat(160)+'\r\n').repeat(4)))).toBe(160);});
+ it('VGA50 uses 50 rows and a true 8x8 font',()=>{const f=selectedFont('IBM VGA50');expect(f?.height).toBe(8);expect(f?.bytes.length).toBe(2048);const t=new Terminal({font:f});expect(t.rows).toBe(50);});
+ it('SAUCE codepage 866 selects its own glyph bank',()=>{expect(selectedFont('IBM VGA 866')?.bytes.length).toBe(4096);expect(selectedFont('Amiga MicroKnight')?.bytes.length).toBe(4096);});
+ it('binary XBin is detected even named ANSI',()=>{const raw=bytes('XBIN\x1a');const all=new Uint8Array([...raw,80,0,1,0,16,0,...Array.from({length:160},(_,i)=>i%2?7:65)]);expect(prepareArt('fake.ans',all).format).toBe('XBIN');});
+ it('Tundra content is detected without a matching extension',()=>{const raw=new Uint8Array([24,...bytes('TUNDRA24'),2,65,0,255,0,0]);const p=prepareArt('odd.ans',raw);expect(p.format).toBe('TND');const t=new Terminal();t.feed(p.stream);expect(t.lines[0][0]&255).toBe(65);expect(t.stats.unknown).toBe(0);});
+ it('bitmap content named ANSI never becomes garbage',()=>{expect(()=>prepareArt('wrong.ans',bytes('GIF89a garbage'))).toThrow('not a text-mode');});
+ it('Avatar attribute and cursor basics preserve positions',()=>{const t=new Terminal();t.feed(legacyText(new Uint8Array([22,1,12,22,8,2,3,65])));expect(t.cell(1,2)&255).toBe(65);expect(t.cell(1,2)>>8&15).toBe(12);});
+});

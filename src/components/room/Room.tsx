@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import wallImg from "@/assets/room/wall.webp";
 import deskImg from "@/assets/room/desk.webp";
 import floppiesImg from "@/assets/room/floppies.webp";
@@ -38,6 +38,27 @@ const noFocus = (e: React.MouseEvent) => e.preventDefault();
 
 export function Room(p: RoomProps) {
   const root = useRef<HTMLElement>(null);
+  const [attract, setAttract] = useState(false);
+  const [edge, setEdge] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem("dialup.profile.v1")) return;
+    const t = setTimeout(() => setAttract(true), 6000);
+    const stop = () => { clearTimeout(t); setAttract(false); };
+    window.addEventListener("pointerdown", stop, { once: true });
+    window.addEventListener("keydown", stop, { once: true });
+    window.addEventListener("wheel", stop, { once: true });
+    return () => { stop(); window.removeEventListener("pointerdown", stop); window.removeEventListener("keydown", stop); window.removeEventListener("wheel", stop); };
+  }, []);
+  useEffect(() => {
+    const r = root.current; if (!r) return;
+    let distance = 0;
+    const wheel = (e: WheelEvent) => { if (Math.abs(e.deltaY) < 8 || (e.target as HTMLElement).closest(".knob, .speaker-knob, .hatch")) return; e.preventDefault(); p.onLean(e.deltaY < 0); };
+    const dist = (e: TouchEvent) => e.touches.length === 2 ? Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY) : 0;
+    const start = (e: TouchEvent) => { distance = dist(e); };
+    const move = (e: TouchEvent) => { const d = dist(e); if (d && distance && d < distance * 0.85) { e.preventDefault(); p.onLean(false); distance = 0; } };
+    r.addEventListener("wheel", wheel, { passive: false }); r.addEventListener("touchstart", start, { passive: true }); r.addEventListener("touchmove", move, { passive: false });
+    return () => { r.removeEventListener("wheel", wheel); r.removeEventListener("touchstart", start); r.removeEventListener("touchmove", move); };
+  }, [p.onLean]);
   const cam = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const layers = useRef<(HTMLDivElement | null)[]>([]);
@@ -99,7 +120,7 @@ export function Room(p: RoomProps) {
   const L = (i: number) => (el: HTMLDivElement | null) => { layers.current[i] = el; };
 
   return (
-    <main ref={root} className={`room ${p.lamp ? "lamp-on" : ""} ${p.reduced ? "reduce" : ""} ${p.leaned ? "leaned" : ""}`} onClick={onClick} onScroll={(e) => { const t = e.currentTarget; if (t.scrollLeft || t.scrollTop) { t.scrollLeft = 0; t.scrollTop = 0; } }}>
+    <main ref={root} className={`room ${attract ? "arrival-attract" : ""} ${p.lamp ? "lamp-on" : ""} ${p.reduced ? "reduce" : ""} ${p.leaned ? "leaned" : ""}`} onPointerMove={(e) => setEdge(e.clientY > window.innerHeight - 100)} onClick={onClick} onScroll={(e) => { const t = e.currentTarget; if (t.scrollLeft || t.scrollTop) { t.scrollLeft = 0; t.scrollTop = 0; } }}>
       <h1 className="sr-only">Dial-Up: a 486 in a dark basement, ready to call The Crawlspace BBS</h1>
       <div ref={cam} className="cam">
         <div ref={stage} className="stage" style={{ aspectRatio: `100 / ${STAGE_H}` }}>
@@ -131,7 +152,7 @@ export function Room(p: RoomProps) {
           </div>
           {/* foreground props */}
           <div ref={L(2)} className="layer layer-front">
-            <div className="note2" style={box(NOTE2)} aria-label="A second sticky note, half under the keyboard">call 555-0113</div>
+            <div className="note2" data-touch style={box(NOTE2)} aria-label="A second sticky note, half under the keyboard">call 555-0113</div>
             <Keyboard />
             <img src={floppiesImg} alt="" className="prop" style={box({ x: -1.5, y: 48.6, w: 17 })} loading="lazy" draggable={false} />
             <img src={printoutImg} alt="" className="prop printout" style={box({ x: 70, y: 51.2, w: 22 })} loading="lazy" draggable={false} />
@@ -160,6 +181,7 @@ export function Room(p: RoomProps) {
         </div>
       </div>
       <div className="grade" aria-hidden><i className="grade-vignette" /><i className="grade-grain" /></div>
+      {p.leaned && <button type="button" data-touch className={`lean-back-edge ${edge ? "raised" : ""}`} aria-label="Lean back" onClick={() => p.onLean(false)}><span>ESCAPE THE TUBE</span><i /><i /><i /><i /><i /><i /><i /><i /></button>}
       {p.children}
     </main>
   );

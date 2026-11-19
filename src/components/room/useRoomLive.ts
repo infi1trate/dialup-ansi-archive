@@ -6,7 +6,7 @@ interface Opts { root: React.RefObject<HTMLElement | null>; getState: () => stri
 
 /**
  * Drives everything that changes in the room without React re-renders: screen-spill light
- * (CSS variables, ~10 Hz with smoothing), modem/HDD LEDs, the occasional headlight sweep.
+ * (CSS variables, display-frame-rate with 300 ms smoothing), modem/HDD LEDs, the occasional headlight sweep.
  */
 export function useRoomLive({ root, getState, reduced }: Opts) {
   useEffect(() => {
@@ -30,7 +30,7 @@ export function useRoomLive({ root, getState, reduced }: Opts) {
     const cur = [0, 0, 0];
     let tgt: [number, number, number] = [0, 0, 0];
     const unsub = screenAverageColor.subscribe((v) => { tgt = v; });
-    let raf = 0, lastLight = 0;
+    let raf = 0, lastLight = performance.now();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const st = getState();
@@ -40,9 +40,9 @@ export function useRoomLive({ root, getState, reduced }: Opts) {
       set("SD", pc && now < sdUntil);
       set("hdd", pc && now < hddUntil && Math.random() < 0.7);
       set("spk", pc && audio.musicOn);
-      if (now - lastLight < 100) return;
+      const alpha = lightAlpha(now - lastLight);
       lastLight = now;
-      for (let i = 0; i < 3; i++) cur[i] += (tgt[i] - cur[i]) * 0.45;
+      for (let i = 0; i < 3; i++) cur[i] += (tgt[i] - cur[i]) * alpha;
       // light colour: hue of the screen, intensity grows with its brightness (soft knee)
       const mx = Math.max(cur[0], cur[1], cur[2], 0.001);
       const lum = (cur[0] * 0.3 + cur[1] * 0.55 + cur[2] * 0.15) / 255;
@@ -67,3 +67,6 @@ export function useRoomLive({ root, getState, reduced }: Opts) {
     return () => { cancelAnimationFrame(raf); unsub(); offs.forEach((f) => f()); clearTimeout(sweepT); };
   }, [root, getState, reduced]);
 }
+
+/** Frame-rate-independent room spill low-pass, milliseconds. */
+export function lightAlpha(dt: number) { return 1 - Math.exp(-Math.max(0, dt) / 300); }

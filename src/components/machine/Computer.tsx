@@ -133,6 +133,7 @@ export function Computer({ deepLink, lost }: Props) {
         <p>login: GUEST</p>
         <p>ENTER skips anything.</p>
         <p>I = who made it.</p>
+        <p>Then kill the lamp.</p>
       </div>
     </Monitor>
   );

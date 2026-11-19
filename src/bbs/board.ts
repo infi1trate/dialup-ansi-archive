@@ -4,7 +4,7 @@ import { ATTIC_UNLOCK, type HostIO, type DeepLink, type KeyHint } from "./io";
 import type { Key } from "@/machine/keyboard";
 import { Aborted } from "@/machine/keyboard";
 import { maxSpeed } from "@/machine/storage";
-import { getFile, getGroupPacks, getGroups, getPack, getYearPacks, getYears, MAX_YEAR } from "@/data/archive";
+import { fileCached, packCached, fileTitle, prefetchFile, getFile, getGroupPacks, getGroups, getPack, getYearPacks, getYears, MAX_YEAR } from "@/data/archive";
 import { HOUSE_ANIMATIONS, HOUSE_PACK } from "@/data/housepack";
 import type { PackFile, PackInfo, PackSummary, Page } from "@/data/types";
 import { parseSauce, sauceDate, type Sauce } from "@/term/sauce";
@@ -211,7 +211,7 @@ export class Board {
   }
 
   // ── lightbar ───────────────────────────────────────────────────
-  async lightbar(o: { row: number; col: number; width: number; height: number; items: { text: string; color: number; dim?: boolean }[]; index?: number; hotkeys?: string }): Promise<{ index: number; key?: string } | null> {
+  async lightbar(o: { row: number; col: number; width: number; height: number; items: { text: string; color: number; dim?: boolean }[]; index?: number; hotkeys?: string; highlight?: (index:number) => void; refresh?: () => boolean }): Promise<{ index: number; key?: string } | null> {
     const { row, col, width, height, items } = o;
     let i = Math.max(0, Math.min(items.length - 1, o.index ?? 0));
     let top = Math.floor(i / height) * height;
@@ -231,8 +231,14 @@ export class Board {
     if (!items.length) { this.send(a().at(row, col).k(8, "  (nothing here)")); }
     page();
     this.hint([...NAV, { label: "PGUP", key: "PageUp" }, { label: "PGDN", key: "PageDown" }, ...[...(o.hotkeys ?? "")].map((c) => hk(c))]);
+    let highlightAt = Date.now(), highlighted = false;
     for (;;) {
-      const k = await this.key();
+      const k = o.highlight || o.refresh ? await this.io.keyTimeout(200) : await this.key();
+      if (!k) {
+        if(!highlighted && Date.now()-highlightAt >= 400) { highlighted=true; o.highlight?.(i); }
+        if(o.refresh?.()) page();
+        continue;
+      }
       const prev = i;
       if (k.key === "Tap" && k.tapRow) {
         const n = top + (k.tapRow - row);
@@ -255,6 +261,7 @@ export class Board {
           if (k.ch !== null && o.hotkeys?.includes(String.fromCharCode(k.ch).toUpperCase())) { this.io.clearOutput(); return { index: i, key: String.fromCharCode(k.ch).toUpperCase() }; }
       }
       if (i === prev || i < 0) continue;
+      highlightAt=Date.now(); highlighted=false;
       const ntop = Math.floor(i / height) * height;
       if (ntop !== top) { top = ntop; page(); }
       else this.send(a().bytes(line(prev, false).build()).bytes(line(i, true).build()));
@@ -731,7 +738,7 @@ export class Board {
       [7, "This board fetches only what you open, and caches it politely."],
       [7, ""],
       [13, "Font: IBM VGA 8x16 from the Ultimate Oldschool PC Font Pack by VileR"],
-      [13, "(int10h.org), licensed CC BY-SA 4.0."],
+      [13, "(int10h.org), CC BY-SA 4.0; extra fonts: libansilove, BSD-2-Clause."],
       [13, "KPLAY music: libopenmpt (BSD license) via chiptune3 (MIT license)."],
       [7, ""],
       [7, "Board software, house pack CRAWL-01, the machine and the modem: Dial-Up."],
@@ -841,7 +848,9 @@ export class Board {
       x.at(23, 4).eol().k(8, `area page ${p.page}/${p.pages} · ${p.total} packs · ENTER open · ESC back`);
       this.status(x);
       this.send(x);
-      const r = await this.lightbar({ row: 7, col: 3, width: 74, height: 14, items, index: idx });
+      const r = await this.lightbar({ row: 7, col: 3, width: 74, height: 14, items, index: idx, highlight: (i) => {
+        const target = p.items[i - (p.page > 1 ? 1 : 0)]; if(target?.name) void getPack(target.name,target.groups).catch(()=>{});
+      } });
       if (!r) return;
       const it = items[r.index];
       if (it.act === "next") { page++; idx = 0; continue; }
@@ -896,7 +905,7 @@ export class Board {
 
   async packScreen(s: PackSummary, startFile?: string) {
     this.send(this.header(a(), `Pack ${s.name.toUpperCase()}`, String(s.year)));
-    await this.loading("Retrieving pack listing...");
+    if (!packCached(s.name)) await this.loading("Retrieving pack listing...");
     let pack: PackInfo;
     try { pack = await getPack(s.name, s.groups); } catch (e) { await this.errorScreen(String((e as Error).message)); return; }
     if (!pack.groups.length) pack.groups = s.groups;
@@ -912,26 +921,33 @@ export class Board {
       const i = viewable.findIndex((f) => f.name.toLowerCase() === startFile.toLowerCase());
       if (i >= 0) await this.viewer(pack, viewable, i);
     }
-    let idx = 0;
+    let idx = 0, showAll = false;
     for (;;) {
+      const listed = pack.files.filter(f => showAll || f.viewable || MUSIC.test(f.name));
+      const hidden = pack.files.length - pack.files.filter(f=>f.viewable||MUSIC.test(f.name)).length;
       const x = this.header(a(), `Pack ${pack.name.toUpperCase()}`, pack.groups.length ? `${pack.year} · ${pack.groups.join(", ")}` : String(pack.year));
       // FILE_ID.DIZ, drawn line by line into the top area
       if (diz) {
         const lines = splitLines(diz).slice(0, 10);
         lines.forEach((l, n) => { x.at(4 + n, 3).reset(); x.bytes(l); x.reset(); });
       } else x.at(5, 4).k(8, "(no FILE_ID.DIZ in this pack)");
-      x.at(14, 3).k(13, pad("File", 14) + rpad("Size", 8) + "  " + pad("Artist", 26) + rpad(`@${this.io.speed}`, 9)).at(15, 3).k(5, "─".repeat(64));
-      x.at(23, 4).eol().k(8, "ENTER view · ").k(7, "D").k(8, " download · ").k(7, "P").k(8, " play music · ESC back · dim = not viewable");
+      x.at(14, 3).k(13, pad("File", 16) + pad("SAUCE title / Artist", 36) + rpad("Size", 10)).at(15, 3).k(5, "─".repeat(64));
+      x.at(23,4).eol().k(8,`${hidden} files this terminal can't show (V to ${showAll?"hide":"list"} them)`);
+      x.at(25,1).k(8,"ENTER view · D download · P play music · ESC back");
       this.status(x);
       this.send(x);
-      const items = pack.files.map((f) => ({
-        text: `${pad(f.name, 14)}${rpad(f.size != null ? String(f.size) : "?", 8)}  ${pad(f.artists.join(", ") || "—", 26)}${rpad(this.estimate(f.size), 8)}`,
+      const label = (f:PackFile) => `${pad(f.name,16)}${pad(f.title || fileTitle(pack.name,f.name) || f.artists.join(", ") || "—",36)}${rpad(String(f.size ?? "?"),10)}`;
+      const items = listed.map((f) => ({
+        text: label(f),
         color: MUSIC.test(f.name) ? 10 : /\.(ans|ice|bin|xb)$/i.test(f.name) ? 11 : 3, dim: !f.viewable && !MUSIC.test(f.name),
       }));
-      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx, hotkeys: "DP" });
+      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx, hotkeys: "DPV", refresh: () => {
+        let changed = false; listed.forEach((f,i)=>{const t=label(f); if(items[i].text!==t){items[i].text=t;changed=true;}});return changed;
+      } });
       if (!r) return;
       idx = r.index;
-      const f = pack.files[r.index];
+      if(r.key === "V") { showAll=!showAll; idx=0; continue; }
+      const f = listed[r.index];
       const music = MUSIC.test(f.name);
       if (r.key === "D" || r.key === "P" || (music && !r.key)) {
         const play = music && r.key !== "D";
@@ -954,7 +970,7 @@ export class Board {
   async download(pack: PackInfo, f: PackFile): Promise<Uint8Array | null> {
     const io = this.io;
     this.setDoing(`downloading ${f.name}`.slice(0, 40));
-    this.send(a().at(23, 4).eol().k(8, "░▒▓ ").k(11, `retrieving ${f.name}...`).k(8, " ▓▒░"));
+    if(!fileCached(pack.name,f.name)) this.send(a().at(23, 4).eol().k(8, "░▒▓ ").k(11, `retrieving ${f.name}...`).k(8, " ▓▒░"));
     let bytes: Uint8Array;
     try { bytes = await getFile(pack.name, f.name); } catch (e) { await this.errorScreen(`${f.name}: ${(e as Error).message}`); return null; }
     await io.drain();
@@ -1004,7 +1020,7 @@ export class Board {
     const restore = () => { io.client.overlay(null); io.client.setMode({ cols: 80, ice: false, ninePixel: true }); };
     for (;;) {
       const f = files[idx];
-      this.send(a().cls().at(12, 1).k(8, center(`░▒▓ retrieving ${f.name} from the stacks ▓▒░`, 79)));
+      if(!opts.local && !fileCached(pack.name,f.name)) this.send(a().cls().at(12, 1).k(8, center(`░▒▓ retrieving ${f.name} from the stacks ▓▒░`, 79)));
       let bytes: Uint8Array;
       try { bytes = opts.local ?? await getFile(pack.name, f.name); } catch (e) { restore(); await this.errorScreen(`${f.name}: ${(e as Error).message}`); return; }
       await io.drain();
@@ -1015,6 +1031,7 @@ export class Board {
       io.client.setMode(mode);
       io.client.markTop();
       io.send(stream);
+      if(!opts.local) for(const n of [idx-1,idx+1]) { const neighbor=files[n]; if(neighbor) prefetchFile(pack.name,neighbor.name); }
       const seen = `${pack.name}/${f.name}`;
       const before = maxSpeed(io.profile);
       if (!opts.local && !io.profile.filesSeen.includes(seen)) { io.profile.filesSeen.push(seen); io.save(); }

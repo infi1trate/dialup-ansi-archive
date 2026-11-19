@@ -2,7 +2,7 @@
 // Cell = uint16: low byte CP437 char, high byte VGA attribute
 // (bits 0-3 fg, 4-6 bg, 7 blink — or bright background in iCE mode).
 
-export interface TermMode { cols: number; ice: boolean; ninePixel: boolean; palette?: Uint32Array | null; font?: { bytes: Uint8Array; height: number } | null }
+export interface TermMode { cols: number; rows?: number; ice: boolean; ninePixel: boolean; palette?: Uint32Array | null; font?: { bytes: Uint8Array; height: number } | null }
 export interface TermStats { bytes: number; sequences: number; unknown: number; unknownList: string[]; linesScrolled: number }
 
 const BLANK = 0x0720;
@@ -58,9 +58,10 @@ export class Terminal {
 
   setMode(m: Partial<TermMode>) {
     const cols = Math.max(40, Math.min(m.cols ?? this.cols, 320));
-    const colsChanged = cols !== this.cols || this.lines.length === 0;
+    const rows = m.rows ?? (m.font?.height === 8 ? 50 : cols > 80 ? Math.round((25 * cols) / 80) : 25);
+    const colsChanged = cols !== this.cols || rows !== this.rows || this.lines.length === 0;
     this.cols = cols;
-    this.rows = cols > 80 ? Math.round((25 * cols) / 80) : 25;
+    this.rows = rows;
     if (m.ice !== undefined) this.ice = m.ice;
     if (m.ninePixel !== undefined) this.ninePixel = m.ninePixel;
     this.palette = m.palette ?? null; // per-file palette/font last only as long as the file
@@ -240,6 +241,11 @@ export class Terminal {
         const rgb = (1 << 24) | ((nums[1] & 255) << 16) | ((nums[2] & 255) << 8) | (nums[3] & 255);
         if (nums[0] === 0) this.tbg = rgb; else if (nums[0] === 1) this.tfg = rgb; else this.unknown(`CSI ${p}t`);
         break;
+      }
+      case "M": { // Delete lines (ANSI music-era files also use this cursor operation).
+        const at = this.top + this.y, count = Math.min(n(0), this.rows-this.y);
+        this.lines.splice(at,count); this.ext.splice(at,count);
+        for(let i=0;i<count;i++){this.lines.push(this.blankLine());this.ext.push(null);} break;
       }
       case "n": break; // device status report: nobody to answer on a one-way stream
       case "s": this.savedX = this.x; this.savedY = this.y; break;

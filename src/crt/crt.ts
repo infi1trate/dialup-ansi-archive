@@ -22,10 +22,11 @@ uniform float onT, offT, time, motion, persist;
 vec2 curve(vec2 u){ u = u*2.-1.; vec2 off = abs(u.yx)/vec2(9.,7.); u = u + u*off*off; return u*0.5+0.5; }
 
 vec3 sharp(vec2 u){
-  vec2 t = u*srcSize; vec2 scale = max(floor(outSize/srcSize), vec2(1.));
-  vec2 ti = floor(t); vec2 f = t-ti; vec2 region = 0.5 - 0.5/scale;
-  f = clamp((f-region)/(1.-2.*region), 0., 1.);
-  return textureLod(src, (ti+f)/srcSize, 0.).rgb;
+  vec2 t = u*srcSize - 0.5;
+  float scale = max(1., floor(min(outSize.x/srcSize.x, outSize.y/srcSize.y)));
+  vec2 ti = floor(t); vec2 f = fract(t);
+  f = clamp((f-0.5)*scale+0.5, 0., 1.);
+  return textureLod(src, (ti+f+0.5)/srcSize, 0.).rgb;
 }
 
 void main(){
@@ -70,14 +71,13 @@ void main(){
   vec2 u = curve(uv);
   // scanlines, only when there is room for them
   float lines = outSize.y / srcSize.y;
-  float sl = lines >= 1.6 ? 0.14 : 0.04;
+  float sl = lines >= 2.0 ? 0.055 : 0.0;
   col *= 1. - sl*(0.5+0.5*cos(u.y*srcSize.y*6.28318));
   // vignette
   vec2 v = u*(1.-u.yx); col *= pow(clamp(v.x*v.y*22., 0., 1.), 0.22);
-  // noise + tiny flicker
-  float n = hash(uv*outSize + (motion > 0.5 ? fract(time)*91. : 0.));
-  col += (n-0.5)*0.022;
-  col *= 1. - motion*0.006*sin(time*2.5); // slow breathing, well under 3 flashes/s
+  // Fixed, low-amplitude grain: no brightness oscillator or per-frame reseeding.
+  float n = hash(u*srcSize);
+  col += (n-0.5)*0.006;
   // tube glass base glow
   col += vec3(0.018,0.022,0.02);
   // rounded corners of the tube

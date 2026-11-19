@@ -265,7 +265,7 @@
     --sr: 0; --sg: 0; --sb: 0; --sk: 0; --refl: 0.55; --lamp: 0;
     --spill: rgb(var(--sr) var(--sg) var(--sb));
     position: fixed; inset: 0; overflow: hidden; background: var(--background);
-    user-select: none; transition: --lamp 600ms ease;
+    user-select: none; transition: --lamp 180ms cubic-bezier(0.32, 0.05, 0.3, 1);
   }
   .room.lamp-on { --lamp: 1; }
   .cam { position: absolute; inset: 0; transform-origin: 0 0; transition: transform 600ms cubic-bezier(0.45, 0, 0.2, 1); will-change: transform; display: grid; place-items: center; }
@@ -405,7 +405,7 @@
   .lm-spill-desk { left: 4cqw; top: 45cqw; width: 86cqw; height: 18cqw; background: radial-gradient(ellipse 50% 60% at 50% 25%, var(--spill), rgb(var(--sr) var(--sg) var(--sb) / 0.4) 45%, transparent 80%); }
   .lm-tube { left: calc(var(--tube-x, 0cqw) + 0.5cqw); top: calc(var(--tube-y, 0cqw) + 0.5cqw); width: calc(var(--tube-w, 0cqw) - 1cqw); height: calc(var(--tube-h, 0cqw) - 1cqw); background: rgb(255 255 255); border-radius: 1.2cqw; box-shadow: 0 0 1.6cqw 0.6cqw rgb(var(--sr) var(--sg) var(--sb) / 0.7), 0 0 0.4cqw 0.3cqw rgb(255 255 255 / 0.5); }
   .lm-lamp { left: -10cqw; top: 18cqw; width: 70cqw; height: 45cqw; opacity: var(--lamp);
-    background: radial-gradient(ellipse 40% 30% at 42% 75%, rgb(255 205 140), transparent 75%), radial-gradient(ellipse 60% 60% at 30% 30%, rgb(140 105 70), transparent 75%); }
+    background: radial-gradient(ellipse 34% 27% at 50% 65%, rgb(255 205 140), transparent 100%), radial-gradient(ellipse 38% 35% at 50% 48%, rgb(140 105 70), transparent 100%); mask-image: radial-gradient(ellipse 50% 50% at center, black 45%, transparent 100%); }
   .lm-clock { background: radial-gradient(ellipse 50% 50% at 50% 40%, rgb(120 20 10), transparent 70%); }
   .lm-modem { background: radial-gradient(ellipse 50% 50% at 50% 40%, rgb(70 20 15), transparent 70%); }
   .glow { inset: 0; pointer-events: none; z-index: 6; }
@@ -468,6 +468,7 @@
 
   /* ── second sticky note + the stairs (stair creak comes from here) ── */
   .note2 {
+    pointer-events: auto; z-index: 1; clip-path: inset(0 55% 65% 0); translate: 0 4cqw; transition: translate 250ms ease, clip-path 250ms ease;
     aspect-ratio: 1; padding: 0.35cqw; transform: rotate(-9deg); font-family: "Nanum Pen Script", cursive; font-size: 1.05cqw; line-height: 1;
     background: linear-gradient(160deg, oklch(0.86 0.12 145), oklch(0.78 0.13 140)); color: oklch(0.25 0.04 260);
     box-shadow: 0.1cqw 0.25cqw 0.4cqw oklch(0 0 0 / 0.6);
@@ -536,3 +537,20 @@
 .crash pre { white-space: pre-wrap; font: inherit; line-height: 1.5; }
 .crash button { justify-self: start; background: none; border: 0; color: oklch(0.9 0 0); font: inherit; cursor: pointer; }
 .crash button:hover, .crash button:focus-visible { color: oklch(0.08 0 0); background: oklch(0.72 0 0); outline: none; }
+
+@layer components {
+  .room [data-touch]:hover { filter: drop-shadow(0 0 2px var(--plastic)) brightness(1.08); }
+  .room:not(.leaned) .monitor-screen:hover { outline: 1px solid var(--plastic-shade); }
+  .note2:hover { translate: 0 0; clip-path: inset(0); }
+  .arrival-attract .led-green.is-standby { animation: arrival-breathe 3s ease-in-out infinite; }
+  .arrival-attract .lamp { animation: lamp-glint 4s ease-in-out infinite; }
+  @keyframes arrival-breathe { 0%, 100% { opacity: .18; } 50% { opacity: 1; } }
+  @keyframes lamp-glint { 0%, 82%, 100% { filter: none; } 90% { filter: drop-shadow(1px 0 2px var(--plastic)); } }
+  .room.reduce.arrival-attract .led-green.is-standby { animation: none; opacity: .65; }
+  .room.reduce.arrival-attract .lamp { animation: none; }
+  .lean-back-edge { position: fixed; z-index: 9; bottom: 0; left: 20%; width: 60%; height: 64px; display: flex; gap: 6px; align-items: end; padding: 20px 14px 8px; border: 0; border-radius: 8px 8px 0 0; background: linear-gradient(var(--plastic), var(--plastic-deep)); transform: translateY(52px); transition: transform 180ms ease; cursor: pointer; box-shadow: 0 -2px 12px var(--bezel); }
+  .lean-back-edge.raised, .lean-back-edge:hover, .lean-back-edge:focus-visible { transform: translateY(0); }
+  .lean-back-edge span { position: absolute; top: 4px; left: 16px; font: 10px var(--font-mono); color: var(--bezel); }
+  .lean-back-edge i { flex: 1; height: 26px; border-radius: 3px; background: var(--plastic); box-shadow: inset 0 -4px 0 var(--plastic-shade); }
+  .room.reduce .lean-back-edge, .room.reduce .note2 { transition: none; }
+}

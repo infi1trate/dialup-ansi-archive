@@ -1,9 +1,12 @@
-# Pass 5 roadmap
-- [x] A downloads, C:\DOWNLOAD, VIEW/DEL
-- [x] B tracker music via libopenmpt, KPLAY, desk speakers + knob
-- [x] C BASEMENT CRAWL door + high scores
-- [x] D sysop chat
-- [x] E screensaver, 404 NO CARRIER, fatal screen, title/favicon/noindex
-- [x] F polish sweep (logos, menu, logoff, VOID logo)
-- [x] G evidence shots (.b64)
-- [x] STATUS.md
+# Sprint A
+- [x] First-visit lamp, hints and hover treatment
+- [x] Stable CRT grain, smooth spill and seamless lamp falloff
+- [x] Wheel, outside click, key and strip checked; pinch implemented, native touch remains unverified
+- [x] KESTREL MENU launcher, downloads and complete DOS HELP
+- [x] Three remembered savers, 45-second idle; call warning/hangup
+- [x] Session prefetch, cache-aware loading and progressive SAUCE titles
+- [x] Crisp CRT text at 1440/1920/2560/3840 DPR1; DPR2 comparison remains unverified
+- [x] Concealed second note
+- [x] 300-file archive audit, format fixes and before/after report
+- [x] Browser regression checks and private Sprint A review shots
+- [x] STATUS Sprint A blocks and commit

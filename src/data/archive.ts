@@ -1,4 +1,5 @@
 // Archive access: everything goes through this project's caching proxy, never to 16colo.rs directly.
+import { parseSauce } from "@/term/sauce";
 import { audio } from "@/audio/bus";
 import { houseFile, housePack, HOUSE_PACK } from "./housepack";
 import { isViewable, type GroupSummary, type PackInfo, type PackSummary, type Page } from "./types";
@@ -64,7 +65,7 @@ export async function getPack(name: string, groups: string[] = []): Promise<Pack
   const r = d.results?.[0];
   if (!r) throw new ArchiveError("pack not found");
   const fl = Object.entries(r.files ?? {}).map(([n, v]: [string, any]) => ({
-    name: n, artists: v.artists ?? [], size: v.file?.size ?? null, viewable: isViewable(n),
+    name: n, artists: v.artists ?? [], size: v.file?.size ?? null, viewable: isViewable(n), title: v.sauce?.title ?? v.file?.sauce?.title ?? "",
   }));
   fl.sort((x, y) => Number(y.viewable) - Number(x.viewable) || x.name.localeCompare(y.name));
   const fileId = r.fileid ?? (fl.find((f) => /^file_id\.diz$/i.test(f.name))?.name ?? null);
@@ -87,9 +88,12 @@ export async function getFile(pack: string, file: string): Promise<Uint8Array> {
       return new Uint8Array(await r.arrayBuffer());
     });
     files.set(k, p);
+    p.then(bytes => { const title = parseSauce(bytes).sauce?.title; if(title) knownTitles.set(k,title); }).catch(() => {});
     p.catch(() => files.delete(k));
   }
-  return files.get(k)!;
+  const found = files.get(k);
+  if (!found) throw new ArchiveError("file cache missing");
+  return found;
 }
 
 /** Fallback group: SAUCE group of the first file that has one; otherwise none (never "unknown"). */
@@ -100,3 +104,9 @@ export function sauceGroup(files: Record<string, any> | undefined): string[] {
   }
   return [];
 }
+
+const knownTitles = new Map<string,string>();
+export const fileCached = (pack:string,file:string) => pack.toLowerCase()===HOUSE_PACK || files.has(`${pack}/${file}`);
+export const packCached = (pack:string) => pack.toLowerCase()===HOUSE_PACK || json.has(`/v1/pack/${pack}?sauce=true&filesize=true`);
+export const fileTitle = (pack:string,file:string) => knownTitles.get(`${pack}/${file}`) ?? "";
+export function prefetchFile(pack:string,file:string) { void getFile(pack,file).catch(()=>{}); }

@@ -49,3 +49,6 @@ use the editor.
 - Downloads live in IndexedDB (`src/machine/drive.ts`, `C:\DOWNLOAD`, size-capped, oldest evicted); DOS VIEW replays them through the board viewer with a local HostIO. Why: offline reading without a server.
 - Tracker music plays only through `src/audio/kplay.ts` (lazy AudioWorklet from `public/wasm/chiptune3`) into the speaker bus in `src/audio/engine.ts`. Why: the 1.5 MB player must never touch the first load, and music needs a visible source.
 - BASEMENT CRAWL daily turns and scores go through `/api/public/net` actions (`doorTurn`, `doorScore`, `doorTop`) on RLS-locked tables. Why: same validation/rate-limit path as every board write.
+
+- Legacy display-code translation and licensed SAUCE font selection stay inside `src/term/prepare.ts`; all viewing surfaces share them so no format gets an alternate renderer.
+- Archive audit tools store downloaded corpus/reference output under `/tmp/dialup-audit` and use the existing proxy serially at one request per second; repository reports contain metrics, not art copies.

@@ -2,9 +2,10 @@
 // Local programs (BIOS, DOS, TELEWIRE) draw straight to the terminal; the board only through the modem.
 import { Ansi, a, box, center, pad, rpad } from "@/bbs/ansi";
 import { DIRECTORY, boardAt, normalizeNumber, phoneBook, type DeepLink, type DirEntry, type HostIO, type KeyHint } from "@/bbs/io";
+import { doorMenu } from "@/bbs/door";
 import { localView, runBoard } from "@/bbs/board";
 import * as drive from "./drive";
-import { kplay, MUSIC, starfield, type LocalEnv } from "./programs";
+import { kplay, MUSIC, screenSaver, SAVERS, type Saver, type LocalEnv } from "./programs";
 import { count } from "@/data/net";
 import { audio } from "@/audio/bus";
 import { Engine } from "./engine";
@@ -46,7 +47,7 @@ export class Machine {
   private skipping = false;
   private cwd = "C:\\";
   private deepLink: (DeepLink & { number: string }) | null = null;
-  /** Set before powerOn for a wrong URL: TELEWIRE dials it, gets NO CARRIER, drops to DOS. */
+  /** Set before powerOn for a wrong URL: TELEWIRE dials it, gets NO CARRIER, drops to the launcher. */
   lostAt: string | null = null;
   private timeTimer: ReturnType<typeof setInterval> | null = null;
   private boardOverlay: Terminal | null = null;
@@ -78,6 +79,7 @@ export class Machine {
   /** A tap on the touch context bar types this key. */
   pressHint(h: KeyHint) {
     if (!this.powered.value) return;
+    this.lastInput = Date.now(); this.inactivityWarned = false;
     audio.emit("keyDown", h.key || " "); setTimeout(() => audio.emit("keyUp", h.key || " "), 70);
     if (h.ch && h.ch.length > 1) { // macro, e.g. "DIAL\r"
       for (const c of h.ch) this.keys.push(c === "\r" ? { key: "Enter", ch: null, ctrl: false, alt: false } : { key: c, ch: c.charCodeAt(0), ctrl: false, alt: false });
@@ -88,11 +90,13 @@ export class Machine {
   /** A tap on a text row of the tube (1-based). Programs that list things treat it like select/Enter. */
   tap(row: number) {
     if (!this.powered.value) return;
+    this.lastInput = Date.now(); this.inactivityWarned = false;
     this.keys.push({ key: "Tap", ch: null, ctrl: false, alt: false, tapRow: row });
   }
   /** Characters typed into the hidden input that summons the phone's keyboard. */
   typeText(ch: string) {
     if (!this.powered.value) return;
+    this.lastInput = Date.now(); this.inactivityWarned = false;
     for (const c of ch) { const code = c.charCodeAt(0); if (code >= 0x20 && code < 0x7f) this.keys.push({ key: c, ch: code, ctrl: false, alt: false }); }
   }
 
@@ -101,6 +105,7 @@ export class Machine {
     // the keyboard is a physical object: it clicks whether or not anything is listening
     if (!e.repeat && !e.metaKey) audio.emit("keyDown", e.key);
     if (!this.powered.value) return;
+    this.lastInput = Date.now(); this.inactivityWarned = false;
     if (e.metaKey || (e.ctrlKey && !["c", "C"].includes(e.key))) return;
     if (CAPTURE.has(e.key) || e.key.length === 1) e.preventDefault();
     this.keys.push(toKey(e));
@@ -147,6 +152,7 @@ export class Machine {
 
   powerOff() {
     if (!this.powered.value) return;
+    this.lastInput = Date.now(); this.inactivityWarned = false;
     this.gen++;
     this.keys.abort("power");
     this.stopTimer();
@@ -165,8 +171,13 @@ export class Machine {
   private localEnv(): LocalEnv {
     return { out: (x) => this.out(x), nextOr: (p) => this.keys.nextOr(p), reduced: () => this.engine.crt.reducedMotion };
   }
-  static IDLE_MS = 180_000;
-  /** Next key at DOS or in the directory; after 3 idle minutes the starfield runs until a key. Returns null if it ran. */
+  static IDLE_MS = 45_000;
+  private saver: Saver = (() => { try { const v = localStorage.getItem("dialup.saver"); return SAVERS.includes(v as Saver) ? v as Saver : "starfield"; } catch { return "starfield"; } })();
+  private lastInput = Date.now();
+  private inactivityWarned = false;
+  static WARNING_MS = 240_000;
+  static HANGUP_MS = 300_000;
+  /** Next key at DOS or in the directory; after 45 idle seconds the starfield runs until a key. Returns null if it ran. */
   private async idleKey(g: number): Promise<Key | null> {
     const k = await this.keys.nextOr(this.sleep(Machine.IDLE_MS));
     this.alive(g);
@@ -174,7 +185,7 @@ export class Machine {
     const prev = this.state.value;
     this.hints.set([{ label: "WAKE", key: "Enter" }]);
     this.engine.term.cursorVisible = false;
-    await starfield(this.localEnv());
+    await screenSaver(this.localEnv(), this.saver);
     this.alive(g);
     this.engine.term.cursorVisible = true;
     this.state.set(prev);
@@ -316,20 +327,77 @@ export class Machine {
         "DEVICE=C:\\DOS\\KSMOUSE.SYS  (no mouse? fine.)", "", "C:\\>PROMPT $P$G", "C:\\>PATH C:\\DOS;C:\\TELEWIRE", "C:\\>MODE COM2:9600,N,8,1",
         "COM2: 9600,n,8,1,-", ""];
       for (const l of boot) { this.out(a().k(7, l).nl()); await this.wait(70); this.alive(g); }
-      this.out(a().k(11, "Starting TELEWIRE in 2 seconds — press any key for the DOS prompt.").nl());
-      this.skipping = false;
-      const k = await this.keys.nextOr(this.sleep(2000));
-      this.alive(g);
-      if (!k) { this.out(a().k(7, "C:\\>TELEWIRE").nl()); await this.comm(g); }
-      else this.out(a().nl());
+      this.out(a().k(7, "C:\\>MENU").nl());
+      await this.wait(350); this.alive(g);
     }
+    await this.launcher(g);
+  }
+
+  private async launcher(g: number) {
+    let sel = 0;
+    const labels = ["Dial a BBS", "Downloads", "Games", "Screen savers", "DOS prompt"];
     for (;;) {
-      this.state.set("dos");
-      this.hints.set([{ label: "type", key: "", text: true }, { label: "DIAL", key: "", ch: "DIAL\r" }, { label: "ENTER", key: "Enter" }]);
-      this.out(a().k(7, `${this.cwd}>`));
-      const line = await this.readLine(g, 70);
-      const r = await this.dosCommand(line.trim(), g);
-      if (r === "comm") await this.comm(g);
+      this.alive(g); this.state.set("dos");
+      this.engine.term.setMode({cols: 80, ice: false, ninePixel: true});
+      this.engine.term.cursorVisible = false;
+      const x = a().reset().cls();
+      x.at(1,1).c(0,3).t(pad(" KESTREL MENU  ·  486DX-33",79)).reset();
+      box(x,4,13,54,16,11,"PROGRAM LAUNCHER",true);
+      labels.forEach((l,i) => x.at(7+i*2,17).c(i===sel?0:15,i===sel?7:0).t(pad(` ${i+1}  ${l}`,44)));
+      x.at(22,13).k(7,"Arrows select · ENTER starts · 1-5 quick launch");
+      this.out(x); this.hints.set([...NAV,...labels.map((_,i)=>hk(String(i+1)))]);
+      const k = await this.idleKey(g); if (!k) continue;
+      const c = k.ch !== null ? String.fromCharCode(k.ch) : "";
+      if (k.key === "ArrowUp") { sel = (sel+4)%5; continue; }
+      if (k.key === "ArrowDown") { sel = (sel+1)%5; continue; }
+      if (k.key === "Tap" && k.tapRow) { const n = Math.floor((k.tapRow-7)/2); if(n<0||n>4) continue; sel=n; }
+      else if (/^[1-5]$/.test(c)) sel = +c-1;
+      else if(k.key !== "Enter") continue;
+      if(sel===0) await this.comm(g);
+      if(sel===1) await this.downloadMenu(g);
+      if(sel===2) await doorMenu({io:this.localIO(),send:x=>this.out(x),user:"GUEST",guest:true,hint:k=>this.hints.set(k)});
+      if(sel===3) await this.saverMenu(g);
+      if(sel===4) await this.prompt(g);
+    }
+  }
+  private async downloadMenu(g: number) {
+    let sel = 0;
+    for (;;) {
+      const fs = await drive.list(); this.alive(g);
+      sel = Math.max(0,Math.min(sel,fs.length-1));
+      const x=a().reset().cls(); box(x,2,3,74,21,11,"C:\\DOWNLOAD");
+      const start=Math.floor(sel/15)*15;
+      fs.slice(start,start+15).forEach((f,i)=>x.at(5+i,6).c(start+i===sel?0:15,start+i===sel?7:0).t(pad(f.name,24)+pad(f.pack,24)+rpad(String(f.bytes.length),16)));
+      if(!fs.length) x.at(6,6).k(7,"No downloads yet. Dial a BBS and press D on a file.");
+      x.at(21,6).k(8,"Arrows select · ENTER / V view · ESC menu"); this.out(x); this.hints.set([...NAV,hk("V")]);
+      const k=await this.idleKey(g);if(!k) continue;
+      if(k.key==="Escape")return;
+      if(k.key==="ArrowUp")sel=Math.max(0,sel-1);
+      else if(k.key==="ArrowDown")sel=Math.min(fs.length-1,sel+1);
+      else if((k.key==="Enter"||k.ch===86||k.ch===118)&&fs[sel]) await this.dosCommand(`VIEW ${fs[sel].name}`,g);
+    }
+  }
+  private async saverMenu(g: number) {
+    for (;;) {
+      const x=a().reset().cls();box(x,5,15,50,14,11,"SCREEN SAVERS");
+      SAVERS.forEach((v,i)=>x.at(8+i*3,19).k(15,`${i+1}  ${v === "number" ? "Bouncing board number" : v === "rain" ? "Falling characters" : "Starfield"}${this.saver===v?" *":""}`));
+      x.at(20,15).k(8,"1-3 select and preview · any key ends · ESC menu");this.out(x);this.hints.set([hk("1"),hk("2"),hk("3"),{label:"ESC",key:"Escape"}]);
+      const k=await this.key();this.alive(g);if(k.key==="Escape")return;
+      const n=(k.ch??0)-49;if(n<0||n>2)continue;
+      this.saver=SAVERS[n];try{localStorage.setItem("dialup.saver",this.saver);}catch{}
+      await screenSaver(this.localEnv(),this.saver);
+    }
+  }
+  private async prompt(g: number) {
+    this.out(a().reset().cls().k(7,"Kestrel DOS 5.0").nl().k(7,"Type MENU for the menu, DIAL to call a BBS, HELP for commands.").nl(2));
+    for (;;) {
+      this.hints.set([{label:"type",key:"",text:true},{label:"MENU",key:"",ch:"MENU\r"},{label:"DIAL",key:"",ch:"DIAL\r"},{label:"ENTER",key:"Enter"}]);
+      this.out(a().k(7,`${this.cwd}>`));
+      const line=await this.readLine(g,70,true);if(line===null)return;
+      const r=await this.dosCommand(line.trim(),g);
+      if(r==="menu")return;
+      if(r==="comm") {await this.comm(g);return;}
+      if(/^(VIEW|KPLAY|WARDIAL)\b/i.test(line))return;
     }
   }
 
@@ -348,7 +416,7 @@ export class Machine {
     }
   }
 
-  private async dosCommand(line: string, g: number): Promise<"comm" | void> {
+  private async dosCommand(line: string, g: number): Promise<"comm" | "menu" | void> {
     const [cmd0, ...rest] = line.split(/\s+/);
     const cmd = (cmd0 ?? "").toUpperCase();
     const arg = rest.join(" ").toUpperCase();
@@ -362,11 +430,14 @@ export class Machine {
       case "TIME": p(`Current time is ${now.toTimeString().slice(0, 8)}.${String(Math.floor(now.getMilliseconds() / 10)).padStart(2, "0")}`); return;
       case "HELP": case "/?":
         p("Kestrel DOS 5.0 commands:", 15);
-        p("  DIR   CLS   VER   DATE   TIME   TYPE <file>   CD <dir>   MEM");
-        p("  VIEW <file>  view a download    KPLAY <file>  play a module    DEL <file>");
-        p("  DIAL  start TELEWIRE and the dialing directory");
-        p("  WARDIAL  scan an exchange for carriers (don't tell the phone company)");
-        p("  (and some things Kestrel won't tell you)", 8); return;
+        ["MENU       open KESTREL MENU", "DIAL       start TELEWIRE (TELEWIRE, EXIT)",
+         "DIR [dir]  list files", "VIEW file  read a download", "KPLAY file play tracker music",
+         "DEL file   erase a download (ERASE)", "CD dir     change directory (CHDIR)",
+         "CLS        clear the screen", "VER        DOS version", "DATE       date", "TIME       time",
+         "TYPE file  read AUTOEXEC.BAT, CONFIG.SYS or README.TXT", "MEM        memory report",
+         "WARDIAL    scan 555-0100 through 555-0199", "HELP       this list (/? )",
+         "XYZZY      test the cave", "WIN        check window installation", "FORMAT     ask about formatting",
+         "DIG/TETRA  test game installation", "SYSOP      locate Static"].forEach((l) => p("  " + l)); return;
       case "MEM":
         p(""); p("    655360 bytes total conventional memory"); p("    633904 bytes available to Kestrel DOS"); p("    598016 largest executable program size");
         p("   3407872 bytes total contiguous extended memory"); p("   3407872 bytes available XMS memory"); p("           Kestrel DOS resident in High Memory Area"); p(""); return;
@@ -418,6 +489,7 @@ export class Machine {
         this.out(a().reset().cls());
         return;
       }
+      case "MENU": return "menu";
       case "DIAL": case "TELEWIRE": case "EXIT": return "comm";
       case "WARDIAL": if (this.cwd !== "C:\\") { p("Bad command or file name"); return; } await this.wardial(g); return;
       case "XYZZY": p("Nothing happens."); return;
@@ -425,7 +497,7 @@ export class Machine {
       case "FORMAT": p("Nice try. Static backed up nothing, so let's not."); return;
       case "DIG": case "TETRA": p("This program requires a math coprocessor and a sense of humor."); return;
       case "SYSOP": p("Static is asleep under the stairs. Shh."); return;
-      default: p("Bad command or file name");
+      default: p("Bad command or file name. Try HELP.");
     }
     void g;
   }
@@ -488,7 +560,7 @@ export class Machine {
       x.at(8 + i * 2, 10).c(3, 1).t(pad(d.blurb, 40));
     });
     box(x, 16, 3, 75, 6, 3, "KEYS", true, 1);
-    x.at(17, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to DOS");
+    x.at(17, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to menu");
     x.at(19, 6).c(7, 1).t("Inside a call: ").c(15, 1).t("ENTER").c(7, 1).t(" finish transfer  ").c(15, 1).t("SPACE").c(7, 1).t(" pause  ").c(15, 1).t("I").c(7, 1).t(" info  ").c(15, 1).t("ESC").c(7, 1).t(" back");
     const fs = this.profile.filesSeen.length;
     const nxt = fs < 5 ? `${5 - fs} more files to unlock 14400` : fs < 15 ? `${15 - fs} more files to unlock 28800` : "all speeds unlocked";
@@ -625,6 +697,7 @@ export class Machine {
   private async session(entry: DirEntry, speed: number, g: number) {
     this.state.set("session");
     const started = Date.now();
+    this.lastInput = started; this.inactivityWarned = false;
     const node = 1;
     const term = this.engine.term;
     const modem = this.engine.modem;
@@ -693,6 +766,17 @@ export class Machine {
     this.stopTimer();
     this.timeTimer = setInterval(() => {
       if (g !== this.gen) return this.stopTimer();
+      const idle = Date.now() - this.lastInput;
+      if (idle >= Machine.HANGUP_MS) {
+        this.boardOverlay=null;this.artOpen=false;this.engine.term.overlay=null;
+        this.engine.modem.resume(); this.engine.modem.clear();
+        this.engine.modem.write(a().reset().cls().at(10,8).k(12,"Five minutes without a key. Static needs the line.").at(12,8).k(7,"Call back when you're at the keyboard. NO CARRIER.").build());
+        this.stopTimer(); setTimeout(() => { if(g===this.gen) this.keys.abort("idle"); },2500); return;
+      }
+      if (idle >= Machine.WARNING_MS && !this.inactivityWarned) {
+        this.inactivityWarned=true;
+        this.engine.modem.write(a().at(25,1).k(14,"Still there? Press a key; the line drops in one minute.").build());
+      }
       if (Date.now() - started >= this.callMinutes * 60000) { this.stopTimer(); this.keys.abort("timeup"); }
     }, 1000);
   }

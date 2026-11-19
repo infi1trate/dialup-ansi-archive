@@ -65,7 +65,7 @@ export class Engine {
     const changed = this.renderer.render(this.term, blinkOn, cursorOn);
     this.crt.render(this.renderer.canvas, changed, this.power, t);
     this.avgT += dt;
-    if (this.avgT > 0.1) {
+    if (changed || this.avgT > 0.1) {
       this.avgT = 0;
       const k = this.powered && this.tube ? 1 : 0;
       const [r, g, b] = this.renderer.avg;

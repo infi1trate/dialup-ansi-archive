@@ -120,3 +120,25 @@ export async function starfield(env: LocalEnv) {
   }
 }
 export { center, rpad };
+
+export type Saver = "starfield" | "number" | "rain";
+export const SAVERS: Saver[] = ["starfield", "number", "rain"];
+export async function screenSaver(env: LocalEnv, kind: Saver) {
+  if (kind === "starfield") return starfield(env);
+  env.out(a().reset().cls());
+  let x = 8, y = 5, dx = 1, dy = 1;
+  const drops = Array.from({length: 35}, () => ({x: 1 + Math.floor(Math.random()*78), y: 1 + Math.floor(Math.random()*23)}));
+  for (;;) {
+    const frame = a();
+    if (kind === "number") {
+      frame.at(y,x).t(" ".repeat(17)); x += dx; y += dy;
+      if (x <= 1 || x >= 61) dx *= -1; if (y <= 1 || y >= 24) dy *= -1;
+      frame.at(y,x).k(11,"BBS 555-0142");
+    } else for (const d of drops) {
+      frame.at(d.y,d.x).t(" "); d.y = d.y % 24 + 1;
+      frame.at(d.y,d.x).k(2 + (d.y % 2)*8, String.fromCharCode(33+Math.floor(Math.random()*90)));
+    }
+    env.out(frame);
+    if (await env.nextOr(sleep(env.reduced() ? 500 : 100))) { env.out(a().reset().cls()); return; }
+  }
+}
