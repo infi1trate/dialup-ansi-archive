@@ -440,3 +440,9 @@
 .hatch-share { display:flex; gap:.25rem; padding:.3rem; background:oklch(0.12 0.005 80 / 0.92); border:1px solid oklch(0.3 0.01 80 / 0.6); border-radius:.4rem; }
 .hatch-share button { color:oklch(0.85 0.02 80); }
 .hatch-tape .hatch-note { display:block; max-width:16rem; font-size:.7rem; opacity:.75; padding:.2rem .5rem; }
+
+/* Lightning: the lamp-on plate through a cool tint at a quarter, and the window glass lit; 90 ms at a time. */
+.plate-lightning { opacity:0; filter:url(#lightning-tint); pointer-events:none; }
+.photo-room.is-lightning .plate-lightning { opacity:.25; }
+.plate-window-flash { position:absolute; inset:0; opacity:0; pointer-events:none; background:radial-gradient(ellipse at 50% 35%, var(--flash-white), transparent 75%); mix-blend-mode:screen; }
+.photo-room.is-lightning .plate-window-flash { opacity:.8; }

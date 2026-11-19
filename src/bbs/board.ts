@@ -27,6 +27,8 @@ import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
 import {phoneBills} from "./bill";
 import {timeBank} from "./time-bank";
+import { houseLines } from "./house-lines";
+import { ScreenRecord } from "@/lib/house";
 import {composePostcard} from "./postcard";
 import {sceneBulletin} from "./scene";
 import type {ScenePack} from "@/lib/scene";
@@ -110,7 +112,20 @@ export class Board {
   creditsLeft = GUEST_CREDITS;
   tagged = new Set<string>();
   private musicQueue: {pack:string;file:string;artist:string}[]=[];
-  constructor(private io: HostIO) { this.node = io.node; this.config=configFor(io.entry); const [aa,bb,cc]=this.config.colors; this.sk = io.entry.mode === "void" ? VOID_SKIN : {name:this.config.name,a:aa,b:bb,c:cc,line:8,hot:[15,bb,aa]}; }
+  /** The current screen as sent (since the last clear), so line noise can be repainted; and a depth of places noise must not reach. */
+  private record = new ScreenRecord(); hush = 0;
+  private onHouse(e: "noise" | "rattle" | "yelled") {
+    if (this.hush > 0 && e !== "yelled") return false;
+    if (e === "noise") { setTimeout(async () => { await this.io.drain(); await sleep(250); const r = this.record.replay(); if (r) this.io.send(r); }, 30); return true; }
+    const l = houseLines(this.io.entry.id);
+    this.send(a().raw("\x1b[s").at(25, 1).k(e === "rattle" ? 14 : 10, pad(e === "rattle" ? l.rattle : l.yelled, 79)).raw("\x1b[u"));
+    return true;
+  }
+  async hushed<T>(f: () => Promise<T>): Promise<T> { this.hush++; try { return await f(); } finally { this.hush--; } }
+  constructor(private io: HostIO) {
+    if (io.send) { const raw = io.send.bind(io); io.send = (b) => { this.record.push(b); raw(b); }; }
+    io.house?.listen((e) => this.onHouse(e));
+    this.node = io.node; this.config=configFor(io.entry); const [aa,bb,cc]=this.config.colors; this.sk = io.entry.mode === "void" ? VOID_SKIN : {name:this.config.name,a:aa,b:bb,c:cc,line:8,hot:[15,bb,aa]}; }
   screenMode(m:Partial<TermMode>={cols:80,rows:25,ice:false,ninePixel:true}) {
     if(this.io.entry.id === "c93" && !this.colorBack) { const levels=[0,55,85,100,75,95,120,150,65,175,200,220,180,210,230,255]; m={...m,palette:Uint32Array.from(levels,v=>(0xff000000 | (v<<8) | Math.floor(v*.12))>>>0)}; }
     if(this.io.entry.id === "strobe" && !m.font)m={...m,font:strobeFont(),ninePixel:false};
@@ -775,7 +790,7 @@ export class Board {
 
   async doors() {
     this.setDoing("in a door: BASEMENT CRAWL");
-    for(;;){this.send(this.header(a(),"Doors").at(6,6).k(15,"1 BASEMENT CRAWL").at(8,6).k(14,"2 THE CORNER").at(12,6).k(8,"ESC main menu"));const k=await this.key();this.io.clearOutput();if(k.key==="Escape")return;if(k.ch===49)await doorMenu({io:this.io,send:y=>this.send(y),user:this.user,guest:this.guest,hint:h=>this.hint(h)});if(k.ch===50)await cornerDoor(this.io,this.guest,this.user);}
+    for(;;){this.send(this.header(a(),"Doors").at(6,6).k(15,"1 BASEMENT CRAWL").at(8,6).k(14,"2 THE CORNER").at(12,6).k(8,"ESC main menu"));const k=await this.key();this.io.clearOutput();if(k.key==="Escape")return;if(k.ch===49)await this.hushed(()=>doorMenu({io:this.io,send:y=>this.send(y),user:this.user,guest:this.guest,hint:h=>this.hint(h)}));if(k.ch===50)await this.hushed(()=>cornerDoor(this.io,this.guest,this.user));}
   }
 
   async credits() {
@@ -1007,7 +1022,7 @@ export class Board {
       if (r.key === "D" || r.key === "P" || (music && !r.key)) {
         const play = music && r.key !== "D";
         if (r.key === "P" && !music) { this.send(a().at(23, 4).eol().k(12, `${f.name}: that's not music. Try D to download it.`)); await sleep(1200); continue; }
-        const bytes = await this.download(pack, f);
+        const bytes = await this.hushed(() => this.download(pack, f));
         if (bytes && play) { await this.io.drain(); await this.io.client.kplay(f.name, bytes); }
         continue;
       }
@@ -1293,7 +1308,7 @@ export class Board {
   async run(): Promise<void> {
     try {
       if (this.io.deepLink) return await this.runDeepLink(this.io.deepLink);
-      if (this.io.postcardEntry) return await this.runPostcardEntry(this.io.postcardEntry);
+      if (this.io.postcardEntry) { const pe = this.io.postcardEntry; return await this.hushed(() => this.runPostcardEntry(pe)); }
       if (this.io.entry.mode === "void") await this.voidGate();
       await this.login();
       await this.logon();

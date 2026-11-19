@@ -14,7 +14,7 @@ export interface RoomProps {
  /** Visitor toys: hotspots render only once they are live (see useToys). */
  toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void; onPhoto:()=>void; onTapes:()=>void };
  /** The last instant print (small JPEG) laid over the photographed one on the cork board. */
- corkPrint?:string|null; flash?:boolean;
+ corkPrint?:string|null; flash?:boolean; storm?:{heavy:boolean;lightning:boolean};
 }
 export const NOTE = ['PWR ON.','ENTER = dial.','login: GUEST','ENTER skips anything.','I = who made it.','Then kill the lamp.'];
 export function Room(p: RoomProps) {
@@ -36,14 +36,15 @@ export function Room(p: RoomProps) {
  r.addEventListener('wheel',wheel,{passive:false});r.addEventListener('touchstart',start,{passive:true});r.addEventListener('touchmove',move,{passive:false});return()=>{r.removeEventListener('wheel',wheel);r.removeEventListener('touchstart',start);r.removeEventListener('touchmove',move);};},[p.onLean]);
  const hotspot=(name:keyof typeof HOTSPOTS,label:string,action:()=>void,extra='')=><Button key={name} variant="ghost" tabIndex={-1} data-touch aria-label={label} className={`plate-hotspot ${extra}`} style={fractionStyle(HOTSPOTS[name])} onPointerDown={e=>e.preventDefault()} onClick={action}/>;
  const volume=(name:'modem'|'speaker',value:number,set:(v:number)=>void)=><PlateVolume key={name} name={name} value={value} onChange={set}/>;
- return <main ref={root} className={`room photo-room ${ready?'plates-ready':''} ${p.lamp?'lamp-on':''} ${p.leaned?'leaned':''} ${p.reduced?'reduce':''} ${attract?'arrival-attract':''} ${p.flash?'is-flash':''}`} onClick={e=>{if(!(e.target as HTMLElement).closest('[data-touch],.monitor-screen,.hatch,.ctxbar,.note-closeup')&&p.leaned)p.onLean(false);}}>
+ return <main ref={root} className={`room photo-room ${ready?'plates-ready':''} ${p.lamp?'lamp-on':''} ${p.leaned?'leaned':''} ${p.reduced?'reduce':''} ${attract?'arrival-attract':''} ${p.flash?'is-flash':''} ${p.storm?.lightning?'is-lightning':''}`} onClick={e=>{if(!(e.target as HTMLElement).closest('[data-touch],.monitor-screen,.hatch,.ctxbar,.note-closeup')&&p.leaned)p.onLean(false);}}>
  <h1 className="sr-only">Dial-Up: DEAD CARRIER in a photographic basement</h1>
- <svg className="room-light-filter" aria-hidden><defs><filter id="room-light-tint" colorInterpolationFilters="sRGB"><feColorMatrix data-room-light type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"/></filter></defs></svg>
+ <svg className="room-light-filter" aria-hidden><defs><filter id="room-light-tint" colorInterpolationFilters="sRGB"><feColorMatrix data-room-light type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"/></filter><filter id="lightning-tint" colorInterpolationFilters="sRGB"><feColorMatrix type="matrix" values=".5 .1 0 0 0  .1 .65 .05 0 0  .05 .2 1.1 0 .04  0 0 0 1 0"/></filter></defs></svg>
  <div className="desk-extension" aria-hidden><div className="desk-crop"><img className="desk-off" src={plates.off[large?1:0]} alt=""/><img className="desk-on" src={plates.on[large?1:0]} alt=""/><img className="desk-light" src={plates.light[large?1:0]} alt=""/></div></div>
  <div ref={stage} className="plate-stage">
  <img className="room-plate plate-off" src={plates.off[0]} srcSet={plateSet(plates.off)} sizes="100vw" fetchPriority="high" alt="" draggable={false}/>
  <img className="room-plate plate-on" src={plates.on[0]} srcSet={plateSet(plates.on)} sizes="100vw" fetchPriority="high" alt="" draggable={false}/>
  <img className="room-plate plate-screen-light" src={plates.light[large?1:0]} alt="" aria-hidden/>
+ <img className="room-plate plate-lightning" src={plates.on[0]} alt="" aria-hidden draggable={false}/>
  <div className="plate-glass" style={{...fractionStyle(GLASS),maskImage:`url(${plates.mask})`}} onClick={()=>p.onLean(true)}>{p.monitor}<img className="plate-reflection" src={plates.reflection} alt="" draggable={false}/></div>
  {p.controls}
  {hotspot('lamp','Desk lamp',p.onLamp)}
@@ -59,7 +60,7 @@ export function Room(p: RoomProps) {
  {volume('modem',p.modemVolume,p.onModemVolume)}{volume('speaker',p.musicVolume,p.onMusicVolume)}
  <div className="plate-note-writing" style={fractionStyle(HOTSPOTS.sticky_note)} aria-hidden>{NOTE.map(line=><p key={line}>{line}</p>)}</div>
  {p.corkPrint&&<CorkPrint src={p.corkPrint} large={large}/>}
- <div className="plate-rain" style={fractionStyle(HOTSPOTS.window)}><Rain still={p.reduced}/></div>
+ <div className="plate-rain" style={fractionStyle(HOTSPOTS.window)}><Rain still={p.reduced} heavy={!!p.storm?.heavy}/><span className="plate-window-flash" aria-hidden/></div>
  <Clock reduced={p.reduced}/>
  <span className={`plate-led pc-power ${p.powered?'is-on':'is-standby'}`} style={{left:'68.1%',top:'77.6%'}}/>
  <span className={`tape-led ${p.recording?'is-on':''}`} aria-hidden style={{left:'70.5%',top:'77.6%'}}/>

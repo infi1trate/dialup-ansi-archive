@@ -16,6 +16,7 @@ import { Signal, currentBoardName, tapeArmRequest, tapeState } from "./signals";
 import { handshakeMs, DTMF_OFF_MS, DTMF_ON_MS } from "@/audio/tables";
 import { Terminal } from "@/term/terminal";
 import { DegaussCoil } from "@/lib/degauss";
+import { isYell, lineNoise, markUpstairsUsed, noiseAllowed, quietHouse, rattleOutcome, upstairsAt, upstairsDue, upstairsUsed } from "@/lib/house";
 import { dirA, fileA, NOT_READY, OWNER, type DiskId, type FloppyFile } from "./floppy";
 import { bricks } from "./bricks";
 import { floppyDisk } from "./signals";
@@ -112,6 +113,7 @@ export class Machine {
     if (!this.powered.value) return;
     this.lastInput = Date.now(); this.inactivityWarned = false;
     audio.emit("keyDown", h.key || " "); setTimeout(() => audio.emit("keyUp", h.key || " "), 70);
+    if (h.key === "Yell") { this.yell(); return; }
     if (h.ch && h.ch.length > 1) { // macro, e.g. "DIAL\r"
       for (const c of h.ch) this.keys.push(c === "\r" ? { key: "Enter", ch: null, ctrl: false, alt: false } : { key: c, ch: c.charCodeAt(0), ctrl: false, alt: false });
       return;
@@ -136,6 +138,7 @@ export class Machine {
     // the keyboard is a physical object: it clicks whether or not anything is listening
     if (!e.repeat && !e.metaKey) audio.emit("keyDown", e.key);
     if (!this.powered.value) return;
+    if (this.rattle && !this.rattle.reprieved && isYell({ key: e.key, ctrl: e.ctrlKey })) { e.preventDefault(); this.lastInput = Date.now(); this.yell(); return; }
     this.lastInput = Date.now(); this.inactivityWarned = false;
     if (e.metaKey || (e.ctrlKey && !["c", "C"].includes(e.key))) return;
     if (CAPTURE.has(e.key) || e.key.length === 1) e.preventDefault();
@@ -220,6 +223,44 @@ export class Machine {
   private saver: Saver = (() => { try { const v = localStorage.getItem("dialup.saver"); return SAVERS.includes(v as Saver) ? v as Saver : "starfield"; } catch { return "starfield"; } })();
   private lastInput = Date.now();
   private inactivityWarned = false;
+  // ── the house: line noise from storms, and somebody upstairs who needs the phone ──
+  private house: ((e: "noise" | "rattle" | "yelled") => boolean) | null = null;
+  private rattle: { at: number; reprieved: boolean } | null = null;
+  private firstCall = false; private upstairsDueAt = 0; private boardHints: KeyHint[] = [];
+  private setBoardHints(k: KeyHint[]) { this.boardHints = k; this.hints.set(this.rattle && !this.rattle.reprieved ? [...k, { label: "YELL", key: "Yell" }] : k); }
+  /** A lightning flash during a call: about a second of line noise, which the board then repaints. False when not allowed. */
+  lineNoise(reduced: boolean) {
+    if (this.state.value !== "session" || !this.house) return false;
+    if (!noiseAllowed({ inCall: true, firstCall: this.firstCall, hushed: false, streaming: this.engine.modem.busy, artOpen: this.artOpen, reduced })) return false;
+    if (!this.house("noise")) return false;
+    this.engine.modem.write(lineNoise(this.engine.modem.bps, Math.random));
+    return true;
+  }
+  /** Ctrl-S (or the YELL key): "five more minutes!" buys the rest of the call. */
+  private yell() {
+    if (!this.rattle || this.rattle.reprieved) return;
+    this.rattle.reprieved = true; audio.emit("upstairs", "grumble"); this.house?.("yelled"); this.setBoardHints(this.boardHints);
+  }
+  private houseTick(started: number) {
+    if (!this.house) return;
+    if (!this.rattle) {
+      if (!upstairsDue({ firstCall: this.firstCall, quiet: quietHouse(), usedThisSession: upstairsUsed(), callSeconds: (Date.now() - started + this.upstairsSkew) / 1000, dueAt: this.upstairsDueAt })) return;
+      if (!this.house("rattle")) return; // in a door or transfer: try again in a second
+      markUpstairsUsed(); this.rattle = { at: Date.now(), reprieved: false }; audio.emit("upstairs", "call"); this.setBoardHints(this.boardHints);
+      return;
+    }
+    if (this.rattle.reprieved) return;
+    if (quietHouse()) { this.rattle.reprieved = true; this.setBoardHints(this.boardHints); return; }
+    if (rattleOutcome({ noticeAt: this.rattle.at, now: Date.now(), reprieved: false }) === "drop") {
+      this.rattle.reprieved = true; this.house = null;
+      this.boardOverlay = null; this.artOpen = false; this.engine.term.overlay = null;
+      this.engine.modem.resume(); this.engine.modem.clear(); audio.emit("upstairs", "pickup");
+      this.keys.abort("upstairs");
+    }
+  }
+  /** Development probe: someone upstairs needs the phone right now (still refused on a first call). */
+  private upstairsSkew = 0;
+  forceUpstairs(skipFiveMinutes = false) { this.upstairsDueAt = -1e9; if (skipFiveMinutes) this.upstairsSkew = 300_000; return { firstCall: this.firstCall, inCall: this.state.value === "session", house: !!this.house, rattle: this.rattle, quiet: quietHouse(), used: upstairsUsed(), timer: !!this.timeTimer }; }
   static WARNING_MS = 240_000;
   static HANGUP_MS = 300_000;
   /** Next key at DOS or in the directory; after 45 idle seconds the starfield runs until a key. Returns null if it ran. */
@@ -885,6 +926,7 @@ export class Machine {
     this.state.set("session");
     const started = Date.now();
     this.sessionSeconds=CALL_MINUTES*60;this.clockRemaining=1800;this.clockExempt=(this.profile.calls===0);
+    this.firstCall = this.profile.calls === 0; this.upstairsDueAt = upstairsAt(Math.random()); this.upstairsSkew = 0; this.rattle = null; this.house = null;
     this.lastInput = started; this.inactivityWarned = false;
     const node = 1;
     const term = this.engine.term;
@@ -895,7 +937,8 @@ export class Machine {
       key: () => this.keys.next(),
       keyOrDrain: () => this.keys.nextOr(modem.drain()),
       keyTimeout: (ms) => this.keys.nextOr(this.sleep(ms)),
-      hint: (k) => this.hints.set(k),
+      hint: (k) => this.setBoardHints(k),
+      house: { listen: (fn) => { this.house = fn; } },
       drain: () => modem.drain(),
       flush: () => modem.flush(),
       pause: () => modem.pause(),
@@ -935,7 +978,7 @@ export class Machine {
     } catch (e) {
       if (!(e instanceof Aborted) || e.reason === "power") throw e;
     } finally {
-      this.stopTimer();
+      this.stopTimer(); this.house = null; this.rattle = null;
     }
     this.alive(g);
     this.keys.revive();
@@ -972,6 +1015,7 @@ export class Machine {
         this.engine.modem.write(a().at(25,1).k(14,"Still there? Press a key; the line drops in one minute.").build());
       }
       if(this.tube.value&&!this.clockExempt)this.clockRemaining=Math.max(0,this.clockRemaining-1);
+      this.houseTick(started);
     }, 1000);
   }
   private stopTimer() { if (this.timeTimer) clearInterval(this.timeTimer); this.timeTimer = null; }

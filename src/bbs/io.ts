@@ -55,6 +55,9 @@ export interface HostIO {
   isPaused(): boolean;
   /** Drop undelivered output (the user aborted a transfer). */
   clearOutput(): void;
+  /** Out-of-band from the caller's house: line noise just hit (the board repaints), someone upstairs wants the phone, or the
+   *  caller yelled back. The board returns false when it cannot take it now (transfer, door game, postcard). */
+  house?: { listen(fn: (e: "noise" | "rattle" | "yelled") => boolean): void };
   client: {
     access?(v:{speed:number;remainingSeconds:number;level:string;exempt?:boolean}):void;
     active?():boolean;

@@ -34,8 +34,19 @@ export function createCompositor(W: number, H: number) {
       if (passes > 1) { g.globalAlpha = la * Math.min(1, passes - 1); g.drawImage(layer, 0, 0); }
       g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     }
+    // Lightning: the lamp-on plate through the cool tint at its displayed opacity, then the lit window glass.
+    const bolt = img(".plate-lightning"), boltA = bolt ? num(getComputedStyle(bolt).opacity) : 0;
+    if (bolt?.complete && boltA > 0.01) {
+      lg.globalCompositeOperation = "source-over"; lg.clearRect(0, 0, W, H); plate(bolt, lg);
+      lg.globalCompositeOperation = "multiply"; lg.fillStyle = "rgb(150,190,255)"; lg.fillRect(0, 0, W, H);
+      lg.globalCompositeOperation = "destination-in"; plate(bolt, lg);
+      g.globalAlpha = boltA; g.drawImage(layer, 0, 0); g.globalAlpha = 1;
+    }
     // Rain in the window.
-    const rain = stage.querySelector<HTMLCanvasElement>(".plate-rain canvas"); if (rain && rain.width) { const [x, y, w, h] = box(rain); g.globalCompositeOperation = "screen"; g.drawImage(rain, x, y, w, h); g.globalCompositeOperation = "source-over"; }
+    const rain = stage.querySelector<HTMLCanvasElement>(".plate-rain canvas"); if (rain && rain.width) { const [x, y, w, h] = box(rain); g.globalCompositeOperation = "screen"; g.drawImage(rain, x, y, w, h);
+      const wf = stage.querySelector(".plate-window-flash"), wa = wf ? num(getComputedStyle(wf).opacity) : 0;
+      if (wa > 0.01) { const gr = g.createRadialGradient(x + w / 2, y + h * 0.35, 0, x + w / 2, y + h * 0.35, Math.max(w, h) * 0.75); gr.addColorStop(0, `rgba(245,248,255,${wa})`); gr.addColorStop(1, "rgba(245,248,255,0)"); g.fillStyle = gr; g.fillRect(x, y, w, h); }
+      g.globalCompositeOperation = "source-over"; }
     // Prints laid into the photograph by quad (stage px, TL TR BR BL), then cut-out plate pieces that sit on top (the pin).
     const sr = stage.getBoundingClientRect(), spx = sr.width / 2560;
     const toCanvas = (X: number, Y: number) => [ox + (sr.left + X * spx - left) * k, oy + (sr.top + Y * spx - top) * k] as const;

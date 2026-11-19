@@ -5,7 +5,7 @@
 - [x] 3. Print Screen: tractor-feed printout rising in the room, PNG; g05-g06
 - [x] 4. Instant photo: flash, developing print, PNG, cork board print; g07-g09
 - [x] 5. The tapes: mixtape through the speaker, sides, ducking, WAV renders; g10 + tunes
-- [ ] 6. Weather and the house: storms, line noise, upstairs phone; g11-g13
+- [x] 6. Weather and the house: storms, line noise, upstairs phone; g11-g13
 - [ ] 7. Small life: owl, calendar month, pencil cup; g14
 
 # Clean-up pass

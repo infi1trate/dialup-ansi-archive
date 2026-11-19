@@ -42,7 +42,7 @@ class Synth {
     bus.tapNode = limiter;
     this.master = c.createGain();
     this.master.connect(limiter);
-    const verb = c.createConvolver();
+    const verb = c.createConvolver(); this.verb = verb;
     verb.buffer = this.impulse(0.7);
     const wet = c.createGain(); wet.gain.value = 0.16;
     verb.connect(wet).connect(this.master);
@@ -106,6 +106,9 @@ class Synth {
     bus.on("printScreen", (sec) => this.printScreen(sec));
     bus.on("camera", () => this.camera());
     bus.on("mixtape", () => this.mixAct(this.mix_.press()));
+    bus.on("storm", (on) => this.storm(on));
+    bus.on("thunder", (far) => this.thunder(far));
+    bus.on("upstairs", (k) => this.upstairs(k));
     bus.on("handshakeStart", () => this.mixDuck(true));
     bus.on("connect", () => this.mixDuck(false));
     bus.on("hangup", () => this.mixDuck(false));
@@ -220,8 +223,12 @@ class Synth {
     [[60, 1], [120, 0.55], [180, 0.2]].forEach(([f, a]) => { const o = this.osc("sine", f); const g = this.gain(a); o.connect(g).connect(hum); o.start(t); });
     // rain on the window glass
     const rain = this.buf(this.white, true), bp = this.biquad("bandpass", 2600, 0.45), hp = this.biquad("highpass", 700), rainG = this.gain(0);
-    rain.connect(bp).connect(hp).connect(rainG).connect(this.panner(PAN.window)).connect(room);
+    const winPan = this.panner(PAN.window); this.stormRain = this.gain(1);
+    rain.connect(bp).connect(hp).connect(rainG).connect(this.stormRain).connect(winPan).connect(room);
     this.start(rain, t);
+    // a storm's downpour: a heavier, lower roar that only opens while it rains hard
+    const roar = this.buf(this.pink, true), rlp = this.biquad("lowpass", 1500, 0.5), rhp = this.biquad("highpass", 250, 0.5); this.stormRoar = this.gain(0);
+    roar.connect(rhp).connect(rlp).connect(this.stormRoar).connect(winPan); this.start(roar, t);
     const patter = this.buf(this.pink, true), pbp = this.biquad("bandpass", 900, 0.8), pg = this.gain(0.012);
     patter.connect(pbp).connect(pg).connect(rainG);
     this.start(patter, t);
@@ -291,7 +298,49 @@ class Synth {
       t += rnd(0.015, 0.06);
     }
   }
+  // ── weather and the house ──
+  private stormRain: GainNode | null = null; private stormRoar: GainNode | null = null;
+  private storm(on: boolean) {
+    const t = this.now;
+    this.stormRain?.gain.setTargetAtTime(on ? 3.4 : 1, t, on ? 3 : 6);
+    this.stormRoar?.gain.setTargetAtTime(on ? 0.05 : 0, t, on ? 4 : 7);
+  }
+  /** Distant thunder through the window: a crack when close, then a long low roll. */
+  private thunder(far: number) {
+    const t = this.now + 0.02, p = this.panner(PAN.window - 0.1); p.connect(this.buses.room); p.connect(this.verb);
+    if (far < 0.4) this.burst(p, t, 0.25, 1800, 0.6, 0.12 * (1 - far));
+    const src = this.buf(this.brown, false, Math.random()), lp = this.biquad("lowpass", 160 - far * 70, 0.7), g = this.gain(0);
+    src.connect(lp).connect(g).connect(p);
+    const peak = 0.5 * (1 - far * 0.6), len = 3.5 + far * 3; let at = t + 0.15 + far * 0.3;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, at);
+    for (let i = 0; i < 4; i++) { at += rnd(0.4, 1.1); g.gain.setTargetAtTime(peak * rnd(0.25, 0.9) * (1 - i / 5), at, 0.25); }
+    g.gain.setTargetAtTime(0, at + 0.3, len / 4);
+    this.start(src, t, at + len + 1);
+  }
+  /** Upstairs, through the floor: a wordless voice with speech rhythm, low-passed hard; the extension's clunk when picked up. */
+  private upstairs(kind: "call" | "grumble" | "pickup") {
+    const t0 = this.now + 0.05, p = this.panner(0.12), floor = this.biquad("lowpass", 380, 0.8), out = this.gain(kind === "pickup" ? 0.5 : 0.32);
+    floor.connect(out).connect(p); p.connect(this.buses.room); p.connect(this.verb);
+    if (kind === "pickup") { this.burst(floor, t0, 0.04, 300, 2, 0.9); this.burst(floor, t0 + 0.09, 0.03, 500, 3, 0.4); return; }
+    const phrases = kind === "call" ? [[5, 1.0], [7, 1.15]] : [[3, 0.85]];
+    const vowels = [[700, 1150], [420, 1900], [320, 850], [560, 1650], [480, 1100]];
+    let t = t0;
+    for (const [syl, lift] of phrases) {
+      const src = this.osc("sawtooth", 150), f1 = this.biquad("bandpass", 600, 5), f2 = this.biquad("bandpass", 1400, 7), g = this.gain(0), mix = this.gain(1);
+      src.connect(f1).connect(mix); src.connect(f2).connect(mix); mix.connect(g).connect(floor);
+      src.frequency.setValueAtTime(150 * lift, t);
+      for (let i = 0; i < syl; i++) {
+        const d = rnd(0.12, 0.24), v = vowels[Math.floor(rnd(0, vowels.length))];
+        f1.frequency.setTargetAtTime(v[0], t, 0.02); f2.frequency.setTargetAtTime(v[1], t, 0.02);
+        src.frequency.setTargetAtTime(150 * lift * (i === syl - 1 ? 0.8 : rnd(0.95, 1.15)), t, 0.05);
+        g.gain.setTargetAtTime(i === 0 || i === syl - 2 ? 1 : 0.7, t, 0.015); g.gain.setTargetAtTime(0.05, t + d, 0.02);
+        t += d + rnd(0.03, 0.07);
+      }
+      g.gain.setTargetAtTime(0, t, 0.05); src.start(t0); src.stop(t + 0.4); t += rnd(0.45, 0.7);
+    }
+  }
   // ── the mixtape: original chiptunes through a cheap tape deck into the room speaker ──
+  private verb!: ConvolverNode;
   private mix_ = new Mixtape();
   private deck: { input: GainNode; duck: GainNode; hiss: AudioBufferSourceNode; out: GainNode; lfo: OscillatorNode[] } | null = null;
   private deckSources: AudioScheduledSourceNode[] = [];

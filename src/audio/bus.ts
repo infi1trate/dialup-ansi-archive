@@ -9,6 +9,12 @@ export interface AudioEvents {
   camera: void;
   /** A click on the cassette stack: play or stop the mixtape. */
   mixtape: void;
+  /** A storm over the house: heavier, louder rain while true. */
+  storm: boolean;
+  /** Thunder from the window side; 0 = close, 1 = far. */
+  thunder: number;
+  /** Upstairs: the muffled call for the phone, the grumble after a yell, the extension picked up. */
+  upstairs: "call" | "grumble" | "pickup";
   /** Mixtape status for the escape hatch: "stopped", or "A: Basement Lamp" style. */
   mixtapeState: string;
   floppyInsert: void;

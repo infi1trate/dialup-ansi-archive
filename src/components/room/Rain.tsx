@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 
 /** Rain running down the basement window glass. A small 2D canvas; frozen under reduced motion. */
-export function Rain({ still }: { still: boolean }) {
+export function Rain({ still, heavy = false }: { still: boolean; heavy?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const hard = useRef(heavy); hard.current = heavy;
   useEffect(() => {
     const cv = ref.current; if (!cv) return;
     const ctx = cv.getContext("2d"); if (!ctx) return;
@@ -28,13 +29,14 @@ export function Rain({ still }: { still: boolean }) {
       const t = acc; acc = 0;
       for (let i = drops.length - 1; i >= 0; i--) {
         const d = drops[i];
-        if (d.v === 0 && Math.random() < 0.004 * d.r) d.v = 8 + Math.random() * 30;
+        if (d.v === 0 && Math.random() < (hard.current ? 0.03 : 0.004) * d.r) d.v = (hard.current ? 25 : 8) + Math.random() * 30;
         if (d.v > 0) { d.y += d.v * t * d.r; d.trail = Math.min(40, d.trail + d.v * t); d.x += Math.sin(d.y * 0.15) * 0.15; if (Math.random() < 0.02) d.v = 0; }
         else d.trail = Math.max(0, d.trail - t * 4);
         if (d.y > H + 5) { drops.splice(i, 1); add(-5); }
       }
       if (Math.random() < 0.3) add();
-      if (drops.length > 110) drops.shift();
+      if (hard.current) for (let i = 0; i < 4; i++) add();
+      if (drops.length > (hard.current ? 240 : 110)) drops.shift();
       draw();
     };
     if (!still) { draw(); raf = requestAnimationFrame(step); }
