@@ -62,5 +62,3 @@ use the editor.
 
 - Fictional release files use canonical C:\WAREZ\<release>\<file> keys in the existing capped drive; ordinary art downloads keep flat keys. Why: DOS directories must isolate identically named DIZ files without a second storage system.
 - MAPLE RIDGE applies the reviewed allowlist at viewer, queue, quick-scan and path boundaries, not only menus. Why: saved shelves and deep links must not bypass the club promise.
-- The ten-second tape composites the room from the live DOM plates/LEDs plus the CRT canvas inside `Engine.afterRender`, and takes audio only from `audio.tapStream()` (the synth's limiter output). Why: WebGL buffers are only readable right after drawing, and the microphone must never be captured.
-- Postcards live in service-role-only tables behind `/api/public/net`; `/p/<id>` dials the sending board through the normal machine call at 2400 bps. Why: same moderation/rate-limit path as oneliners and the card arrives through the modem.

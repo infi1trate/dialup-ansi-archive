@@ -1,0 +1,2 @@
+- The tape (`tape-recorder.ts`) draws inside `Engine.afterRender` and records audio only from `audio.tapStream()`. Why: WebGL is readable only right after drawing; never the microphone.
+- `/p/<id>` postcards dial through the normal `call()` at 2400 bps; storage stays service-role-only behind `/api/public/net`. Why: one moderation path, modem-delivered.
