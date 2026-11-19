@@ -17,16 +17,16 @@ export function pictureBox(width: number, height: number) {
   const glass = pixelBox(GLASS,width,height), w=glass.h*4/3;
   return {x:glass.x+(glass.w-w)/2,y:glass.y,w,h:glass.h};
 }
-export function camera(width: number, height: number, leaned: boolean) {
+export function camera(width: number, height: number, leaned: boolean, safeTop=0, availableHeight=height) {
   const portrait = height > width, phoneLandscape = !portrait && height < 540;
   let scale = Math.max(width/2560,height/1440);
-  if (portrait) scale = width*.94/(HOTSPOTS.monitor[2]*2560);
+  if (portrait) scale = Math.min((width-16)/(HOTSPOTS.monitor[2]*2560), (availableHeight-safeTop-190)/(HOTSPOTS.monitor[3]*1440));
   if (phoneLandscape) scale = height*.92/(HOTSPOTS.monitor[3]*1440);
   if (leaned && !portrait) scale = Math.min(height*.92/(HOTSPOTS.monitor[3]*1440),width*.96/(HOTSPOTS.monitor[2]*2560));
   const cx=(GLASS[0]+GLASS[2]/2)*2560, cy=(GLASS[1]+GLASS[3]/2)*1440;
   // Desktop retains the entire registered 16:9 photo when the viewport is 16:9.
-  const x = Math.min(0,Math.max(width-2560*scale,width/2-cx*scale));
-  const y = portrait ? height*.27-cy*scale : leaned || phoneLandscape ? height/2-cy*scale : Math.min(0,Math.max(height-1440*scale,height/2-720*scale));
+  const x = portrait ? width/2-(HOTSPOTS.monitor[0]+HOTSPOTS.monitor[2]/2)*2560*scale : Math.min(0,Math.max(width-2560*scale,width/2-cx*scale));
+  const y = portrait ? safeTop-HOTSPOTS.monitor[1]*1440*scale : leaned || phoneLandscape ? height/2-cy*scale : Math.min(0,Math.max(height-1440*scale,height/2-720*scale));
   return {scale,x,y};
 }
 export function lampEase(from: number, on: boolean, elapsed: number) {
@@ -35,5 +35,13 @@ export function lampEase(from: number, on: boolean, elapsed: number) {
   return Math.max(0,Math.min(1.05,from+((on?1:0)-from)*eased+(on?.045*Math.sin(Math.PI*t):0)));
 }
 export function screenLightOpacity(monitor: boolean, brightness: number, lamp: number, warmup=1) {
-  return monitor ? Math.max(0,Math.min(1,brightness))*Math.max(0,Math.min(1,warmup))*(1-.4*Math.min(1,lamp)) : 0;
+  return monitor ? Math.max(0,Math.min(1,2.2*brightness))*Math.max(0,Math.min(1,warmup))*(1-.4*Math.min(1,lamp)) : 0;
 }
+export function screenLight(rgb: readonly number[], monitor: boolean, lamp: number, warmup=1) {
+ const max=Math.max(...rgb,0), luminance=(.2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2])/255;
+ const gain=screenLightOpacity(monitor,luminance,lamp,warmup);
+ return {gain,tint:rgb.map(v=>max>0?v/max:0)};
+}
+// Digit window measured inside the original photographed alarm_clock hotspot.
+export const CLOCK_DISPLAY: Box = [132/2560,1090/1440,168/2560,61/1440];
+export function clockDigits(date: Date) { const hour=date.getHours()%12||12; return `${hour<10?' ':''}${hour}${String(date.getMinutes()).padStart(2,'0')}`; }

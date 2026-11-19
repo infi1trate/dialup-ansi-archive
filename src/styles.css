@@ -311,7 +311,9 @@
 .reduce .plate-stage { transition:none; }
 .room-plate { position:absolute; inset:0; width:100%; height:100%; max-width:none; pointer-events:none; }
 .plate-on { opacity:var(--lamp-level); }
-.plate-screen-light { position:absolute; inset:0; background:var(--screen-tint); mask-mode:luminance; mask-size:100% 100%; mask-repeat:no-repeat; mix-blend-mode:screen; opacity:var(--screen-opacity); pointer-events:none; }
+.plate-screen-light { filter:url(#room-light-tint); mix-blend-mode:plus-lighter; pointer-events:none; }
+.room-light-filter { position:absolute; width:0; height:0; }
+.desk-extension,.desk-note { display:none; }
 .plate-glass { position:absolute; overflow:hidden; mask-size:100% 100%; mask-repeat:no-repeat; mask-mode:alpha; cursor:pointer; }
 .photo-monitor { position:absolute; inset:0; }
 .photo-monitor .monitor-screen { position:absolute; height:100%; width:auto; aspect-ratio:4/3; left:50%; transform:translateX(-50%); border-radius:0; background:transparent; max-width:none; }
@@ -359,3 +361,31 @@
 
 @media (hover:hover) { .arrival-attract:not(.reduce) .plate-hotspot[aria-label="Desk lamp"]::after { animation:photo-lamp-glint 4s ease-in-out infinite; } }
 @keyframes photo-lamp-glint { 0%,82%,100% {opacity:0;} 90% {opacity:.05;} }
+
+/* Sampled from the original LED window; only the digits are replaced. */
+:root { --clock-panel-off:rgb(17 0 1); --clock-panel-on:rgb(31 1 2); --clock-led:rgb(237 17 40); --clock-unlit:rgb(53 4 8); --clock-bloom:rgb(237 17 40 / .45); }
+.plate-clock { position:absolute; pointer-events:none; transform:rotate(-7deg) skewX(-7deg); background:color-mix(in srgb,var(--clock-panel-on) calc(var(--lamp-level)*100%),var(--clock-panel-off)); padding:3px 6px; }
+.clock-module { position:relative;width:100%;height:100%;display:grid;grid-template-columns:repeat(2,1fr) .24fr repeat(2,1fr);gap:4px; }
+.clock-digit { position:relative;height:100%; }
+.digit-2 { grid-column:4; }.digit-3 { grid-column:5; }
+.segment { position:absolute;background:var(--clock-unlit);opacity:.38; }
+.segment.lit { background:var(--clock-led);opacity:1;box-shadow:0 0 4px var(--clock-bloom); }
+.segment-a,.segment-d,.segment-g { height:9%;left:13%;width:74%;clip-path:polygon(12% 0,88% 0,100% 50%,88% 100%,12% 100%,0 50%); }
+.segment-a { top:0; }.segment-d { bottom:0; }.segment-g { top:45.5%; }
+.segment-b,.segment-c,.segment-e,.segment-f { width:15%;height:42%;clip-path:polygon(50% 0,100% 12%,100% 88%,50% 100%,0 88%,0 12%); }
+.segment-b { right:0;top:5%; }.segment-c { right:0;bottom:5%; }.segment-f { left:0;top:5%; }.segment-e { left:0;bottom:5%; }
+.clock-colon { position:absolute;left:49%;top:27%;height:8%;width:4%;background:var(--clock-unlit);box-shadow:0 23px 0 var(--clock-unlit); }
+.clock-colon.lit { background:var(--clock-led);box-shadow:0 23px 0 var(--clock-led),0 0 5px var(--clock-bloom); }
+@media (orientation:portrait) {
+ .photo-room { padding-top:env(safe-area-inset-top); --usable-height:100dvh; }
+ .desk-extension { display:block;position:absolute;left:0;right:0;top:var(--desk-top);bottom:0;overflow:hidden;mask-image:linear-gradient(to bottom,var(--photo-highlight) 0%,var(--photo-highlight) 15%,transparent 100%); }
+ .desk-crop { position:absolute;inset:0;transform:scaleY(-1);filter:blur(22px); }
+ .desk-crop img { position:absolute;left:var(--stage-left);bottom:0;width:var(--stage-width);height:1666.667%;max-width:none; }
+ .desk-on { opacity:var(--lamp-level); }.desk-light { filter:url(#room-light-tint);mix-blend-mode:plus-lighter; }
+ .photo-room .ctxbar { bottom:auto;top:calc(var(--usable-height) - 174px - env(safe-area-inset-bottom));max-height:120px;overflow-y:auto; }
+ .photo-room .hatch { bottom:auto;top:calc(var(--usable-height) - 48px - env(safe-area-inset-bottom)); }
+ .hatch-lamp-direct { position:fixed;left:12px;top:calc(var(--usable-height) - 52px - env(safe-area-inset-bottom));width:40px;height:40px;opacity:.8; }
+ .desk-note { display:block;position:absolute;left:62px;top:calc(var(--usable-height) - 52px - env(safe-area-inset-bottom));width:40px;height:40px;z-index:20;color:var(--note-ink);background:var(--note-paper);opacity:calc(.05 + .95*var(--lamp-level)); }
+ .photo-room .hatch-menu { position:absolute;right:0;bottom:36px;max-height:calc(var(--usable-height) - 350px);overflow-y:auto; }
+ .note-closeup { align-items:end;padding-bottom:70px; }
+}

@@ -54,19 +54,27 @@ export class Machine {
   private boardOverlay: Terminal | null = null;
   private artOpen = false;
   private portrait = false;
-  /** Portrait phone: art is a landscape thing, so TELEWIRE asks you to turn the phone (in text mode). */
+  private portraitNoticeShown = false;
+  /** Portrait notice is a one-shot local TELEWIRE screen before the art stream. */
   setPortrait(v: boolean) { this.portrait = v; this.applyOverlay(); }
+  private async openArt(on: boolean) {
+    this.artOpen=on;
+    if(on&&this.portrait&&!this.portraitNoticeShown) {
+      this.portraitNoticeShown=true;
+      const term=this.engine.term,ov=new Terminal({cols:80},{masked:true});
+      const x=a().cls();box(x,8,16,48,9,14,'TELEWIRE');
+      x.at(10,20).k(15,'This picture is wider than it is tall.');
+      x.at(12,20).k(11,'Turn your phone sideways: ').k(14,'landscape').k(11,'.');
+      x.at(14,20).k(8,'Menus are fine either way.');ov.feed(x.build());
+      term.overlay=ov;term.version++;
+      this.keys.clear(); // Buffered boot-skip keys must not erase the notice before its first frame.
+      await this.keys.nextOr(this.sleep(3000));
+    }
+    this.applyOverlay();
+  }
   private applyOverlay() {
     const term = this.engine.term;
-    if (this.artOpen && this.portrait) {
-      const ov = new Terminal({ cols: 80 }, { masked: true });
-      const x = a(); box(x, 8, 16, 48, 9, 14, "TELEWIRE");
-      x.at(10, 20).k(15, "This picture is wider than it is tall.");
-      x.at(12, 20).k(11, "Turn your phone sideways: ").k(14, "landscape").k(11, ".");
-      x.at(14, 20).k(8, "Menus are fine either way.");
-      ov.feed(x.build());
-      term.overlay = ov;
-    } else term.overlay = this.boardOverlay;
+    term.overlay = this.boardOverlay;
     term.version++;
   }
   private debug = parseDebug(typeof location !== "undefined" ? location.search : "");
@@ -207,7 +215,7 @@ export class Machine {
           else { const ov = new Terminal({ cols: 80 }, { masked: true }); ov.feed(bytes); this.boardOverlay = ov; }
           this.applyOverlay();
         },
-        artOpen: (on) => { this.artOpen = on; this.applyOverlay(); }, rows: () => term.rows,
+        artOpen: (on) => this.openArt(on), rows: () => term.rows,
         disk: () => audio.emit("diskSeek"), saveDownload: async () => null, kplay: async () => {},
       },
       speed: 28800, node: 0, entry: DIRECTORY[0], profile: this.profile, save: () => saveProfile(this.profile), timeLeftMs: () => 3600_000,
@@ -734,7 +742,7 @@ export class Machine {
           else { const ov = new Terminal({ cols: 80 }, { masked: true }); ov.feed(bytes); this.boardOverlay = ov; }
           this.applyOverlay();
         },
-        artOpen: (on) => { this.artOpen = on; this.applyOverlay(); },
+        artOpen: (on) => this.openArt(on),
         rows: () => term.rows,
         disk: () => audio.emit("diskSeek"),
         saveDownload: (f) => { audio.emit("diskSeek"); return drive.put(f); },

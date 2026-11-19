@@ -48,7 +48,7 @@ export function Computer({ deepLink, lost }: Props) {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setOsReduced(mq.matches);
     const touch = window.matchMedia("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 820;
-    setLayout(touch || window.innerWidth < 640 ? "tube" : "room");
+    setLayout(touch || window.innerWidth < 640 || window.innerHeight>window.innerWidth ? "tube" : "room");
     setLeaned(s.lean ?? false);
     audio.setMix({ muted: s.muted, modemVolume: s.modemVolume, musicVolume: s.musicVolume });
     void import("@/data/net").then((n) => n.count("landed"));

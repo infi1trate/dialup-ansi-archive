@@ -1008,6 +1008,7 @@ export class Board {
       const art = { sauce: prep.sauce };
       if(!opts.local)void net("index",{rows:[{pack:pack.name,file:f.name,year:pack.year,title:prep.sauce?.title||f.title||"",artist:prep.sauce?.author||f.artists.join(", "),groups:prep.sauce?.group||pack.groups.join(", ")}]});
       const mode = prep.mode, stream = prep.stream;
+      await io.client.artOpen(true);
       this.screenMode(mode);
       io.client.markTop();
       io.send(stream);
@@ -1026,7 +1027,6 @@ export class Board {
         hk("F","F favorite"),hk("E","E rate 1-5"),...(this.io.entry.id==="c93"?[hk("C","C color")]:[]),hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), ...(opts.local ? [] : [hk("R", "R report")]), { label: "ESC back", key: "Escape" },
       ]);
       viewHints(false);
-      io.client.artOpen(true);
       const showInfo = () => io.client.overlay(info ? infoPanel(pack, f, art.sauce, bytes.length, mode, unlocked, url) : null);
       let next = 0;
       while (!next) {

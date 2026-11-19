@@ -1,8 +1,12 @@
 # Sprint B
+- [x] Part 2: additive plate-shaped screen colour with luminance gain and 250 ms smoothing
+- [x] Part 2: portrait bezel fit, continuous desk, thumb controls and pre-art notice
+- [x] Part 2: visitor-local seven-segment alarm clock
+- [x] Part 2: refreshed b03/b04/b05/b06/b09/b10/b11/b12 and new b13/b14; all tests
 - [x] 1/2/4/5: photographic stage, plate light, physical controls and registered lean transform
 - [x] First six private evidence pictures uploaded and committed
 - [x] Live LEDs, paper notes and window rain; photographed clock fallback documented
-- [ ] Decode-safe loading and all nine viewport checks — nine sizes checked; tall portrait cannot simultaneously cover the viewport and fit the entire photographed monitor at 94% width, so a bottom band remains.
+- [x] Decode-safe loading and all nine viewport checks — Part 2 replaces the portrait band with a plate-derived desk extension and 8px bezel margins.
 - [x] Regression tests, Sprint A checks and DEAD CARRIER call — 114 tests; live guest archive call ended with goodbye and TELEWIRE directory readback.
 - [x] Twelve private evidence links and four-state comparison
 - [x] Sprint B status blocks and final commit

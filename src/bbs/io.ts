@@ -63,7 +63,7 @@ export interface HostIO {
     overlay(bytes: Uint8Array | null): void;
     rows(): number;
     /** A piece is on screen (TELEWIRE shows "turn your phone" in portrait). */
-    artOpen(on: boolean): void;
+    artOpen(on: boolean): void | Promise<void>;
     /** TELEWIRE writes a received block to disk (HDD LED, seek sound). */
     disk(): void;
     /** TELEWIRE stores a finished download in C:\DOWNLOAD. */
