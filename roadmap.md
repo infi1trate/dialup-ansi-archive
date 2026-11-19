@@ -1,3 +1,11 @@
+# Clean-up pass
+- [x] 1. House pack renamed DC-01 / DC-LOGO.ANS with aliases; logo redrawn; old wording swept; f01
+- [ ] 2. Tape composites the live stage at current framing; tape2 + f02
+- [ ] 3. Quick scan skips blank leading rows; shelf titles and artists; f03-f04
+- [ ] 4. Warez area walked by keyboard; STATUS table; f05-f08
+- [ ] 5. MAPLE RIDGE refuses non-allowlisted pieces on every route; live 0-DAY; f09-f10
+- [ ] 6. Utility screens wear their board's chrome; f11-f14
+
 # Sprint E part 3
 - [x] 1. Dot-matrix bill print with ruled calls and tear-off stub; e18b
 - [x] 2. Postcards: composer, server, /p/<id> playback, share card; e20-e27

@@ -18,12 +18,12 @@ export const Route = createFileRoute("/lab")({
   component: Lab,
 });
 
-const HOUSE = ["CRWL-LGO.ANS", "STAIRS.ANS", "SCROLLER.ANS", "SPINNER.ANS", "TERMINAL.ASC", "ICECOLD.ICE", "FILE_ID.DIZ"];
+const HOUSE = ["DC-LOGO.ANS", "STAIRS.ANS", "SCROLLER.ANS", "SPINNER.ANS", "TERMINAL.ASC", "ICECOLD.ICE", "FILE_ID.DIZ"];
 
 function Lab() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const engine = useRef<Engine | null>(null);
-  const [pack, setPack] = useState("crawl-01");
+  const [pack, setPack] = useState("dc-01");
   const [file, setFile] = useState("SCROLLER.ANS");
   const [speed, setSpeed] = useState(9600);
   const [stats, setStats] = useState("power on and press Stream");
@@ -89,7 +89,7 @@ function Lab() {
       <aside className="lab-panel">
         <strong>/lab · terminal bench</strong>
         <label>House pack file
-          <select value={pack === "crawl-01" ? file : ""} onChange={(ev) => { setPack("crawl-01"); setFile(ev.target.value); }}>
+          <select value={pack === "dc-01" ? file : ""} onChange={(ev) => { setPack("dc-01"); setFile(ev.target.value); }}>
             <option value="">(archive file below)</option>
             {HOUSE.map((h) => <option key={h} value={h}>{h}</option>)}
           </select>

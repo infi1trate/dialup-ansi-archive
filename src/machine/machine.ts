@@ -604,7 +604,7 @@ export class Machine {
       case "WIN": p("Kestrel Windows is not installed. You have a modem. What more do you need?"); return;
       case "FORMAT": p("Nice try. Static backed up nothing, so let's not."); return;
       case "DIG": case "TETRA": p("This program requires a math coprocessor and a sense of humor."); return;
-      case "SYSOP": p("Static is asleep under the stairs. Shh."); return;
+      case "SYSOP": p("Static is asleep in the basement. Shh."); return;
       default: p("Bad command or file name. Try HELP.");
     }
     void g;

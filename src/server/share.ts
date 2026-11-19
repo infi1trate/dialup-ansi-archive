@@ -3,9 +3,9 @@ export interface ShareMeta { title: string; artist: string; group: string; pack:
 
 export async function shareMeta(pack: string, file: string, year: number): Promise<ShareMeta> {
   const base: ShareMeta = { title: file, artist: "unknown artist", group: "", pack, year, file };
-  const { HOUSE_PACK, housePack, houseFile } = await import("@/data/housepack");
+  const { HOUSE_PACK, isHousePack, housePack, houseFile } = await import("@/data/housepack");
   const { parseSauce } = await import("@/term/sauce");
-  if (pack.toLowerCase() === HOUSE_PACK) {
+  if (isHousePack(pack)) {
     const hp = housePack(), f = hp.files.find((x) => x.name.toLowerCase() === file.toLowerCase());
     const bytes = houseFile(file);
     const s = bytes ? parseSauce(bytes).sauce : null;

@@ -1,4 +1,4 @@
-// CRAWL-01: the board's own house pack, generated in code so the loop works offline.
+// DC-01: the board's own house pack, generated in code so the loop works offline.
 import { Ansi, a, bigText, shadeBar, center } from "@/bbs/ansi";
 import type { PackInfo } from "./types";
 import { VGA_8X16_B64 } from "@/term/vga-font";
@@ -6,7 +6,11 @@ import { VGA_8X16_B64 } from "@/term/vga-font";
 /** House ansimations shown in the board's [A]nimations area. */
 export const HOUSE_ANIMATIONS = ["SPINNER.ANS", "RAIN.ANS"];
 
-export const HOUSE_PACK = "crawl-01";
+export const HOUSE_PACK = "dc-01";
+/** Old pack and file names keep saved deep links working. */
+export const isHousePack = (p: string) => /^(dc|crawl)-01$/i.test(p);
+const FILE_ALIAS: Record<string, string> = { "CRWL-LGO.ANS": "DC-LOGO.ANS", "DC01.EXE": "DC01.EXE" };
+export const houseName = (n: string) => FILE_ALIAS[n.toUpperCase()] ?? n.toUpperCase();
 
 function rng(seed: number) {
   let s = seed >>> 0;
@@ -39,15 +43,16 @@ function diz() {
 }
 
 function logo() {
+  // Same composition as the DEAD CARRIER connect logo: shadowed block letters and a carrier tear.
   const x = a().cls();
-  x.at(2, 4); shadeBar(x, 72, 1);
-  x.at(4, 30).k(8, "t h e");
-  bigText(x, 6, 10, "DEAD CARRIER", [11, 3, 1], 8);
-  bigText(x, 10, 30, "BBS", [13, 5, 5], 8);
-  x.at(15, 4); shadeBar(x, 72, 5);
-  x.at(17, 1).k(7, center("Running on a 486 under the stairs since 1991", 80));
-  x.at(19, 1).k(3, center("sysop: Static  ·  node 1-2  ·  9600-28800", 80));
-  x.at(22, 60).k(8, "logo by static/crwl").at(25, 1).reset();
+  bigText(x, 5, 6, "DEAD CARRIER", [4, 4, 4], 8);
+  bigText(x, 4, 4, "DEAD CARRIER", [12, 4, 7], 4);
+  x.at(6, 4).k(4, "░░").at(7, 3).k(8, "░".repeat(73));
+  x.at(9, 4).k(11, "▀▄ ▀▀▄▄ ▀ ▄▀▀▄▄  ▀▄▄▀ ▄ ▀▀▄").k(8, "  carrier lost / carrier found");
+  x.at(12, 1).k(7, center("No lamers. No leeches. No carrier.", 80));
+  x.at(14, 1).k(3, center("sysop: Static  ·  555-0142  ·  9600-28800", 80));
+  x.at(17, 4); shadeBar(x, 72, 4);
+  x.at(22, 38).k(8, "logo by Static / Dead Carrier house crew").at(25, 1).reset();
   return join(x.build(), sauce("DEAD CARRIER logo", "Static", "DEAD CARRIER"));
 }
 
@@ -67,11 +72,11 @@ function stairs() {
       else x.c(0).t(" ");
     }
   }
-  // the machine under the stairs
+  // the machine in the basement
   x.at(19, 6).k(7, "┌──────┐").at(20, 6).k(7, "│").k(10, "▒▒▒▒▒▒").k(7, "│").at(21, 6).k(7, "└──┬┬──┘").at(22, 5).k(8, "▄▄▄▀▀▄▄▄▄");
   x.at(20, 8).k(10, "C:\\>").at(23, 4).k(12, "•").k(8, " hdd");
-  x.at(3, 50).k(15, "UNDER THE STAIRS").at(4, 50).k(8, "a still life, 1994").at(25, 1).reset();
-  return join(x.build(), sauce("Under the Stairs", "Static", "DEAD CARRIER"));
+  x.at(3, 50).k(15, "THE BASEMENT STAIRS").at(4, 50).k(8, "a still life, 1994").at(25, 1).reset();
+  return join(x.build(), sauce("The Basement Stairs", "Static", "DEAD CARRIER"));
 }
 
 function scroller() {
@@ -93,7 +98,7 @@ function scroller() {
     if (line % 12 === 6) { const wd = words[Math.floor(line / 12) % words.length]; x.raw("\r").k(15, ` ${wd}`); }
     x.nl();
   }
-  x.k(13, center("· end of scroller · crwl 1994 ·", 79)).nl().reset();
+  x.k(13, center("· end of scroller · dead carrier 1994 ·", 79)).nl().reset();
   return join(x.build(), sauce("Tunnel Scroller", "Static", "DEAD CARRIER", { lines: 141 }));
 }
 
@@ -144,7 +149,7 @@ function xbinPiece() {
     const v = Math.sin(x / 9) + Math.cos(y / 4 + x / 23);
     put(x, y, v > 1.1 ? 0xdb : v > 0.5 ? 0xb2 : v > 0 ? 0xb1 : v > -0.6 ? 0xb0 : 0x20, (Math.min(7, Math.max(0, Math.round((v + 2) * 1.7))) << 4) | 15);
   }
-  const msg = " XBIN · CUSTOM PALETTE · CUSTOM FONT · CRWL ";
+  const msg = " XBIN · CUSTOM PALETTE · CUSTOM FONT · DC ";
   for (let i = 0; i < msg.length; i++) put(18 + i, 12, msg.charCodeAt(i), 0x0e);
   put(17, 12, 0x01, 0x0e); put(18 + msg.length, 12, 0x01, 0x0e);
   // palette: 16 amber tones (6-bit RGB)
@@ -186,7 +191,7 @@ function ascii() {
     "        /  [] [] [] [] [] [] [] [] [] [] []  \\",
     "       /  [] [] [] [] [] [] [] [] [] [] [] [] \\",
     "      /_________________________________________\\",
-    "", "            pure ascii by static / crwl '94", "",
+    "", "            pure ascii by static / dead carrier '94", "",
   ].join("\r\n");
   const out = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
@@ -203,13 +208,13 @@ function ice() {
       x.c(v > 0.6 ? 1 : 9, bg).t(v > 1.4 ? "▓" : v > 0.9 ? "▒" : v > 0.2 ? "░" : " ");
     }
   }
-  x.at(11, 30).c(15, 1).t("  ICE COLD  CRWL  ").at(12, 30).c(1, 15).t(" bright backgrounds ").at(25, 1).reset();
+  x.at(11, 30).c(15, 1).t("  ICE COLD   DC   ").at(12, 30).c(1, 15).t(" bright backgrounds ").at(25, 1).reset();
   return join(x.build(), sauce("Ice Cold", "Static", "DEAD CARRIER", { ice: true }));
 }
 
 const FILES: Record<string, { make: () => Uint8Array; artists: string[] }> = {
   "FILE_ID.DIZ": { make: diz, artists: ["static"] },
-  "CRWL-LGO.ANS": { make: logo, artists: ["static"] },
+  "DC-LOGO.ANS": { make: logo, artists: ["static"] },
   "STAIRS.ANS": { make: stairs, artists: ["static"] },
   "SCROLLER.ANS": { make: scroller, artists: ["static"] },
   "SPINNER.ANS": { make: spinner, artists: ["static"] },
@@ -217,12 +222,13 @@ const FILES: Record<string, { make: () => Uint8Array; artists: string[] }> = {
   "AMBER.XB": { make: xbinPiece, artists: ["static"] },
   "TERMINAL.ASC": { make: ascii, artists: ["static"] },
   "ICECOLD.ICE": { make: ice, artists: ["static"] },
-  "CRAWL01.EXE": { make: () => new Uint8Array(0), artists: ["static"] },
+  "DC01.EXE": { make: () => new Uint8Array(0), artists: ["static"] },
 };
 
 const cache = new Map<string, Uint8Array>();
 export function houseFile(name: string): Uint8Array | null {
-  const f = FILES[name.toUpperCase()];
+  name = houseName(name);
+  const f = FILES[name];
   if (!f) return null;
   if (!cache.has(name)) cache.set(name, f.make());
   return cache.get(name)!;

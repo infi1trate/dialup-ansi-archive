@@ -10,7 +10,7 @@ export const RULES: { k: RegExp; say: string[] }[] = [
   { k: /\b(bye|later|cya|gtg|goodnight|night)\b/i, say: ["ok later. dont tie up the line", "night. mom needs the phone at 7 anyway"] },
   { k: /\b(void|secret|hidden|elite|113)\b/i, say: ["theres no secret board. ...who told you", "if u want the quiet board count the stairs. thats all im saying"] },
   { k: /\b(password|nup|pass)\b/i, say: ["never tell anyone ur password. not even me", "the passwords on the credits screen. dont tell anyone i said that"] },
-  { k: /\b(who are you|who r u|static|your name)\b/i, say: ["im static. i run this thing from under the stairs", "static. 19. i fix vcrs for money and run a bbs for love"] },
+  { k: /\b(who are you|who r u|static|your name)\b/i, say: ["im static. i run this thing from my basement", "static. 19. i fix vcrs for money and run a bbs for love"] },
   { k: /\b(art|ansi|ascii|drawing|pack)\b/i, say: ["the 93 packs are the best. fight me", "i drew one ansi once. it was a duck. it was bad", "check the top 10 bulletin, ppl have taste"] },
   { k: /\b(modem|baud|bps|speed|slow|fast|28800|14400|9600|2400)\b/i, say: ["view more files and ur modem negotiates up. 15 files gets u 28.8", "2400 is for monks", "my corvid does 14.4 on a good night and 9600 when it rains"] },
   { k: /\b(door|game|crawl|lord|play)\b/i, say: ["BASEMENT CRAWL! i wrote it in 3 nights. watch out for the pump", "the printer is based on a true story"] },

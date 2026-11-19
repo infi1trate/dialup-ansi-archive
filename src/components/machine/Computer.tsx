@@ -16,14 +16,14 @@ import type { TapeDeck } from "@/lib/tape";
 import { tapeArmRequest, tapeState } from "@/machine/signals";
 import type { DeepLink } from "@/bbs/io";
 // literal, not imported: the house pack (and the terminal it pulls in) must stay out of the first frame
-const HOUSE_PACK = "crawl-01";
+const HOUSE_PACK = "dc-01";
 
 import type { Postcard } from "@/lib/postcard";
 import { fractionStyle, GLASS } from "@/components/room/plate-layout";
 type PostcardProp = { card: Postcard & { id: string }; number: string } | { missing: string };
 interface Props { postcard?: PostcardProp; deepLink?: DeepLink & { number: string }; /** a wrong URL: dial it, get NO CARRIER, land at DOS */ lost?: string }
 
-export const SKIP_TO_ART = `/dial/555-0142/1994/${HOUSE_PACK}/CRWL-LGO.ANS`;
+export const SKIP_TO_ART = `/dial/555-0142/1994/${HOUSE_PACK}/DC-LOGO.ANS`;
 
 /** The Kestrel 486 in its basement. All canvas/WebGL/audio/storage work starts in effects only. */
 export function Computer({ deepLink, lost, postcard }: Props) {
@@ -197,7 +197,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       onMute={() => { const v = !cfg.muted; update({ muted: v }); audio.setMix({ muted: v }); }}
       onReduced={() => update({ reducedMotion: !reduced })}
       onLamp={toggleLamp}
-      onSkip={() => { audio.unlock(); void navigate({ to: "/dial/$number/$year/$pack/$file", params: { number: "555-0142", year: "1994", pack: HOUSE_PACK, file: "CRWL-LGO.ANS" } }); }}
+      onSkip={() => { audio.unlock(); void navigate({ to: "/dial/$number/$year/$pack/$file", params: { number: "555-0142", year: "1994", pack: HOUSE_PACK, file: "DC-LOGO.ANS" } }); }}
     />
   );
 

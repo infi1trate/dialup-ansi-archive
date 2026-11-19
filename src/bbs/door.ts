@@ -58,7 +58,7 @@ export async function doorMenu(c: DoorCtx) {
     box(x, 2, 10, 60, 19, 6, "DOORS");
     x.at(4, 14).k(14, "The sysop finally found the shoebox of floppies.");
     x.at(5, 14).k(8, "One of them still works.");
-    x.at(8, 16).hot("1", "  BASEMENT CRAWL", 15, 6, 11).k(8, "  a dungeon under the stairs");
+    x.at(8, 16).hot("1", "  BASEMENT CRAWL", 15, 6, 11).k(8, "  a dungeon below the basement");
     x.at(10, 16).hot("H", "  high scores", 15, 6, 11);
     x.at(12, 16).hot("Q", "  back to the main menu", 15, 6, 11);
     x.at(16, 14).k(7, "10 floor attempts/day; resets at 00:00 UTC.");

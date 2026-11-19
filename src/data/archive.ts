@@ -2,7 +2,7 @@
 import { parseSauce } from "@/term/sauce";
 import { indexPack } from "./browsing";
 import { audio } from "@/audio/bus";
-import { houseFile, housePack, HOUSE_PACK } from "./housepack";
+import { houseFile, housePack, HOUSE_PACK, isHousePack } from "./housepack";
 import { isViewable, type GroupSummary, type PackInfo, type PackSummary, type Page } from "./types";
 
 export class ArchiveError extends Error {}
@@ -61,7 +61,7 @@ export async function getGroupPacks(group: string, min = MIN_YEAR, max = MAX_YEA
 }
 
 export async function getPack(name: string, groups: string[] = []): Promise<PackInfo> {
-  if (name.toLowerCase() === HOUSE_PACK) return housePack();
+  if (isHousePack(name)) return housePack();
   const d = await api(`/v1/pack/${name}?sauce=true&filesize=true`);
   const r = d.results?.[0];
   if (!r) throw new ArchiveError("pack not found");
@@ -76,7 +76,7 @@ export async function getPack(name: string, groups: string[] = []): Promise<Pack
 }
 
 export async function getFile(pack: string, file: string): Promise<Uint8Array> {
-  if (pack.toLowerCase() === HOUSE_PACK) {
+  if (isHousePack(pack)) {
     const f = houseFile(file);
     if (!f) throw new ArchiveError("no such file");
     return f;
@@ -107,8 +107,8 @@ export function sauceGroup(files: Record<string, any> | undefined): string[] {
 }
 
 const knownTitles = new Map<string,string>();
-export const fileCached = (pack:string,file:string) => pack.toLowerCase()===HOUSE_PACK || files.has(`${pack}/${file}`);
-export const packCached = (pack:string) => pack.toLowerCase()===HOUSE_PACK || json.has(`/v1/pack/${pack}?sauce=true&filesize=true`);
+export const fileCached = (pack:string,file:string) => isHousePack(pack) || files.has(`${pack}/${file}`);
+export const packCached = (pack:string) => isHousePack(pack) || json.has(`/v1/pack/${pack}?sauce=true&filesize=true`);
 export const fileTitle = (pack:string,file:string) => knownTitles.get(`${pack}/${file}`) ?? "";
 export function prefetchFile(pack:string,file:string) { void getFile(pack,file).catch(()=>{}); }
 

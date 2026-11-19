@@ -29,7 +29,7 @@ function Gallery() {
         <label>Pack name <input value={pack} onChange={(e) => setPack(e.target.value)} placeholder="acdu0193" /></label>
         <button type="submit">Open pack</button>
       </form>
-      <GalleryPack pack="crawl-01" year={1994} />
+      <GalleryPack pack="dc-01" year={1994} />
       <p><Link to="/credits">Credits</Link> · <Link to="/">Back to the basement</Link></p>
     </main>
   );

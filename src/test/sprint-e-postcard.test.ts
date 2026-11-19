@@ -72,3 +72,18 @@ describe("postcards", () => {
     for (const s of ["postcard_sent", "postcard_opened", "postcard_entered"]) { expect(FUNNEL).toContain(s); expect(CLIENT_STEPS as readonly string[]).not.toContain(s); }
   });
 });
+
+import { houseFile, isHousePack, housePack } from "@/data/housepack";
+describe("house pack rename", () => {
+  it("aliases the old logo name to DC-LOGO.ANS", () => {
+    expect(isHousePack("crawl-01")).toBe(true);
+    expect(houseFile("CRWL-LGO.ANS")).toEqual(houseFile("DC-LOGO.ANS"));
+    expect(housePack().files.some((f) => /crwl/i.test(f.name))).toBe(false);
+  });
+  it("logo carries the current tagline and credit", () => {
+    const t = new TextDecoder("latin1").decode(houseFile("DC-LOGO.ANS")!);
+    expect(t).toContain("No lamers. No leeches. No carrier.");
+    expect(t).toContain("logo by Static / Dead Carrier house crew");
+    expect(t).not.toMatch(/486|under the stairs/i);
+  });
+});

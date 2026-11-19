@@ -5,7 +5,7 @@ import type { Key } from "@/machine/keyboard";
 import { Aborted } from "@/machine/keyboard";
 import { maxSpeed } from "@/machine/storage";
 import { fileCached, packCached, fileTitle, prefetchFile, getFile, getGroupPacks, getGroups, getPack, getYearPacks, getYears, MAX_YEAR } from "@/data/archive";
-import { HOUSE_ANIMATIONS, HOUSE_PACK } from "@/data/housepack";
+import { HOUSE_ANIMATIONS, HOUSE_PACK, isHousePack, houseName } from "@/data/housepack";
 import type { PackFile, PackInfo, PackSummary, Page } from "@/data/types";
 import { parseSauce, sauceDate, type Sauce } from "@/term/sauce";
 import { prepareArt, type Prepared } from "@/term/prepare";
@@ -223,7 +223,7 @@ export class Board {
     x.at(9, 17).k(15, "The archive drive didn't answer.");
     x.at(11, 17).k(7, pad(what, 46));
     x.at(13, 17).k(3, "The sysop has been notified (he's asleep).");
-    x.at(14, 17).k(3, "The house pack CRAWL-01 is always on line.");
+    x.at(14, 17).k(3, "The house pack DC-01 is always on line.");
     this.send(x);
     await this.anyKey(18);
   }
@@ -657,7 +657,7 @@ export class Board {
     };
     if (!r) return fail("OFFLINE", "The message base is offline.");
     if (r.disabled) return fail("CONSOLE DISABLED", "Console disabled. Static pulled the key switch.");
-    if (!r.ok) return fail("ACCESS DENIED", r.status === 429 ? "Too many tries. The console is sulking." : "Wrong key. A dog growls under the stairs.");
+    if (!r.ok) return fail("ACCESS DENIED", r.status === 429 ? "Too many tries. The console is sulking." : "Wrong key. A dog growls in the basement.");
     const op = (o: string, arg = "") => net("sysop", { key, op: o, arg });
     for (;;) {
       const m = this.header(a(), "Sysop console", "node 0");
@@ -722,7 +722,7 @@ export class Board {
     const x = this.header(a(), "User list");
     x.at(5, 4).k(13, pad("Handle", 22)).k(13, pad("From", 20)).k(13, "Level");
     x.at(6, 4).k(5, "─".repeat(56));
-    const users = [[SYSOP, "under the stairs", "255"], ...CALLERS.map((c) => [c[0], c[1], "20"])];
+    const users = [[SYSOP, "in the basement", "255"], ...CALLERS.map((c) => [c[0], c[1], "20"])];
     if (!this.guest) users.push([this.user, this.io.profile.city || "parts unknown", "10"]);
     users.forEach((u, n) => x.at(7 + n, 4).k(n === 0 ? 14 : 11, pad(u[0], 22)).k(3, pad(u[1], 20)).k(7, u[2]));
     this.send(x);
@@ -752,7 +752,7 @@ export class Board {
     }
     const y = a();
     box(y, 9, 10, 60, 7, 13, "NO ANSWER");
-    y.at(11, 13).k(15, `${SYSOP} is asleep under the stairs, next to the 486.`);
+    y.at(11, 13).k(15, `${SYSOP} is asleep in the basement, next to the modem.`);
     y.at(12, 13).k(7, "He set the chat flag to \"only for emergencies\" in 1992.");
     y.at(13, 13).k(7, "Try leaving a oneliner. Or paging again. And again.");
     this.send(y);
@@ -777,7 +777,7 @@ export class Board {
       [13, "(int10h.org), CC BY-SA 4.0; extra fonts: libansilove, BSD-2-Clause."],
       [13, "KPLAY music: libopenmpt (BSD license) via chiptune3 (MIT license)."],
       [7, ""],
-      [7, "Board software, house pack CRAWL-01, the machine and the modem: Dial-Up."],
+      [7, "Board software, house pack DC-01, the machine and the modem: Dial-Up."],
       [7, "All brand names here are invented."],
       [7, ""],
       [14, "Takedown requests: sysop@ (placeholder)"],
@@ -849,7 +849,7 @@ export class Board {
       const [y0, y1] = this.io.entry.years;
       try { years = await getYears(y0, y1); } catch { failed = true; }
       const items = [
-        { text: `${pad("HOUSE", 8)}${pad("CRAWL-01 · the board's own pack", 44)}7 files`, color: 14 },
+        { text: `${pad("HOUSE", 8)}${pad("DC-01 · the board's own pack", 44)}7 files`, color: 14 },
         ...years.map((y) => ({ text: `${pad(String(y.year), 8)}${pad("Art packs released in " + y.year, 44)}${y.packs} packs`, color: 11 })),
       ];
       const y = a().at(5, 4).k(13, pad("Area", 9) + pad("Description", 44) + "Size").at(6, 4).k(5, "─".repeat(70));
@@ -954,6 +954,7 @@ export class Board {
     if(this.io.entry.id === "c93")pack.files.sort((a,b)=>Number(/\.(nfo|diz|asc|txt)$/i.test(b.name))-Number(/\.(nfo|diz|asc|txt)$/i.test(a.name)));
     const viewable = pack.files.filter((f) => f.viewable);
     if (startFile) {
+      if (isHousePack(pack.name)) startFile = houseName(startFile);
       const i = viewable.findIndex((f) => f.name.toLowerCase() === startFile.toLowerCase());
       if (i >= 0) await this.viewer(pack, viewable, i);
     }
