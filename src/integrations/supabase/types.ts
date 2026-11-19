@@ -488,6 +488,27 @@ export type Database = {
         }
         Relationships: []
       }
+      scene_bulletins: {
+        Row: {
+          day: string
+          payload: Json
+          ready: boolean
+          started_at: string
+        }
+        Insert: {
+          day: string
+          payload?: Json
+          ready?: boolean
+          started_at?: string
+        }
+        Update: {
+          day?: string
+          payload?: Json
+          ready?: boolean
+          started_at?: string
+        }
+        Relationships: []
+      }
       sysop_mail: {
         Row: {
           board: string

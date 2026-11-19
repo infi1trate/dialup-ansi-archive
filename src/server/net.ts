@@ -1,5 +1,6 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import {sceneAction} from "./scene";
 import {dailyScores} from "./daily";
 import {inspectMail,queueMail,mailAction,dailyTopMail} from "./mail";
 import {newScan} from "./new-scan";
@@ -98,11 +99,12 @@ export async function hiddenFiles(pack: string): Promise<Set<string>> {
   return new Set((data ?? []).map((r) => r.file.toLowerCase()));
 }
 
-export async function handle(b: Json, req: Request): Promise<Json> {
+export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>void=(p)=>{void p.catch(()=>{});}): Promise<Json> {
   const s = await db();
   const ip = await ipHash(req);
   const now=requestClock(req);
   const action = str(b.action, 20);
+  if(action==="scene"){await limit([ip],"scene",120,600);return sceneAction(s,now,defer);}
   if(action==="mail"||action==="mailRead"){const th=await tokenHash(b.token);await limit([th,ip],"mail",120,600);return mailAction(s,b.guest?null:await callerByToken(th),b);}
   if(action==="newScan"){const th=await tokenHash(b.token);await limit([th,ip],"newScan",120,600);return newScan(s,b.guest?null:await callerByToken(th),str(b.board,20));}
   if (["record","wall","wallPost","innerCircle","messageReport"].includes(action)) {

@@ -25,6 +25,8 @@ import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
+import {sceneBulletin} from "./scene";
+import type {ScenePack} from "@/lib/scene";
 import {mailbox} from "./mail";
 import {callScan} from "./new-scan";
 import { yourRecord, promotionNotice } from "./record";
@@ -515,7 +517,7 @@ export class Board {
     if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record'],['M','Mail']];
     if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
     if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
-    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','Bulletins / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
+    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','This week / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
   }
   private menuCallers = CALLERS.slice(0,3).map(c=>c[0]);
   private menuOneliner = ONELINERS[0][1];
@@ -552,7 +554,7 @@ export class Board {
       this.io.clearOutput();
       if(this.io.entry.id==='maple'){if(c==='M')await this.mail();else if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
       if(this.io.entry.id==='c93'){if(c==='M')await this.mail();else if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
-      switch(c){case 'M':await this.mail();break;case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
+      switch(c){case 'M':await this.mail();break;case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':if(this.io.entry.id==='crawl')await sceneBulletin(this);else await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
     }
   }
 
@@ -1140,7 +1142,10 @@ export class Board {
   async newScan(){await callScan(this); }
   async textList(){const packs=[...discovered.values()];if(!packs.length){try{packs.push(await getPack('ensiart'));}catch{}}const rows=packs.flatMap(p=>p.files.filter(f=>/\.(nfo|diz|asc|txt)$/i.test(f.name)).map(f=>({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')})));await this.fileResults('text first',rows);}
   private zeroDayCache: PackSummary[] | null=null;
-  async zeroDay(){const month=new Date().getUTCMonth()+1;this.send(this.header(a(),'0-DAY ART',`month ${month} / 199x`));if(!this.zeroDayCache){const packs:PackSummary[]=[];for(let year=1996;year>=1990;year--){this.send(a().at(6,4).eol().k(8,`Checking ${year} disks for month ${month}...`));let page=1;for(;;){const p=await getYearPacks(year,page,100);packs.push(...p.items.filter(p=>releasedInMonth(p,month)));if(page>=p.pages)break;page++;}}this.zeroDayCache=packs.sort((a,b)=>b.year-a.year||b.name.localeCompare(a.name));}if(!this.zeroDayCache.length){this.send(a().at(8,4).k(8,'No packs released in this calendar month.'));await this.anyKey(22);return;}await this.pagedPacks('0-DAY ART','this month in the scene, 199x',async()=>({items:this.zeroDayCache??[],page:1,pages:1,total:this.zeroDayCache?.length??0}));}
+  setScenePacks(packs:ScenePack[]){this.zeroDayCache=packs;}
+  async openScenePack(p:ScenePack){await this.packScreen(p);}
+  async zeroDay(){await sceneBulletin(this,true);}
+
 
   async roulette(){try{const years=await getYears();const y=years[Math.floor(Math.random()*years.length)];const list=await getYearPacks(y.year,1);const chosen=list.items[Math.floor(Math.random()*list.items.length)];const pack=await getPack(chosen.name);const fs=pack.files.filter(f=>f.viewable);if(fs.length)await this.viewer(pack,fs,Math.floor(Math.random()*fs.length));}catch(e){await this.errorScreen(String(e));}}
   async autoQueue(pack:PackInfo,files:PackFile[]){for(let i=0;i<files.length;i++){const f=files[i];if(this.io.entry.id==='maple'&&!familyAllowed(pack.name,f.name))continue;try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));this.screenMode(prep.mode);this.io.client.markTop();this.send(prep.stream);if(files[i+1])prefetchFile(pack.name,files[i+1].name);const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();break;}await this.io.drain();if(await this.io.keyTimeout(ACCESS[this.level].hold))break;}catch{}}this.io.clearOutput();this.screenMode();}
@@ -1255,6 +1260,7 @@ export class Board {
       if (this.io.entry.mode === "void") await this.voidGate();
       await this.login();
       await this.logon();
+      if(this.io.entry.id==='crawl')await sceneBulletin(this);
       await this.newScan();
       if(this.mailWaiting){this.send(this.header(a(),"Mail waiting").at(8,5).k(this.sk.a,`${this.mailWaiting} private notes waiting. M reads / ENTER menu`));this.hint([{key:"M",ch:"M",label:"MAIL"},{key:"Enter",label:"MENU"}]);const k=await this.key();this.io.clearOutput();if(String.fromCharCode(k.ch??0).toUpperCase()==="M")await this.mail();}
       

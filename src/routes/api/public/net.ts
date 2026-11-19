@@ -11,7 +11,7 @@ export const Route = createFileRoute("/api/public/net")({
         try { body = await request.json(); } catch { return Response.json({ error: "bad json" }, { status: 400 }); }
         if (!body || typeof body !== "object") return Response.json({ error: "bad body" }, { status: 400 });
         try {
-          return Response.json(await handle(body, request), { headers: { "cache-control": "no-store" } });
+          return Response.json(await handle(body, request, (task)=>{const r=request as Request & {waitUntil?:(p:Promise<void>)=>void};if(r.waitUntil)r.waitUntil(task);else void task.catch(()=>{});}), { headers: { "cache-control": "no-store" } });
         } catch (e) {
           if (e instanceof NetError) return Response.json({ error: e.message }, { status: e.status });
           console.error("[net]", e);
