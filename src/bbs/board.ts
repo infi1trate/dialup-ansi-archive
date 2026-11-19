@@ -1015,7 +1015,9 @@ export class Board {
   async viewer(pack: PackInfo, files: PackFile[], idx: number, opts: { animation?: boolean; local?: Uint8Array } = {}) {
     if(this.io.entry.id==="maple"){files=files.filter(f=>familyAllowed(pack.name,f.name));idx=Math.min(idx,files.length-1);if(!files.length)return;}
     const io = this.io;
-    const restore = () => { io.client.overlay(null); this.screenMode(); };
+    let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearNotice = () => { clearTimeout(noticeTimer); noticeTimer=undefined; };
+    const restore = () => { clearNotice(); io.client.overlay(null); this.screenMode(); };
     for (;;) {
       const f = files[idx];
       if(!opts.local && !fileCached(pack.name,f.name)) this.send(a().cls().at(12, 1).k(8, center(`░▒▓ retrieving ${f.name} from the stacks ▓▒░`, 79)));
@@ -1058,10 +1060,17 @@ export class Board {
           if (info) { info = false; showInfo(); continue; }
           io.clearOutput(); io.resume(); restore(); io.client.artOpen(false); return;
         }
-        if(c === "F" && !opts.local){const favored=this.guest?toggleGuestFavorite(pack.name,f.name):(await net("favorite",{pack:pack.name,file:f.name}))?.favorite;io.client.overlay(a().at(24,2).k(14,favored?"Added to your shelf":"Removed from your shelf").build());continue;}
+        if(c === "F" && !opts.local){
+          clearNotice();
+          const title=prep.sauce?.title||f.title||fileTitle(pack.name,f.name)||'';
+          const favored=this.guest?toggleGuestFavorite(pack.name,f.name,title):(await net("favorite",{pack:pack.name,file:f.name}))?.favorite;
+          io.client.overlay(a().at(25,1).c(14,0).t(pad(typeof favored==='boolean'?(favored?'Added to your shelf':'Removed from your shelf'):'Shelf unavailable. Try again later.',79)).build());
+          noticeTimer=setTimeout(()=>{noticeTimer=undefined;showInfo();},2000);
+          continue;
+        }
         if(c === "C" && this.io.entry.id === "c93"){this.colorBack=!this.colorBack;io.clearOutput();this.screenMode(mode);io.send(stream);finished=false;continue;}
         if(c === "E" && !opts.local){const k=await io.key();const rating=(k.ch??0)-48;if(rating>=1&&rating<=5)await net("rating",{pack:pack.name,file:f.name,rating});continue;}
-        if (c === "I") { info = !info; showInfo(); continue; }
+        if (c === "I") { clearNotice(); info = !info; showInfo(); continue; }
         if (c === "R" && !opts.local) { await this.report(pack, f); showInfo(); viewHints(finished); continue; }
         if (c === "N" && idx < files.length - 1) { next = 1; break; }
         if (c === "P" && idx > 0) { next = -1; break; }
@@ -1075,7 +1084,7 @@ export class Board {
           case "End": io.client.scrollTo("bottom"); break;
         }
       }
-      io.clearOutput(); io.resume(); io.client.overlay(null); io.client.artOpen(false);
+      clearNotice(); io.clearOutput(); io.resume(); io.client.overlay(null); io.client.artOpen(false);
       idx += next;
     }
   }
@@ -1099,11 +1108,11 @@ export class Board {
     io.client.overlay(null);
   }
 
-  async openPath(path:string){const [pack,file]=path.split('/');if(!pack||!file)return;if(this.io.entry.id==='maple'&&!familyAllowed(pack,file)){await this.errorScreen('Not on the club-approved shelf.');return;}try{const p=await getPack(pack);await this.packScreen({name:pack,year:p.year,groups:p.groups},file);}catch(e){await this.errorScreen(String(e));}}
+  async openPath(path:string){const [pack,file]=path.split('/');if(!pack||!file)return;if(this.io.entry.id==='maple'&&!familyAllowed(pack,file)){await this.errorScreen('Not on the club-approved shelf.');return;}try{const p=await getPack(pack);const i=p.files.filter(f=>f.viewable).findIndex(f=>f.name.toLowerCase()===file.toLowerCase());if(i<0){await this.errorScreen('That file is not viewable.');return;}await this.viewer(p,p.files.filter(f=>f.viewable),i);}catch(e){await this.errorScreen(String(e));}}
   async openFamily(piece:typeof FAMILY_SHELF[number]|undefined){if(!piece)return;await this.openPath(`${piece.pack}/${piece.file}`);}
   async familyList(){for(;;){this.send(this.header(a(),'Club-approved shelf').at(23,3).k(8,'ENTER picture / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:FAMILY_SHELF.map(f=>({text:`${pad(f.file,18)}${pad(f.pack,18)}${f.artist}`,color:9}))});if(!r)return;await this.openFamily(FAMILY_SHELF[r.index]);}}
   async fileResults(title:string,rows:{pack:string;file:string;year?:number;title?:string;artist?:string}[]){if(this.io.entry.id==='maple')rows=rows.filter(r=>familyAllowed(r.pack,r.file));if(!rows.length){this.send(this.header(a(),title).at(7,5).k(8,'No results found.'));await this.anyKey(22);return;}for(;;){this.send(this.header(a(),title).at(23,3).k(8,'ENTER view / SPACE tag / V queue / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:rows.map(f=>({text:`${this.tagged.has(`${f.pack}/${f.file}`)?'*':' '} ${pad(f.file,16)}${pad(f.pack,16)}${pad(f.title||f.artist||'',36)}`,color:this.sk.a})),hotkeys:' V'});if(!r)return;if(r.key==='V'){await this.playTags();continue;}const f=rows[r.index];if(!f)continue;if(r.key===' '){const id=`${f.pack}/${f.file}`;if(this.tagged.has(id))this.tagged.delete(id);else this.tagged.add(id);continue;}await this.openPath(`${f.pack}/${f.file}`);}}
-  async shelf(){const rows=this.guest?guestShelf():(await net('shelf'))?.rows??[];await this.fileResults('Your shelf',rows);}
+  async shelf(){const rows=this.guest?guestShelf():(await net('shelf'))?.rows??[];const enriched=[];for(const row of rows){if(this.io.entry.id==='maple'&&!familyAllowed(row.pack,row.file))continue;let title=row.title||fileTitle(row.pack,row.file)||'';if(!title){try{const p=await getPack(row.pack);title=p.files.find(f=>f.name===row.file)?.title||'';if(!title)title=prepareArt(row.file,await getFile(row.pack,row.file)).sauce?.title||'';}catch{}}enriched.push({...row,title});}await this.fileResults('Your shelf',enriched);}
   async search(){const query=await this.ask(22,'Artist / group / title',60);if(!query)return;this.send(this.header(a(),'Searching',query));let rows:any[]=[];if(this.io.entry.id==='maple')rows=FAMILY_SHELF.filter(f=>`${f.file} ${f.artist} ${f.pack}`.toLowerCase().includes(query.toLowerCase()));else{const r=await net('search',{query});rows=r?.rows??[];for(const p of discovered.values())for(const f of p.files)if(f.viewable&&`${f.name} ${f.title} ${f.artists.join(' ')} ${p.groups.join(' ')}`.toLowerCase().includes(query.toLowerCase())&&!rows.some(r=>r.pack===p.name&&r.file===f.name))rows.push({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')});if(!rows.length){try{const gs=await getGroupPacks(query,1990,1996);if(gs.length){await this.pagedPacks(`Group: ${query}`,'archive credits',async()=>({items:gs,page:1,pages:1,total:gs.length}));return;}const d=await directLookup('artist',query);const packs=d.results?.packs??{};for(const [year,names]of Object.entries(packs))for(const name of names as string[]){const p=await getPack(name);for(const f of p.files.filter(f=>f.artists.some(a=>a.toLowerCase().includes(query.toLowerCase()))))rows.push({pack:name,file:f.name,year:+year,artist:f.artists.join(', ')});if(rows.length>=80)break;}}catch{}}}await this.fileResults(`Search: ${query}`,rows);}
   async artistIndex(){const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';this.send(this.header(a(),'Artist index A-Z').at(5,4).k(11,letters.split('').join(' ')).at(8,4).k(8,'Pick an initial / ESC return'));const k=await this.key();if(k.key==='Escape')return;const letter=String.fromCharCode(k.ch??0).toUpperCase();if(!letters.includes(letter))return;const artists=[...new Set([...discovered.values()].flatMap(p=>p.files.flatMap(f=>f.artists)))].filter(a=>a.toUpperCase().startsWith(letter)).sort();this.send(this.header(a(),`Artists: ${letter}`).at(23,3).k(8,'ENTER search / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:artists.map(a=>({text:a,color:11}))});if(r){const result=await net('search',{query:artists[r.index]});await this.fileResults(artists[r.index],result?.rows??[]);}}
   async newScan(){const result=await net('newScan');const unviewed=[...discovered.values()].filter(p=>!this.io.profile.filesSeen.some(f=>f.startsWith(p.name+'/')));const x=this.header(a(),'New since your last call');x.at(6,5).k(this.sk.a,`${result?.lines??0} new oneliners / ${result?.scores??0} new THE CORNER scores`);x.at(8,5).k(15,`${unviewed.length} discovered packs new to you.`);unviewed.slice(0,8).forEach((p,i)=>x.at(10+i,5).k(this.sk.c,p.name));if(!this.guest){const b=await net('balance');this.creditsLeft=b?.balance??this.creditsLeft;if(this.creditsLeft===0)x.at(20,5).k(12,'Mail from Static: your ratio is empty. Art earns your way back.');}x.at(22,5).k(8,'Any key returns');this.send(x);await this.key();this.io.clearOutput();}
