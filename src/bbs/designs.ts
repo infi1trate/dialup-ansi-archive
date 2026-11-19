@@ -1,6 +1,5 @@
 // Byte-only compositions. Positions are shared by drawing and keyboard selection.
 import { a, Ansi, box, center, pad, bigText, shadeBar } from './ansi';
-import { Terminal } from '@/term/terminal';
 export type MenuItem = [string,string];
 export interface MenuStatus { user:string; node:number; credits:number; minutes:number; callers:string[]; oneliner:string; zeroDay:string; featured:string }
 export const CLUB_TIPS = [
@@ -36,9 +35,24 @@ export function boardLogo(id:string,name:string) {
     x.at(7,2).k(11,center('F U L L   B L O C K   /   T H E   S H O W R O O M',77));
   } else if(id==='strobe') {
     for(let r=1;r<=9;r++){x.at(r,1);for(let c=0;c<79;c++)x.k([13,14,11][Math.floor((c+r*3)/5)%3],'█');}
-    // Black cut-out lettering across the diagonal stripe field.
-    const letters=a();bigText(letters,1,1,'STROBE',[7,7,7],0);const mask=new Terminal();mask.feed(letters.build());
-    for(let r=0;r<3;r++)for(let c=0;c<36;c++)if((mask.cell(r,c)&255)!==32)x.at(4+r,22+c).k(0,'█');
+    // Six full-cell rows, 59 columns: solid lettering remains readable in thumbnails.
+    const glyphs=[
+      ['#########','##.......','#########','.......##','.......##','#########'],
+      ['#########','...###...','...###...','...###...','...###...','...###...'],
+      ['########.','##.....##','########.','##...##..','##....##.','##.....##'],
+      ['.#######.','##.....##','##.....##','##.....##','##.....##','.#######.'],
+      ['########.','##.....##','########.','##.....##','##.....##','########.'],
+      ['#########','##.......','#######..','##.......','##.......','#########'],
+    ];
+    const pixels=Array.from({length:6},(_,r)=>glyphs.map(g=>g[r]).join('.'));
+    for(let r=-1;r<=6;r++){
+      x.at(2+r,10);
+      for(let c=-1;c<=59;c++){
+        const lit=pixels[r]?.[c]==='#';
+        const outline=[-1,0,1].some(dy=>[-1,0,1].some(dx=>pixels[r+dy]?.[c+dx]==='#'));
+        x.k(lit?15:outline?0:[13,14,11][Math.floor((c+10+(r+2)*3)/5)%3],'█');
+      }
+    }
     x.at(10,1).k(14,center('KICKDRUM / FOUR CHANNELS / AFTERHOURS',79));
   } else if(id==='maple') {
     x.c(15,1).raw('\x1b[2J');box(x,2,7,66,6,15,undefined,true,1);

@@ -1,3 +1,10 @@
+# Sprint C part 4
+- [x] 1. Readable STROBE logo; tests; d06b uploaded; commit
+- [ ] 2. Guest and handle favorites add/list/open/remove; tests; d13 uploaded; commit
+- [ ] 3. Modem-speed contact-sheet quick scan; tests; d14 uploaded; commit
+- [ ] 4. Four NFO house styles across 24 releases; tests; d15-d18 uploaded; commit
+- [ ] 5. EMBER/CHROMA logos, effects, scrollers and music; tests; d19-d21 uploaded; commit
+
 # Sprint C part 3
 - [x] Part 1: five compositions, inverse selection, directory spacing and 80x25 checks
 - [x] Part 1: twelve private evidence links and commit before Part 2
