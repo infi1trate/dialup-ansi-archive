@@ -1,6 +1,6 @@
 # Clean-up pass
 - [x] 1. House pack renamed DC-01 / DC-LOGO.ANS with aliases; logo redrawn; old wording swept; f01
-- [ ] 2. Tape composites the live stage at current framing; tape2 + f02
+- [x] 2. Tape composites the live stage at current framing; tape2 + f02
 - [ ] 3. Quick scan skips blank leading rows; shelf titles and artists; f03-f04
 - [ ] 4. Warez area walked by keyboard; STATUS table; f05-f08
 - [ ] 5. MAPLE RIDGE refuses non-allowlisted pieces on every route; live 0-DAY; f09-f10

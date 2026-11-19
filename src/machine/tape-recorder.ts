@@ -23,24 +23,31 @@ export function createTape(engine: Engine, root: () => HTMLElement | null, hooks
   let rec: MediaRecorder | null = null, chunks: Blob[] = [], startedAt = 0, lastDraw = 0, tap: { close: () => void } | null = null, hasAudio = false;
   let mime = "";
 
+  // Everything is placed by its on-screen rectangle, so the tape frames exactly what the caller
+  // sees: leaned in is leaned in. The viewport is cover-fitted to 1280x720.
   const draw = (crt: HTMLCanvasElement) => {
     const now = performance.now(); if (now - lastDraw < 1000 / TAPE_FPS - 2) return; lastDraw = now;
     const el = root(); const stage = el?.querySelector<HTMLElement>(".plate-stage"); if (!el || !stage) return;
-    const sr = stage.getBoundingClientRect(); const k = TAPE_W / sr.width;
-    const box = (e: Element) => { const r = e.getBoundingClientRect(); return [(r.left - sr.left) * k, (r.top - sr.top) * k, r.width * k, r.height * k] as const; };
+    const vr = el.getBoundingClientRect(); const k = Math.max(TAPE_W / vr.width, TAPE_H / vr.height);
+    const ox = (TAPE_W - vr.width * k) / 2, oy = (TAPE_H - vr.height * k) / 2;
+    const box = (e: Element) => { const r = e.getBoundingClientRect(); return [ox + (r.left - vr.left) * k, oy + (r.top - vr.top) * k, r.width * k, r.height * k] as const; };
     g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.fillStyle = "#000"; g.fillRect(0, 0, TAPE_W, TAPE_H);
     const img = (sel: string) => stage.querySelector<HTMLImageElement>(sel);
     const off = img(".plate-off"), on = img(".plate-on"), light = img(".plate-screen-light");
-    if (off?.complete) g.drawImage(off, 0, 0, TAPE_W, TAPE_H);
-    if (on?.complete) { g.globalAlpha = num(getComputedStyle(on).opacity); g.drawImage(on, 0, 0, TAPE_W, TAPE_H); g.globalAlpha = 1; }
+    const plate = (im: HTMLImageElement | null, ctx: CanvasRenderingContext2D) => { if (im?.complete && im.naturalWidth) { const [x, y, w, h] = box(im); ctx.drawImage(im, x, y, w, h); } };
+    plate(off, g);
+    if (on) { g.globalAlpha = num(getComputedStyle(on).opacity); plate(on, g); g.globalAlpha = 1; }
     // Screen light: the plate multiplied by the live tint (same matrix the room's filter uses), added.
     const values = el.querySelector("feColorMatrix[data-room-light]")?.getAttribute("values")?.split(/\s+/).map(Number) ?? [];
     const [r, gg, b] = [values[0] ?? 0, values[6] ?? 0, values[12] ?? 0];
     if (light?.complete && r + gg + b > 0.003) {
-      lg.globalCompositeOperation = "source-over"; lg.clearRect(0, 0, TAPE_W, TAPE_H); lg.drawImage(light, 0, 0, TAPE_W, TAPE_H);
+      lg.globalCompositeOperation = "source-over"; lg.clearRect(0, 0, TAPE_W, TAPE_H); plate(light, lg);
       lg.globalCompositeOperation = "multiply"; lg.fillStyle = `rgb(${Math.min(255, r * 255)},${Math.min(255, gg * 255)},${Math.min(255, b * 255)})`; lg.fillRect(0, 0, TAPE_W, TAPE_H);
-      g.globalCompositeOperation = "lighter"; g.globalAlpha = Math.min(1, num(getComputedStyle(light).opacity)); g.drawImage(layer, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
-      if (Math.max(r, gg, b) > 1) { g.globalCompositeOperation = "lighter"; g.globalAlpha = Math.min(1, Math.max(r, gg, b) - 1); g.drawImage(layer, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = "source-over"; }
+      lg.globalCompositeOperation = "destination-in"; plate(light, lg);
+      const passes = Math.max(r, gg, b); const la = Math.min(1, num(getComputedStyle(light).opacity));
+      g.globalCompositeOperation = "lighter"; g.globalAlpha = la; g.drawImage(layer, 0, 0);
+      if (passes > 1) { g.globalAlpha = la * Math.min(1, passes - 1); g.drawImage(layer, 0, 0); }
+      g.globalAlpha = 1; g.globalCompositeOperation = "source-over";
     }
     // Rain in the window.
     const rain = stage.querySelector<HTMLCanvasElement>(".plate-rain canvas"); if (rain && rain.width) { const [x, y, w, h] = box(rain); g.globalCompositeOperation = "screen"; g.drawImage(rain, x, y, w, h); g.globalCompositeOperation = "source-over"; }
@@ -52,6 +59,24 @@ export function createTape(engine: Engine, root: () => HTMLElement | null, hooks
       const m = maskImage(mask); if (m?.complete && m.naturalWidth) { lg.globalCompositeOperation = "destination-in"; lg.drawImage(m, x, y, w, h); }
       g.drawImage(layer, 0, 0);
       const refl = glass.querySelector<HTMLImageElement>(".plate-reflection"); if (refl?.complete) { g.globalAlpha = num(getComputedStyle(refl).opacity); g.globalCompositeOperation = "screen"; g.drawImage(refl, x, y, w, h); g.globalAlpha = 1; g.globalCompositeOperation = "source-over"; }
+    }
+    // The live alarm clock: each seven-segment bar in its own colour and opacity.
+    stage.querySelectorAll<HTMLElement>(".plate-clock .segment, .plate-clock .clock-colon").forEach((seg) => {
+      const cs = getComputedStyle(seg); const col = cs.backgroundColor; if (!col || col === "rgba(0, 0, 0, 0)") return;
+      const [x, y, w, h] = box(seg); g.globalAlpha = num(cs.opacity); g.fillStyle = col;
+      if (seg.classList.contains("lit")) { g.shadowColor = col; g.shadowBlur = 4 * k; }
+      g.fillRect(x, y, w, h); g.shadowBlur = 0; g.globalAlpha = 1;
+    });
+    // Sticky-note handwriting, rotated like the page draws it.
+    const note = stage.querySelector<HTMLElement>(".plate-note-writing");
+    if (note) {
+      // Rotated boxes grow their client rect, so size from layout and the camera's own scale.
+      const cs = getComputedStyle(note); const [x, y, bw, bh] = box(note); const sc = k * (stage.getBoundingClientRect().width / (stage.offsetWidth || 1));
+      const w = note.offsetWidth * sc, h = note.offsetHeight * sc, fs = parseFloat(cs.fontSize) * sc, lh = (parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.04) * sc;
+      g.save(); g.translate(x + bw / 2, y + bh / 2); g.rotate(-5 * Math.PI / 180); g.translate(-w / 2, -h / 2);
+      g.globalAlpha = num(cs.opacity); g.globalCompositeOperation = "multiply"; g.fillStyle = cs.color; g.font = `${fs}px ${cs.fontFamily}`; g.textBaseline = "top";
+      [...note.querySelectorAll("p")].forEach((pEl, i) => g.fillText(pEl.textContent ?? "", parseFloat(cs.paddingLeft) * sc, parseFloat(cs.paddingTop) * sc + i * lh, Math.max(1, w - 2 * parseFloat(cs.paddingLeft) * sc)));
+      g.restore();
     }
     // LEDs that are lit (including the REC LED), as soft dots in their own colour.
     stage.querySelectorAll<HTMLElement>(".plate-led, .tape-led").forEach((led) => {
