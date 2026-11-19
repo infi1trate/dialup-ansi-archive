@@ -1,3 +1,9 @@
+# Sprint E part 1
+- [x] 1. Access levels, Your record, THE WALL, INNER CIRCLE; 142 tests; e01-e05 uploaded; commit
+- [ ] 2. New since last call, board-specific scans; tests; e06-e07; commit
+- [ ] 3. Deferred sysop mailbox and rules; tests; e08-e10; commit
+- [ ] 4. Daily/all-time scores, yesterday winners and streaks; tests; e11; commit
+
 # Sprint C part 4
 - [x] 1. Readable STROBE logo; tests; d06b uploaded; commit
 - [x] 2. Guest and handle favorites add/list/open/remove; tests; d13 uploaded; commit

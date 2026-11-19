@@ -56,6 +56,7 @@ export interface HostIO {
   /** Drop undelivered output (the user aborted a transfer). */
   clearOutput(): void;
   client: {
+    access?(v:{speed:number;remainingSeconds:number;level:string}):void;
     setMode(m: Partial<TermMode>): void;
     scroll(delta: number): void;
     scrollTo(where: "top" | "bottom"): void;

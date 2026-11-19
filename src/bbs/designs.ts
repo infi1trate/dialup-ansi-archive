@@ -1,7 +1,7 @@
 // Byte-only compositions. Positions are shared by drawing and keyboard selection.
 import { a, Ansi, box, center, pad, bigText, shadeBar } from './ansi';
 export type MenuItem = [string,string];
-export interface MenuStatus { user:string; node:number; credits:number; minutes:number; callers:string[]; oneliner:string; zeroDay:string; featured:string }
+export interface MenuStatus { user:string; level?:string; node:number; credits:number; minutes:number; callers:string[]; oneliner:string; zeroDay:string; featured:string }
 export const CLUB_TIPS = [
   'Label your disks before putting them away.', 'Keep drinks away from the keyboard.',
   'Make a second copy of your important files.', 'Turn off the printer before changing its ribbon.',
@@ -13,7 +13,7 @@ export const CLUB_TIPS = [
 const day = () => Math.floor(Date.now()/86400000);
 export function menuPosition(id:string,i:number) {
   if(id==='vault')return {row:10+Math.floor(i/6)*5,col:3+(i%6)*13,width:12};
-  if(id==='strobe') { const positions=[[11,4],[11,31],[11,57],[15,4],[15,57],[19,4],[19,31],[19,57],[22,16],[22,48]];const [row,col]=positions[i]??[22,4];return {row,col,width:22}; }
+  if(id==='strobe') { const positions=[[11,4],[11,31],[11,57],[15,4],[15,57],[19,4],[19,31],[19,57],[22,16],[22,48],[13,4],[13,57]];const [row,col]=positions[i]??[22,4];return {row,col,width:22}; }
   if(id==='crawl')return {row:8+i,col:3+(i%3),width:32};
   return {row:9+Math.floor(i/2),col:6+(i%2)*36,width:32};
 }
@@ -68,7 +68,7 @@ export function drawMenu(id:string,name:string,items:MenuItem[],s:MenuStatus,sel
     x.at(6,4).k(8,'COMMANDS / NO HANDHOLDING');
     // Single-line status panel; deliberately not a box around the commands.
     x.at(8,40).k(8,'┌'+'─'.repeat(36)+'┐');for(let r=9;r<22;r++)x.at(r,40).k(8,'│').at(r,77).k(8,'│');x.at(22,40).k(8,'└'+'─'.repeat(36)+'┘');
-    const lines=[`NODE ${s.node} / LIVE STATUS`,`${s.user} / ${s.user==='Guest'?'VISITOR':'CALLER'}`,`RATIO: ${s.credits} credits`,`TIME LEFT: ${s.minutes} min`,'LAST THREE CALLERS',...s.callers.slice(0,3),'LATEST ONELINER',s.oneliner,`0-DAY: ${s.zeroDay} packs this month`];
+    const lines=[`NODE ${s.node} / LIVE STATUS`,`${s.user} / ${s.level??'NEW USER'}`,`RATIO: ${s.credits} credits`,`TIME LEFT: ${s.minutes} min`,'LAST THREE CALLERS',...s.callers.slice(0,3),'LATEST ONELINER',s.oneliner,`0-DAY: ${s.zeroDay} packs this month`];
     lines.forEach((t,i)=>x.at(9+i,42).k(i===0||i===4||i===8?11:7,pad(t,34)));
     items.forEach((_,i)=>x.bytes(menuSelection(id,items,i,i===selected).build()));
     x.at(24,1).c(0,4).t(pad(' NO LAMERS. NO LEECHES. NO CARRIER. / STATIC OWNS THE DISCONNECT.',79));
@@ -77,17 +77,17 @@ export function drawMenu(id:string,name:string,items:MenuItem[],s:MenuStatus,sel
     items.forEach((_,i)=>x.bytes(menuSelection(id,items,i,i===selected).build()));
     for(let i=items.length;i<12;i++){const {row,col}=menuPosition(id,i);box(x,row,col,12,4,1);x.at(row+1,col+1).k(3,center(['80 x 25','16 COLORS','RAW BYTES'][i-items.length]??'',10));x.at(row+2,col+1).k(1,'░▒▓████▓▒░');}
     x.at(21,3).k(15,'HALFTONE / THE COLLECTIVE LEAVES NO CELL UNDECIDED');
-    x.at(22,3).k(11,'ARROWS select tile / ENTER open / letter jumps to its command');
+    x.at(22,3).k(11,pad(`${s.user} / ${s.level??'NEW USER'} / ${s.minutes} min`,73));
     x.at(24,1);shadeBar(x,79,3);
   } else if(id==='maple') {
-    items.forEach(([k,l],i)=>x.at(9+i,16).k(14,`${k}. `,1).k(15,pad(l,25).replace(/ +$/g,m=>'.'.repeat(m.length))+' '+['a daily picture','reviewed by the club','a pleasant discovery','meeting notices','saved pictures','catch up','find a picture','thank the artists','please call again'][i],1));
+    items.forEach(([k,l],i)=>x.at(9+(i%9),i<9?12:48).k(14,`${k}. `,1).k(15,pad(l,i<9?30:24),1));
     box(x,19,7,66,4,15,'Tip of the day',true,1);x.at(21,9).k(14,center(CLUB_TIPS[day()%CLUB_TIPS.length],62),1);
-    x.at(24,1).k(15,center(`Welcome, ${s.user}.  ${Math.min(30,s.minutes)} minutes left.  Thank you for sharing.`,79),1);
+    x.at(24,1).k(15,center(`Welcome, ${s.user}.  ${s.level??'NEW USER'} / ${s.minutes} minutes left.  Thank you for sharing.`,79),1);
   } else if(id==='strobe') {
     items.forEach((_,i)=>x.bytes(menuSelection(id,items,i,i===selected).build()));
     box(x,14,29,24,6,13,'CHANNELS');x.bytes(strobeMotion(0).build());
-    x.at(24,1).k(14,pad(' GREETS / FULL BLOCK / LATCHKEY / TIN SAINTS / ALL NIGHT CALLERS / ',79));
-  } else x.at(7,2).k(10,'Command (?=help): ');
+    x.at(24,1).k(14,pad(` ${s.user} / ${s.level??'NEW USER'} / FOUR CHANNELS / `,79));
+  } else x.at(5,2).k(2,`${s.user} / ${s.level??'NEW USER'} / ${s.minutes} min`).at(7,2).k(10,'Command (?=help): ');
   return x.reset();
 }
 export function strobeMotion(frame:number) {

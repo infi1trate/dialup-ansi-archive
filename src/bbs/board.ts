@@ -25,6 +25,9 @@ import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
+import { yourRecord, promotionNotice } from "./record";
+import { wall, innerCircle } from "./wall";
+import { ACCESS, accessLevel } from "@/lib/access";
 import {scanPreview,scanCaption} from './quick-scan';
 
 export function wrapCourier(text:string){const lines:string[]=[];let line="";for(const word of text.split(/\s+/)){if((line+" "+word).trim().length>70){lines.push(line);line=word;}else line=(line+" "+word).trim();}if(line)lines.push(line);return lines;}
@@ -74,6 +77,9 @@ export class Board {
   node: number;
   caller: CallerInfo | null = null;
   private session = newSessionId();
+  private callSession: string | undefined;
+  ioEntryId(){return this.io.entry.id;}
+  get level(){return accessLevel(this.guest?null:this.caller?.level);}
   private doing = "logging on";
   private lastBeat = 0;
   private beatTimer: ReturnType<typeof setInterval> | null = null;
@@ -96,7 +102,7 @@ export class Board {
   async beat(doing?: string) {
     if (doing) this.doing = doing;
     this.lastBeat = Date.now();
-    const r = await net("beat", { session: this.session, doing: this.doing, speed: this.io.speed, guest: this.guest });
+    const r = await net("beat", { session: this.session, doing: this.doing, speed: this.io.speed, guest: this.guest, callSession:this.callSession });
     if (r?.online) { const me = r.online.findIndex((o: any) => o.me); if (me >= 0) this.node = me + 1; }
     return r;
   }
@@ -115,14 +121,14 @@ export class Board {
     if (!this.beatTimer) return;
     clearInterval(this.beatTimer); this.beatTimer = null;
     setLiveSession(null);
-    void net("leave", { session: this.session });
+    void net("leave", { session: this.session,callSession:this.callSession });
   }
   offlineNote(x: Ansi, row: number) {
     return x.at(row, 4).k(12, "░ the message base is offline ░").k(8, " this is the printout Static taped up");
   }
   become(c: CallerInfo) {
     this.user = c.handle; this.guest = false; this.caller = c;
-    Object.assign(this.io.profile, { handle: c.handle, city: c.city, serverFiles: c.files });
+    Object.assign(this.io.profile, { handle: c.handle, city: c.city, serverFiles: c.files,accessLevel:accessLevel(c.level) });
     this.io.save();
   }
   async suspended(): Promise<never> {
@@ -182,10 +188,10 @@ export class Board {
   }
 
   status(x: Ansi, row = 24) {
-    if(row===24 && ["vault","strobe","crawl"].includes(this.io.entry.id)) return x;
+    if(row===24 && ["vault","strobe","crawl"].includes(this.io.entry.id)) row=25;
     const left = Math.max(0, Math.min(this.io.entry.id==="maple"?30:60,Math.ceil(this.io.timeLeftMs() / 60000)));
-    x.at(row, 1).c(15, 1).t(pad(` ${this.user}`, 26)).c(11, 1).t(pad(`node ${this.node}`, 12))
-      .c(14, 1).t(pad(`${this.io.speed} bps`, 14)).c(15, 1).t(rpad(`time left: ${left} min `, 27)).reset();
+    x.at(row, 1).c(15, 1).t(pad(` ${this.user} / ${this.level}`, 38)).c(11, 1).t(pad(`node ${this.node}`, 8))
+      .c(14, 1).t(pad(`${this.io.speed} bps`, 12)).c(15, 1).t(rpad(`${left} min `, 21)).reset();
     return x;
   }
 
@@ -416,10 +422,13 @@ export class Board {
 
   async logon() {
     if (this.online) {
-      const r = await net("logon", { speed: this.io.speed, guest: this.guest });
+      const r = await net("logon", { speed: this.io.speed, guest: this.guest, callSession:this.callSession });
       if (!r || r.error) this.online = !!r;
       else if (r.banned) await this.suspended();
-      else if (r.caller) { this.caller = r.caller; this.io.profile.serverFiles = r.caller.files; this.io.save(); }
+      else { if(r.caller)this.become(r.caller);this.callSession=r.callSession;
+        this.io.speed=r.speed??9600;this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.remainingSeconds??1800,level:this.level});
+        if(r.promotion)await promotionNotice(this,r.promotion);
+      }
     }
     this.startPresence();
   }
@@ -427,10 +436,10 @@ export class Board {
   // ── logon parade ───────────────────────────────────────────────
   async lastCallers() {
     const x = this.header(a(), "Last 10 callers", this.io.entry.number);
-    x.at(5, 4).k(13, pad("#", 4)).k(13, pad("Handle", 20)).k(13, pad("From", 20)).k(13, pad("Speed", 9)).k(13, "When");
+    x.at(5, 4).k(13, pad("#", 4)).k(13, pad("Handle", 20)).k(13, pad("Level", 20)).k(13, pad("Speed", 9)).k(13, "When");
     x.at(6, 4).k(5, "─".repeat(66));
     const r = this.online ? await net("callers") : null;
-    const real: string[][] = (r?.callers ?? []).map((c: any) => [c.handle, c.city || "parts unknown", String(c.speed), timeAgo(c.created_at)]);
+    const real: string[][] = (r?.callers ?? []).map((c: any) => [c.handle, c.level||"NEW USER", String(c.speed), timeAgo(c.created_at)]);
     const seeded = CALLERS.map((c, n) => [c[0], c[1], n % 3 ? "2400" : "9600", c[2]]);
     const list = [...real, ...seeded].slice(0, 10);
     list.forEach((c, n) => {
@@ -461,9 +470,9 @@ export class Board {
     this.setDoing("reading the oneliners");
     for (;;) {
       const r = this.online ? await net("oneliners") : null;
-      const list: string[][] = r?.oneliners ? r.oneliners.map((o: any) => [o.handle, o.body]) : ONELINERS;
+      const list: string[][] = r?.oneliners ? r.oneliners.map((o: any) => [o.handle+" / "+(o.level||"NEW USER"), o.body]) : ONELINERS;
       const x = this.header(a(), "Oneliners wall", r?.oneliners ? `latest ${list.length}` : "");
-      list.slice(-15).forEach(([h, t], n) => { x.at(5 + n, 3).k(8, "░▒").k(n % 2 ? 13 : 11, pad(h, 17)); pipes(x, t); });
+      list.slice(-15).forEach(([h, t], n) => { x.at(5 + n, 3).k(8, "░▒").k(n % 2 ? 13 : 11, pad(h, 29)); pipes(x, t.slice(0,45)); });
       if (!list.length) x.at(6, 6).k(8, "The wall is bare. Be the first.");
       const canPost = !!r?.oneliners && !this.guest;
       if (!r?.oneliners) this.offlineNote(x, 21);
@@ -494,18 +503,18 @@ export class Board {
 
   // ── main menu ──────────────────────────────────────────────────
   menuItems():[string,string][] {
-    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye']];
-    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit']];
-    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye']];
-    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye']];
-    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','Bulletins / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye']];
+    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye'],['0','Your record']];
+    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record']];
+    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record']];
+    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record']];
+    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','Bulletins / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record']];
   }
   private menuCallers = CALLERS.slice(0,3).map(c=>c[0]);
   private menuOneliner = ONELINERS[0][1];
   private menuFeatured = HOUSE_PACK;
   menuScreen(selected=0) {
     this.screenMode();
-    if(!["attic","void"].includes(this.io.entry.id))return drawMenu(this.io.entry.id,this.config.name,this.menuItems(),{user:this.user,node:this.node,credits:this.creditsLeft,minutes:Math.ceil(this.io.timeLeftMs()/60000),callers:this.menuCallers,oneliner:this.menuOneliner,zeroDay:this.zeroDayCache?String(this.zeroDayCache.length):'checking',featured:this.menuFeatured},selected);
+    if(!["attic","void"].includes(this.io.entry.id))return drawMenu(this.io.entry.id,this.config.name,this.menuItems(),{user:this.user,node:this.node,credits:this.creditsLeft,minutes:Math.ceil(this.io.timeLeftMs()/60000),callers:this.menuCallers,oneliner:this.menuOneliner,level:this.level,zeroDay:this.zeroDayCache?String(this.zeroDayCache.length):'checking',featured:this.menuFeatured},selected);
     const x=a().cls();shadeBar(x,79,this.sk.a&7);chromeText(x,3,4,this.io.entry.id==='attic'?'ATTIC':'VOID NODE',[15,this.sk.b,this.sk.a,this.sk.a,this.sk.c,this.sk.c&7],this.sk.a&7);box(x,8,3,75,11,this.sk.a&7);this.menuItems().forEach((_,i)=>x.bytes(menuSelection(this.io.entry.id,this.menuItems(),i,i===selected).build()));this.status(x,24);return x;
   }
   async mainMenu(): Promise<'bye'> {
@@ -533,9 +542,9 @@ export class Board {
         if(items.some(([v])=>v===c)||c==='!')break;
       }
       this.io.clearOutput();
-      if(this.io.entry.id==='maple'){if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
-      if(this.io.entry.id==='c93'){if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
-      switch(c){case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
+      if(this.io.entry.id==='maple'){if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
+      if(this.io.entry.id==='c93'){if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
+      switch(c){case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
     }
   }
 
@@ -578,7 +587,7 @@ export class Board {
   /** Who's online: refreshes every 15 s while on screen, repainting only the rows that changed. */
   async whosOnline() {
     const x = this.header(a(), "Who's online");
-    x.at(5, 4).k(13, pad("Node", 6)).k(13, pad("Caller", 18)).k(13, pad("From", 16)).k(13, pad("Speed", 8)).k(13, "Doing");
+    x.at(5, 4).k(13, pad("Node", 6)).k(13, pad("Caller", 18)).k(13, pad("Level", 16)).k(13, pad("Speed", 8)).k(13, "Doing");
     x.at(6, 4).k(5, "─".repeat(72));
     this.send(x);
     let prev: string[] = [];
@@ -590,7 +599,7 @@ export class Board {
         const o = list[n];
         const y = a().at(7 + n, 4).k(15, pad(String(n + 1), 6));
         if (!o) y.k(8, pad("-", 18)).k(8, pad("", 16)).k(8, pad("", 8)).k(8, pad("waiting for caller...", 26));
-        else y.k(o.me ? 15 : 11, pad(o.handle || "Guest", 18)).k(3, pad(o.city || "-", 16)).k(14, pad(String(o.speed), 8)).k(7, pad(String(o.doing).slice(0, 26), 26));
+        else y.k(o.me ? 15 : 11, pad(o.handle || "Guest", 18)).k(3, pad(o.level || "NEW USER", 16)).k(14, pad(String(o.speed), 8)).k(7, pad(String(o.doing).slice(0, 26), 26));
         rows.push(y.build());
       }
       const foot = a().at(17, 4).eol();
@@ -627,7 +636,7 @@ export class Board {
     const op = (o: string, arg = "") => net("sysop", { key, op: o, arg });
     for (;;) {
       const m = this.header(a(), "Sysop console", "node 0");
-      const items: [string, string][] = [["1", " list oneliners"], ["2", " hide a oneliner"], ["3", " ban a handle"], ["4", " list reports"], ["5", " hide a file"], ["6", " unhide a file"], ["7", " counters, 14 days"], ["Q", "uit console"]];
+      const items: [string, string][] = [["1", " list oneliners"], ["2", " hide a oneliner"], ["3", " ban a handle"], ["4", " list reports"], ["5", " hide a file"], ["6", " unhide a file"], ["7", " counters, 14 days"], ["8"," wall posts"],["9"," hide wall post"],["0"," message reports"],["Q", "uit console"]];
       items.forEach(([k, l], n) => m.at(5 + n * 2, 8).hot(k, l, 15, 12, 14));
       m.at(22, 4).k(12, "Sysop").k(8, " ► ").k(14, "Command").k(5, ": ");
       this.send(m);
@@ -635,6 +644,8 @@ export class Board {
       this.io.clearOutput();
       const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : k.key === "Escape" ? "Q" : "";
       if (c === "Q") return;
+      if(c==="8"||c==="0"){const r=await op(c==="8"?"wall":"messageReports");const x=this.header(a(),c==="8"?"Wall posts":"Message reports");(r?.rows??[]).slice(0,15).forEach((v:any,i:number)=>x.at(5+i,4).k(7,pad(c==="8"?`#${v.id} ${v.handle} ${v.hidden?"HIDDEN":""} ${v.body.replace(/\n/g," / ")}`:`${v.kind} #${v.message_id}`,72)));this.send(x);await this.anyKey(22);continue;}
+      if(c==="9"){const id=await this.ask(23,"Wall post #",10);await op("hideWall",id);continue;}
       const result = async (p: Promise<any>) => {
         const res = await p;
         this.send(a().at(23, 4).eol().k(res?.ok ? 10 : 12, res?.ok ? "Done." : "No such thing, or the base didn't answer."));
@@ -783,6 +794,8 @@ export class Board {
 
   // ── file areas ─────────────────────────────────────────────────
   async files() {
+    if(this.io.entry.id==='crawl'){this.send(this.header(a(),'File areas').at(6,5).k(15,'1 Archive / 2 THE WALL / 3 INNER CIRCLE').at(9,5).k(11,'WALL write: VALIDATED / INNER CIRCLE: ELITE'));this.hint(['1','2','3'].map(c=>({key:c,ch:c,label:c})));const k=await this.key();this.io.clearOutput();if(k.key==='Escape')return;if(k.ch===50){await wall(this);return;}if(k.ch===51){await innerCircle(this);return;}}
+
     this.setDoing("browsing the file areas");
     const mode = this.io.entry.mode;
     if (mode === "year1993") return this.textList();
@@ -1039,7 +1052,7 @@ export class Board {
       const before = maxSpeed(io.profile);
       if (!opts.local && !io.profile.filesSeen.includes(seen)) { if(this.guest)this.creditsLeft++;io.profile.filesSeen.push(seen); io.save(); }
       if (!opts.local) { this.setDoing(`viewing ${f.name}`.slice(0, 40)); artViewed(); }
-      if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
+      if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name,guest:this.guest }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
       const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
       const unlocked = maxSpeed(io.profile) !== before ? maxSpeed(io.profile) : 0;
       let finished = false, info = false;
@@ -1122,8 +1135,8 @@ export class Board {
   async zeroDay(){const month=new Date().getUTCMonth()+1;this.send(this.header(a(),'0-DAY ART',`month ${month} / 199x`));if(!this.zeroDayCache){const packs:PackSummary[]=[];for(let year=1996;year>=1990;year--){this.send(a().at(6,4).eol().k(8,`Checking ${year} disks for month ${month}...`));let page=1;for(;;){const p=await getYearPacks(year,page,100);packs.push(...p.items.filter(p=>releasedInMonth(p,month)));if(page>=p.pages)break;page++;}}this.zeroDayCache=packs.sort((a,b)=>b.year-a.year||b.name.localeCompare(a.name));}if(!this.zeroDayCache.length){this.send(a().at(8,4).k(8,'No packs released in this calendar month.'));await this.anyKey(22);return;}await this.pagedPacks('0-DAY ART','this month in the scene, 199x',async()=>({items:this.zeroDayCache??[],page:1,pages:1,total:this.zeroDayCache?.length??0}));}
 
   async roulette(){try{const years=await getYears();const y=years[Math.floor(Math.random()*years.length)];const list=await getYearPacks(y.year,1);const chosen=list.items[Math.floor(Math.random()*list.items.length)];const pack=await getPack(chosen.name);const fs=pack.files.filter(f=>f.viewable);if(fs.length)await this.viewer(pack,fs,Math.floor(Math.random()*fs.length));}catch(e){await this.errorScreen(String(e));}}
-  async autoQueue(pack:PackInfo,files:PackFile[]){for(let i=0;i<files.length;i++){const f=files[i];if(this.io.entry.id==='maple'&&!familyAllowed(pack.name,f.name))continue;try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));this.screenMode(prep.mode);this.io.client.markTop();this.send(prep.stream);if(files[i+1])prefetchFile(pack.name,files[i+1].name);const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();break;}await this.io.drain();if(await this.io.keyTimeout(3000))break;}catch{}}this.io.clearOutput();this.screenMode();}
-  async playTags(){for(const path of orderedTags(this.tagged)){const [name,file]=path.split('/');try{const p=await getPack(name),f=p.files.find(f=>f.name===file&&f.viewable);if(!f||(this.io.entry.id==='maple'&&!familyAllowed(name,file)))continue;const prep=prepareArt(f.name,await getFile(name,file));this.screenMode(prep.mode);this.send(prep.stream);for(;;){const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}if(await this.io.keyTimeout(3000))break;}catch{}}this.io.clearOutput();this.screenMode();}
+  async autoQueue(pack:PackInfo,files:PackFile[]){for(let i=0;i<files.length;i++){const f=files[i];if(this.io.entry.id==='maple'&&!familyAllowed(pack.name,f.name))continue;try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));this.screenMode(prep.mode);this.io.client.markTop();this.send(prep.stream);if(files[i+1])prefetchFile(pack.name,files[i+1].name);const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();break;}await this.io.drain();if(await this.io.keyTimeout(ACCESS[this.level].hold))break;}catch{}}this.io.clearOutput();this.screenMode();}
+  async playTags(){for(const path of orderedTags(this.tagged)){const [name,file]=path.split('/');try{const p=await getPack(name),f=p.files.find(f=>f.name===file&&f.viewable);if(!f||(this.io.entry.id==='maple'&&!familyAllowed(name,file)))continue;const prep=prepareArt(f.name,await getFile(name,file));this.screenMode(prep.mode);this.send(prep.stream);for(;;){const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}if(await this.io.keyTimeout(ACCESS[this.level].hold))break;}catch{}}this.io.clearOutput();this.screenMode();}
   async quickScan(pack:PackInfo,files:PackFile[]){
     files=files.filter(f=>f.viewable&&(this.io.entry.id!=='maple'||familyAllowed(pack.name,f.name)));
     if(!files.length)return;

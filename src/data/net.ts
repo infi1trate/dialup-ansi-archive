@@ -14,7 +14,7 @@ export function deviceToken(): string {
 let memToken: string | null = null;
 export const newSessionId = () => rand(12);
 
-export interface CallerInfo { handle: string; city: string; calls: number; files: number; speed: number; banned: boolean }
+export interface CallerInfo { handle: string; city: string; calls: number; files: number; speed: number; banned: boolean; level?: import("@/lib/access").AccessLevel }
 export interface NetResult { [k: string]: any; error?: string; status?: number }
 
 export async function net(action: string, body: Record<string, unknown> = {}, timeoutMs = 7000): Promise<NetResult | null> {

@@ -11,8 +11,8 @@ const profile = (seen: number): Profile => ({
 
 describe("modem speed unlocks", () => {
   it("new callers top out at 9600", () => expect(maxSpeed(profile(0))).toBe(9600));
-  it("14400 unlocks after viewing 5 files", () => { expect(maxSpeed(profile(4))).toBe(9600); expect(maxSpeed(profile(5))).toBe(14400); });
-  it("28800 unlocks after viewing 15 files", () => { expect(maxSpeed(profile(14))).toBe(14400); expect(maxSpeed(profile(15))).toBe(28800); });
+  it("14400 requires an earned VALIDATED handle", () => { expect(maxSpeed(profile(60))).toBe(9600); expect(maxSpeed({...profile(15),handle:'Relay',accessLevel:'VALIDATED'})).toBe(14400); });
+  it("28800 requires an earned ELITE handle", () => { expect(maxSpeed({...profile(60),handle:'Relay',accessLevel:'VALIDATED'})).toBe(14400); expect(maxSpeed({...profile(60),handle:'Relay',accessLevel:'ELITE'})).toBe(28800); });
   it("2400 hard mode is always available", () => expect(allowedSpeeds(profile(0))).toContain(2400));
 });
 

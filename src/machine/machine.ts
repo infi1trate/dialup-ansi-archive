@@ -19,7 +19,7 @@ import type { Speed } from "@/modem/modem";
 
 export type MachineState = "off" | "boot" | "dos" | "comm" | "dialing" | "handshake" | "session" | "hangup";
 
-const CALL_MINUTES = 60;
+const CALL_MINUTES = 30;
 
 /** ?debug=busy forces a busy signal on the first dial; ?debug=time=1 makes a call last 1 minute. Combine with commas. */
 export function parseDebug(search: string): { busy: boolean; minutes: number | null; offline: boolean } {
@@ -81,7 +81,8 @@ export class Machine {
   private creaked = false;
   /** Keys the current screen accepts (out of band, for the touch context bar). */
   hints = new Signal<KeyHint[]>([]);
-  private get callMinutes() { return this.debug.minutes ?? CALL_MINUTES; }
+  private sessionSeconds=CALL_MINUTES*60;
+  private get callMinutes() { return this.debug.minutes ?? this.sessionSeconds/60; }
 
   constructor(public engine: Engine) {}
 
@@ -582,14 +583,14 @@ export class Machine {
     x.at(18, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to menu");
     x.at(20, 6).c(7, 1).t("Inside a call: ").c(15, 1).t("ENTER").c(7, 1).t(" finish transfer  ").c(15, 1).t("SPACE").c(7, 1).t(" pause  ").c(15, 1).t("I").c(7, 1).t(" info  ").c(15, 1).t("ESC").c(7, 1).t(" back");
     const fs = this.profile.filesSeen.length;
-    const nxt = fs < 5 ? `${5 - fs} more files to unlock 14400` : fs < 15 ? `${15 - fs} more files to unlock 28800` : "all speeds unlocked";
-    x.at(23, 1).c(0, 3).t(pad(` ${fs} files seen · ${nxt}`, 79));
+    const nxt = `${this.profile.handle?this.profile.accessLevel??'NEW USER':'GUEST / NEW USER'} / cap ${maxSpeed(this.profile)} / earn access in Your record`;
+    x.at(23,1).c(0,3).t(pad(` ${nxt}`,79));
     x.at(24, 1).c(15, 1);
     return x;
   }
 
   private filesSeenCount() { return Math.max(this.profile.filesSeen.length, this.profile.serverFiles ?? 0); }
-  private book() { return phoneBook(this.filesSeenCount()); }
+  private book() { return phoneBook(this.profile.accessLevel==='ELITE'?Math.max(10,this.filesSeenCount()):this.filesSeenCount()); }
 
   private async comm(g: number) {
     let sel = 0;
@@ -640,7 +641,7 @@ export class Machine {
       box(x, 4, 18, 44, 12, 11, "LINE SPEED", true, 1);
       speeds.forEach((s, i) => {
         const ok = allowed.includes(s);
-        const label = pad(`${s} bps`, 12) + (s === 2400 ? "hard mode" : !ok ? (s === 14400 ? "locked: view 5 files" : "locked: view 15 files") : s === this.profile.speed ? "current" : "");
+        const label = pad(`${s} bps`, 12) + (s === 2400 ? "hard mode" : !ok ? (s === 14400 ? "requires VALIDATED" : "requires ELITE") : s === this.profile.speed ? "current" : "");
         x.at(6 + i * 2, 21);
         if (i === sel) x.c(1, 7).t(pad(" " + label, 38)); else x.c(ok ? 15 : 8, 1).t(pad(" " + label, 38));
       });
@@ -716,6 +717,7 @@ export class Machine {
   private async session(entry: DirEntry, speed: number, g: number) {
     this.state.set("session");
     const started = Date.now();
+    this.sessionSeconds=CALL_MINUTES*60;
     this.lastInput = started; this.inactivityWarned = false;
     const node = 1;
     const term = this.engine.term;
@@ -734,6 +736,7 @@ export class Machine {
       isPaused: () => modem.paused,
       clearOutput: () => modem.clear(),
       client: {
+        access: (v) => {modem.bps=v.speed;this.sessionSeconds=Math.max(0,v.remainingSeconds);},
         setMode: (m) => { term.setMode(m); term.reset(); },
         scroll: (d) => term.scrollView(d),
         scrollTo: (w) => term.scrollViewTo(w === "top" ? term.scrollbackLines : 0),

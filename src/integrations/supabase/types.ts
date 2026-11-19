@@ -92,6 +92,60 @@ export type Database = {
         }
         Relationships: []
       }
+      call_sessions: {
+        Row: {
+          board: string
+          caller_id: string
+          charged_at: string
+          closed: boolean
+          day: string
+          id: string
+          started_at: string
+          used_seconds: number
+        }
+        Insert: {
+          board?: string
+          caller_id: string
+          charged_at?: string
+          closed?: boolean
+          day?: string
+          id?: string
+          started_at?: string
+          used_seconds?: number
+        }
+        Update: {
+          board?: string
+          caller_id?: string
+          charged_at?: string
+          closed?: boolean
+          day?: string
+          id?: string
+          started_at?: string
+          used_seconds?: number
+        }
+        Relationships: []
+      }
+      caller_access: {
+        Row: {
+          announced_level: string
+          caller_id: string
+          level: string
+          previous_call_at: string | null
+        }
+        Insert: {
+          announced_level?: string
+          caller_id: string
+          level?: string
+          previous_call_at?: string | null
+        }
+        Update: {
+          announced_level?: string
+          caller_id?: string
+          level?: string
+          previous_call_at?: string | null
+        }
+        Relationships: []
+      }
       caller_shelf: {
         Row: {
           caller_id: string
@@ -287,6 +341,30 @@ export type Database = {
         }
         Relationships: []
       }
+      message_reports: {
+        Row: {
+          caller_id: string | null
+          created_at: string
+          id: number
+          kind: string
+          message_id: number
+        }
+        Insert: {
+          caller_id?: string | null
+          created_at?: string
+          id?: never
+          kind: string
+          message_id: number
+        }
+        Update: {
+          caller_id?: string | null
+          created_at?: string
+          id?: never
+          kind?: string
+          message_id?: number
+        }
+        Relationships: []
+      }
       oneliners: {
         Row: {
           body: string
@@ -428,6 +506,33 @@ export type Database = {
         }
         Relationships: []
       }
+      wall_posts: {
+        Row: {
+          body: string
+          caller_id: string
+          created_at: string
+          handle: string
+          hidden: boolean
+          id: number
+        }
+        Insert: {
+          body: string
+          caller_id: string
+          created_at?: string
+          handle: string
+          hidden?: boolean
+          id?: never
+        }
+        Update: {
+          body?: string
+          caller_id?: string
+          created_at?: string
+          handle?: string
+          hidden?: boolean
+          id?: never
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -438,6 +543,11 @@ export type Database = {
         Returns: number
       }
       bump_counter: { Args: { _step: string }; Returns: undefined }
+      caller_record: { Args: { _caller: string }; Returns: Json }
+      charge_call: {
+        Args: { _caller: string; _close?: boolean; _session: string }
+        Returns: number
+      }
       top_files: {
         Args: { _limit: number }
         Returns: {

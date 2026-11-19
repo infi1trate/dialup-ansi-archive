@@ -1,5 +1,8 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import { requestClock } from "./clock";
+import { accessAction, logonAccess, record, publicLevels } from "./access";
+import { ACCESS, accessLevel } from "@/lib/access";
 import { sprintC } from "./sprint-c";
 import { CREDIT_AWARDS } from "@/bbs/warez-catalog";
 import { allow, type HitStore } from "@/lib/ratelimit";
@@ -95,7 +98,12 @@ export async function hiddenFiles(pack: string): Promise<Set<string>> {
 export async function handle(b: Json, req: Request): Promise<Json> {
   const s = await db();
   const ip = await ipHash(req);
+  const now=requestClock(req);
   const action = str(b.action, 20);
+  if (["record","wall","wallPost","innerCircle","messageReport"].includes(action)) {
+    const th=await tokenHash(b.token);await limit([th,ip],"accessRead",180,600);
+    return accessAction(b,s,b.guest?null:await callerByToken(th),th,ip);
+  }
   if (["index","search","newScan","cornerTop","balance","warezBuy","favorite","shelf","rating","trainer","cornerStart","cornerFinish"].includes(action)) {
     const th=await tokenHash(b.token);await limit([th,ip], action === "index" ? "index" : "sprintC",action === "index" ? 120 : 180,600);return sprintC(b,s,await callerByToken(th),th);
   }
@@ -103,7 +111,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
     case "hello": {
       const th = await tokenHash(b.token);
       await limit([th, ip], "hello", 30, 600);
-      return { caller: pub(await callerByToken(th)) };
+      const c=await callerByToken(th);const r=await record(s,c);return { caller: c?{...pub(c),level:r.level,speed:ACCESS[accessLevel(r.level)].speed}:null };
     }
     case "check": {
       await limit([ip], "check", 40, 600);
@@ -148,7 +156,8 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       await limit([th, ip], "logon", 20, 600);
       const c = b.guest ? null : await callerByToken(th);
       if (c?.banned) return { banned: true };
-      const speed = [2400, 9600, 14400, 28800].includes(b.speed) ? b.speed : 9600;
+      const requested = [2400, 9600, 14400, 28800].includes(b.speed) ? b.speed : 9600;
+      const access=await logonAccess(s,c,str(b.board,20),requested,now);const speed=access.speed;
       let prevDay: string | null = null;
       if (c) prevDay = c.last_call_at ? String(c.last_call_at).slice(0, 10) : null;
       else {
@@ -156,21 +165,21 @@ export async function handle(b: Json, req: Request): Promise<Json> {
         prevDay = data ? String(data.created_at).slice(0, 10) : null;
       }
       const calledBack = !!prevDay && prevDay < today();
-      await s.from("call_log").insert({ caller_id: c?.id ?? null, token_hash: th, handle: c?.handle ?? null, city: c?.city ?? "", speed });
-      if (c) await s.from("callers").update({ calls: c.calls + 1, last_call_at: new Date().toISOString() }).eq("id", c.id);
+      if(c)await s.from("call_log").insert({ caller_id: c?.id ?? null, token_hash: th, handle: c?.handle ?? null, city: c?.city ?? "", speed,created_at:now.toISOString() });
+      if (c) await s.from("callers").update({ calls: c.calls + 1, last_call_at: now.toISOString() }).eq("id", c.id);
       await bump("logged_in");
       if (calledBack) await bump("called_back");
-      return { caller: c ? pub({ ...c, calls: c.calls + 1 }) : null, calledBack };
+      return { caller: c ? {...pub({ ...c, calls: c.calls + 1 }),level:access.level,speed:access.speed} : null, calledBack,...access };
     }
     case "callers": {
       await limit([ip], "read", 120, 600);
-      const { data } = await s.from("call_log").select("handle, city, speed, created_at").not("handle", "is", null).order("created_at", { ascending: false }).limit(10);
-      return { callers: data ?? [] };
+      const { data } = await s.from("call_log").select("caller_id, handle, city, speed, created_at").not("handle", "is", null).order("created_at", { ascending: false }).limit(10);
+      return { callers: await publicLevels(s,data??[]) };
     }
     case "oneliners": {
       await limit([ip], "read", 120, 600);
-      const { data } = await s.from("oneliners").select("handle, body, created_at").eq("hidden", false).order("created_at", { ascending: false }).limit(15);
-      return { oneliners: (data ?? []).reverse() };
+      const { data } = await s.from("oneliners").select("id, caller_id, handle, body, created_at").eq("hidden", false).order("created_at", { ascending: false }).limit(15);
+      return { oneliners: await publicLevels(s,(data??[]).reverse()) };
     }
     case "post": {
       const th = await tokenHash(b.token);
@@ -197,15 +206,19 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       if (existing && existing.token_hash !== th) throw new NetError(403, "not yours");
       await s.from("presence").upsert({
         session_id: sid, token_hash: th, handle: c?.handle ?? null, city: c?.city ?? "",
-        speed: [2400, 9600, 14400, 28800].includes(b.speed) ? b.speed : 9600,
+        speed: Math.min([2400,9600,14400,28800].includes(b.speed)?b.speed:9600,ACCESS[accessLevel((await record(s,c)).level)].speed),
         doing: str(b.doing, 40).replace(/[^\x20-\x7e]/g, "") || "idle", updated_at: new Date().toISOString(),
       });
       if (Math.random() < 0.05) await s.from("presence").delete().lt("updated_at", new Date(Date.now() - 3600_000).toISOString());
+      if(c&&typeof b.callSession==='string')await s.rpc('charge_call',{_session:b.callSession,_caller:c.id});
       const list = await onlineList();
-      return { online: list.map((r) => ({ handle: r.handle, city: r.city, speed: r.speed, doing: r.doing, me: r.session_id === sid })) };
+      const {data:levels}=await s.from('callers').select('handle,id');
+      const leveled=await publicLevels(s,list.map(r=>({...r,caller_id:levels?.find(v=>v.handle===r.handle)?.id})));
+      return { online: leveled.map((r:any) => ({ level:r.level, handle: r.handle, city: r.city, speed: r.speed, doing: r.doing, me: r.session_id === sid })) };
     }
     case "leave": {
       const th = await tokenHash(b.token);
+      const c=await callerByToken(th);if(c&&typeof b.callSession==='string')await s.rpc('charge_call',{_session:b.callSession,_caller:c.id,_close:true});
       await s.from("presence").delete().eq("session_id", str(b.session, 40)).eq("token_hash", th);
       return { ok: true };
     }
@@ -214,15 +227,16 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       await limit([th], "view", 120, 600);
       const pack = str(b.pack, 80).toLowerCase(), file = str(b.file, 120);
       if (!/^[a-z0-9._\-]+$/.test(pack) || !file) throw new NetError(400, "bad file");
-      const c = await callerByToken(th);
-      const viewer = c ? "c:" + c.id : "t:" + th;
+      const c = b.guest?null:await callerByToken(th);
+      if(!c)return {files:null,speed:9600};
+      const viewer = "c:" + c.id;
       await s.from("views").upsert({ viewer, pack, file }, { onConflict: "viewer,pack,file", ignoreDuplicates: true });
       if (!c) return { files: null };
       const { count } = await s.from("views").select("pack", { count: "exact", head: true }).eq("viewer", viewer);
       const files = count ?? 0;
-      await s.from("callers").update({ files_viewed: files, speed_unlocked: speedFor(files) }).eq("id", c.id);
+      await s.from("callers").update({ files_viewed: files, speed_unlocked: ACCESS[accessLevel((await record(s,c)).level)].speed }).eq("id", c.id);
       await s.rpc("board_credit",{_caller:c.id,_event:"art:"+pack+"/"+file,_amount:CREDIT_AWARDS.art});
-      return { files, speed: speedFor(files) };
+      const r=await record(s,c);return {files,speed:ACCESS[accessLevel(r.level)].speed,level:r.level};
     }
     case "top": {
       await limit([ip], "read", 120, 600);
@@ -296,6 +310,9 @@ async function sysop(b: Json, ip: string): Promise<Json> {
       const { data } = await s.from("oneliners").select("id, handle, body, hidden").order("created_at", { ascending: false }).limit(15);
       return { rows: data ?? [] };
     }
+    case "wall": {const {data}=await s.from('wall_posts').select('id,handle,body,hidden').order('created_at',{ascending:false}).limit(30);return {rows:data??[]};}
+    case "messageReports": {const {data}=await s.from('message_reports').select('kind,message_id,created_at').order('created_at',{ascending:false}).limit(30);return {rows:data??[]};}
+    case "hideWall": {const {data}=await s.from('wall_posts').update({hidden:true}).eq('id',Number(arg)||0).select('id');return {ok:!!data?.length};}
     case "hideOneliner": {
       const { data } = await s.from("oneliners").update({ hidden: true }).eq("id", Number(arg) || 0).select("id");
       return { ok: !!data?.length };
