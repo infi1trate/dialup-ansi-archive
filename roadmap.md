@@ -2,7 +2,7 @@
 - [x] 1. Readable STROBE logo; tests; d06b uploaded; commit
 - [x] 2. Guest and handle favorites add/list/open/remove; tests; d13 uploaded; commit
 - [x] 3. Modem-speed contact-sheet quick scan; tests; d14 uploaded; commit
-- [ ] 4. Four NFO house styles across 24 releases; tests; d15-d18 uploaded; commit
+- [x] 4. Four NFO house styles across 24 releases; tests; d15-d18 uploaded; commit
 - [ ] 5. EMBER/CHROMA logos, effects, scrollers and music; tests; d19-d21 uploaded; commit
 
 # Sprint C part 3
