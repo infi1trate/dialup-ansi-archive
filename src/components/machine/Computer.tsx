@@ -11,6 +11,9 @@ import { EscapeHatch } from "@/components/room/EscapeHatch";
 import { DEFAULTS, brightnessGain, contrastGain, loadRoom, saveRoom, type RoomSettings } from "@/components/room/settings";
 import { audio } from "@/audio/bus";
 import type { Machine } from "@/machine/machine";
+import type { TapeResult } from "@/machine/tape-recorder";
+import type { TapeDeck } from "@/lib/tape";
+import { tapeArmRequest, tapeState } from "@/machine/signals";
 import type { DeepLink } from "@/bbs/io";
 // literal, not imported: the house pack (and the terminal it pulls in) must stay out of the first frame
 const HOUSE_PACK = "crawl-01";
@@ -28,6 +31,11 @@ export function Computer({ deepLink, lost, postcard }: Props) {
   const [cardWaiting, setCardWaiting] = useState(!!pendingCard);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [reported, setReported] = useState(false);
+  const [tape, setTape] = useState<"idle" | "armed" | "rec">("idle");
+  const [tapeOk, setTapeOk] = useState(false);
+  const [tapeNote, setTapeNote] = useState<string | null>(null);
+  const [tapeFile, setTapeFile] = useState<TapeResult | null>(null);
+  const deck = useRef<TapeDeck | null>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const machine = useRef<Machine | null>(null);
   const navigate = useNavigate();
@@ -78,16 +86,33 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       engine.crt.contrast = contrastGain(c.contrast);
       if (c.turbo) m.toggleTurbo(); // the turbo button stays where you left it
       const unsubs = [m.powered.subscribe(setPowered), m.tube.subscribe(setTube), m.turbo.subscribe((t) => { setTurbo(t); if (t !== cfgRef.current.turbo) update({ turbo: t }); }), m.hints.subscribe(setHints), m.shareUrl.subscribe(setShareUrl), m.exitHome.subscribe((v) => { if (v) void navigate({ to: "/" }); })];
+      const { createTape, tapeSupported, saveTape } = await import("@/machine/tape-recorder");
+      if (disposed) return;
+      const touchy = window.matchMedia("(pointer: coarse)").matches;
+      if (tapeSupported()) {
+        const t = createTape(engine, () => document.querySelector<HTMLElement>(".photo-room"), {
+          onNote: setTapeNote,
+          onResult: (r) => {
+            setTapeFile(r);
+            if (import.meta.env.DEV) (window as unknown as { __tape?: unknown }).__tape = { size: r.size, duration: r.duration, mime: r.mime, hasAudio: r.hasAudio, name: r.name, blob: r.blob }; // test hook, dev only
+            if (!touchy) void saveTape(r, false);
+            void import("@/data/net").then((n) => n.count("tape_recorded"));
+          },
+        });
+        deck.current = t.deck; setTapeOk(true);
+        unsubs.push(t.destroy, tapeState.subscribe(setTape), tapeArmRequest.subscribe(() => { if (t.deck.state === "armed") t.deck.disarm(); else t.deck.arm(); }));
+      }
       const orient = () => m.setPortrait(window.innerHeight > window.innerWidth);
       orient();
       window.addEventListener("resize", orient);
       unsubs.push(() => window.removeEventListener("resize", orient));
       const down = (e: KeyboardEvent) => {
         if (e.key === "`" && !e.ctrlKey && !e.altKey) { e.preventDefault(); toggleLean(); return; }
+        if (e.key === "F9") { e.preventDefault(); if (!e.repeat) deck.current?.record(); return; } // hold F9 to record
         if ((e.target as HTMLElement)?.closest?.(".hatch")) return;
         m.handleKeyDown(e);
       };
-      const up = (e: KeyboardEvent) => m.handleKeyUp(e);
+      const up = (e: KeyboardEvent) => { if (e.key === "F9") { e.preventDefault(); deck.current?.finish(); return; } m.handleKeyUp(e); };
       window.addEventListener("keydown", down);
       window.addEventListener("keyup", up);
       if (postcard && "missing" in postcard) { m.lostAt = "POSTCARD"; m.lostNote = postcard.missing === "withdrawn" ? "This card was withdrawn." : "That postcard has expired, or was never sent."; m.powerOn(); }
@@ -138,6 +163,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
   }, [cardWaiting, pickUp]);
   const reportCard = async () => { if (!pendingCard || reported) return; const { net } = await import("@/data/net"); await net("postcardReport", { id: pendingCard.card.id }); setReported(true); };
 
+  const saveTapeFile = async (r: TapeResult) => { const { saveTape } = await import("@/machine/tape-recorder"); await saveTape(r, window.matchMedia("(pointer: coarse)").matches); };
   const toggleLamp = () => { audio.unlock(); audio.emit("lampToggle", !cfg.lamp); update({ lamp: !cfg.lamp }); };
 
   const monitor = (
@@ -159,6 +185,11 @@ export function Computer({ deepLink, lost, postcard }: Props) {
   const hatch = (
       <EscapeHatch
       share={shareUrl}
+      tape={tapeOk ? <div className="hatch-share hatch-tape" role="group" aria-label="Ten-second tape">
+        <Button variant="ghost" type="button" aria-pressed={tape === "rec"} onClick={(e) => { audio.unlock(); deck.current?.toggle(); e.currentTarget.blur(); }}>{tape === "rec" ? "■ Stop" : tape === "armed" ? "REC armed" : "● REC"}</Button>
+        {tapeFile && tape !== "rec" && <Button variant="ghost" type="button" onClick={(e) => { void saveTapeFile(tapeFile); e.currentTarget.blur(); }}>Save tape</Button>}
+        {tapeNote && <span className="hatch-note">{tapeNote}</span>}
+      </div> : null}
       physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
@@ -180,6 +211,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       turbo={turbo}
       lamp={cfg.lamp}
       leaned={leaned}
+      recording={tape === "rec"}
       reduced={reduced}
       modemVolume={cfg.modemVolume}
       musicVolume={cfg.musicVolume}

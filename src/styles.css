@@ -129,6 +129,7 @@
   --plastic-deep: oklch(0.58 0.04 80);
   --bezel: oklch(0.2 0.01 80);
   --led-on: oklch(0.82 0.2 140);
+  --led-rec: oklch(0.66 0.25 28);
   --led-off: oklch(0.32 0.04 140);
   --glass: oklch(0.13 0.008 160);
   --shadow-case: 0 2.5rem 6rem oklch(0 0 0 / 0.75), inset 0 0.25rem 0 oklch(1 0 0 / 0.35), inset 0 -0.6rem 1.2rem oklch(0.4 0.04 80 / 0.35);
@@ -349,6 +350,8 @@
 .plate-rain .rain { width:100%;height:100%; }
 .plate-led { position:absolute; width:5px;height:4px; border-radius:50%;opacity:0;pointer-events:none; }
 .plate-led.is-on { opacity:1; }
+.tape-led { position:absolute;width:5px;height:4px;border-radius:50%;pointer-events:none;background:var(--led-rec);opacity:0;transition:opacity .08s; }
+.tape-led.is-on { opacity:1;box-shadow:0 0 4px var(--led-rec),0 0 9px var(--led-rec); }
 .pc-power,.monitor-light { background:var(--led-on);box-shadow:0 0 3px var(--led-on); }
 .drive-light { background:var(--drive-amber);box-shadow:0 0 3px var(--drive-amber); }
 .modem-light { background:var(--modem-red);box-shadow:0 0 3px var(--modem-red); }
@@ -405,3 +408,4 @@
 @keyframes postcard-sway { 50% { transform:rotate(-1deg) translateY(-2px); } }
 .hatch-share { display:flex; gap:.25rem; padding:.3rem; background:oklch(0.12 0.005 80 / 0.92); border:1px solid oklch(0.3 0.01 80 / 0.6); border-radius:.4rem; }
 .hatch-share button { color:oklch(0.85 0.02 80); }
+.hatch-tape .hatch-note { display:block; max-width:16rem; font-size:.7rem; opacity:.75; padding:.2rem .5rem; }

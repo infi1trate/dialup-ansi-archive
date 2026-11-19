@@ -9,3 +9,8 @@ export class Signal<T> {
 /** Average RGB of the terminal framebuffer, updated ~10x/second (for room lighting later). */
 export const screenAverageColor = new Signal<[number, number, number]>([0, 0, 0]);
 export const screenPictureBrightness = new Signal(0);
+
+/** Ten-second tape: deck state for the REC LED and TELEWIRE, and the board being called (file name). */
+export const tapeState = new Signal<"idle" | "armed" | "rec">("idle");
+export const tapeArmRequest = new Signal(0);
+export const currentBoardName = new Signal<string | null>(null);

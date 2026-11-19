@@ -12,7 +12,7 @@ import { audio } from "@/audio/bus";
 import { Engine } from "./engine";
 import { Aborted, KeyQueue, toKey, type Key } from "./keyboard";
 import { allowedSpeeds, loadProfile, maxSpeed, saveProfile, type Profile } from "./storage";
-import { Signal } from "./signals";
+import { Signal, currentBoardName, tapeArmRequest, tapeState } from "./signals";
 import { handshakeMs, DTMF_OFF_MS, DTMF_ON_MS } from "@/audio/tables";
 import { Terminal } from "@/term/terminal";
 import type { Speed } from "@/modem/modem";
@@ -670,6 +670,7 @@ export class Machine {
     x.at(15,6).c(14,1).t(pad(this.book()[sel]?.blurb ?? "",68));
     box(x, 17, 3, 75, 5, 3, "KEYS", true, 1);
     x.at(18, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to menu");
+    if (typeof MediaRecorder !== "undefined") { const st = tapeState.value; x.at(19, 6).c(15, 1).t("R").c(7, 1).t(" record the next dial (10 s tape)  ").c(st === "armed" ? 12 : 8, 1).t(st === "armed" ? "TAPE ARMED - dial to roll" : st === "rec" ? "TAPE ROLLING             " : "                         "); }
     x.at(20, 6).c(7, 1).t("Inside a call: ").c(15, 1).t("ENTER").c(7, 1).t(" finish transfer  ").c(15, 1).t("SPACE").c(7, 1).t(" pause  ").c(15, 1).t("I").c(7, 1).t(" info  ").c(15, 1).t("ESC").c(7, 1).t(" back");
     const fs = this.profile.filesSeen.length;
     const nxt = `${this.profile.handle?this.profile.accessLevel??'NEW USER':'GUEST / NEW USER'} / cap ${maxSpeed(this.profile)} / earn access in Your record`;
@@ -690,7 +691,7 @@ export class Machine {
       this.engine.term.cursorVisible = false;
       const book = this.book();
       sel = Math.min(sel, book.length - 1);
-      this.hints.set([...NAV, hk("S", "S setup"), hk("M", "M dial #")]);
+      this.hints.set([...NAV, hk("S", "S setup"), hk("M", "M dial #"), ...(typeof MediaRecorder !== "undefined" ? [hk("R", "R tape dial")] : [])]);
       this.out(this.dirScreen(sel));
       const k = await this.idleKey(g);
       if (!k) continue;
@@ -704,6 +705,7 @@ export class Machine {
       }
       else if (k.key === "Enter" || c === "D") { this.engine.term.cursorVisible = true; await this.call(book[sel], g, false); }
       else if (c === "S") await this.setup(g);
+      else if (c === "R" && typeof MediaRecorder !== "undefined") tapeArmRequest.set(tapeArmRequest.value + 1);
       else if (c === "M") {
         this.hints.set([{ label: "type", key: "", text: true }, { label: "ENTER", key: "Enter" }, { label: "ESC", key: "Escape" }]);
         this.out(a().at(21, 6).c(14, 1).t("Manual dial · number: ").c(15, 1).raw("\x1b[K"));
@@ -750,6 +752,7 @@ export class Machine {
   private async call(entry: DirEntry, g: number, express: boolean, opts?: { speed?: number; onConnect?: () => Promise<void> }) {
     const speed = opts?.speed ?? (allowedSpeeds(this.profile).includes(this.profile.speed) ? this.profile.speed : 9600);
     this.state.set("dialing");
+    currentBoardName.set(entry.name);
     count("dialed");
     this.skipping = false;
     const t = express ? 0.25 : 1;
@@ -870,6 +873,7 @@ export class Machine {
     this.hints.set([]);
     this.out(a().reset().nl(2).k(7, "NO CARRIER").nl());
     audio.emit("hangup");
+    currentBoardName.set(null);
     const d = new Date();
     this.profile.lastCall[entry.number] = `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}-93 ${d.toTimeString().slice(0, 5)}`;
     this.profile.calls++;

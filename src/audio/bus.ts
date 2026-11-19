@@ -2,6 +2,8 @@
 // (src/audio/engine.ts) subscribes. The bus itself stays tiny so it can ship in the first frame.
 export interface AudioEvents {
   printer: boolean;
+  /** The PC's tape-drive motor while the ten-second tape records. */
+  tapeMotor: boolean;
   introMusic: boolean;
   programTone: {frequency:number;duration:number;speaker:"modem"|"music"};
   powerOn: void; powerOff: void; keyDown: string; keyUp: string; beep: void;
@@ -24,6 +26,14 @@ class AudioBus {
   mix: Mix = { muted: false, modemVolume: 0.6, musicVolume: 0.6 };
   musicOn = false;
   musicNode: AudioNode | null = null;
+  /** The synth's final output (after the limiter), published by the engine for the tape. */
+  tapNode: AudioNode | null = null;
+  /** A stream of the product's own output for MediaRecorder; never the microphone. Null if the synth is not running. */
+  tapStream(): { stream: MediaStream; close: () => void } | null {
+    if (!this.ctx || !this.tapNode || typeof this.ctx.createMediaStreamDestination !== "function") return null;
+    const dest = this.ctx.createMediaStreamDestination(); this.tapNode.connect(dest);
+    return { stream: dest.stream, close: () => { try { this.tapNode?.disconnect(dest); } catch { /* already gone */ } } };
+  }
 
   on<K extends keyof AudioEvents>(name: K, fn: Handler<AudioEvents[K]>) {
     (this.handlers[name] ??= []).push(fn);

@@ -21,9 +21,13 @@ export class Engine {
   fps = 60;
   /** Called every frame (for lab stats etc.). */
   onFrame: ((dt: number) => void) | null = null;
+  /** Runs right after the CRT draws, while its WebGL buffer is still readable (the tape). */
+  afterRender: ((crt: HTMLCanvasElement) => void) | null = null;
+  readonly screen: HTMLCanvasElement;
 
   constructor(canvas: HTMLCanvasElement) {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    this.screen = canvas;
     this.crt = new CRTDisplay(canvas, reduce);
     this.modem = new Modem((b) => this.term.feed(b));
     this.term.onBell = () => audio.emit("beep");
@@ -64,6 +68,7 @@ export class Engine {
     const cursorOn = blinkPhase(t, CURSOR_BLINK_HZ, this.crt.reducedMotion);
     const changed = this.renderer.render(this.term, blinkOn, cursorOn);
     this.crt.render(this.renderer.canvas, changed, this.power, t);
+    this.afterRender?.(this.screen);
     this.avgT += dt;
     if (changed || this.avgT > 0.1) {
       this.avgT = 0;

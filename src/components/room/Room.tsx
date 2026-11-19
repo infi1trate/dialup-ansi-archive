@@ -9,7 +9,7 @@ import { Clock } from './Clock';
 export interface RoomProps {
  monitor: ReactNode; controls?: ReactNode; powered: boolean; turbo: boolean; lamp: boolean; leaned: boolean; reduced: boolean;
  modemVolume: number; musicVolume: number; onMusicVolume:(v:number)=>void; getState:()=>string;
- onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode;
+ onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode; recording?:boolean;
 }
 export const NOTE = ['PWR ON.','ENTER = dial.','login: GUEST','ENTER skips anything.','I = who made it.','Then kill the lamp.'];
 export function Room(p: RoomProps) {
@@ -52,6 +52,7 @@ export function Room(p: RoomProps) {
  <div className="plate-rain" style={fractionStyle(HOTSPOTS.window)}><Rain still={p.reduced}/></div>
  <Clock reduced={p.reduced}/>
  <span className={`plate-led pc-power ${p.powered?'is-on':'is-standby'}`} style={{left:'68.1%',top:'77.6%'}}/>
+ <span className={`tape-led ${p.recording?'is-on':''}`} aria-hidden style={{left:'70.5%',top:'77.6%'}}/>
  <span className="plate-led drive-light" data-led="hdd" style={{left:'69.3%',top:'77.6%'}}/>
  <span className="plate-led monitor-light" data-led="monitor" style={{left:'61.5%',top:'61.3%'}}/>
  {['MR','OH','CD','RD','SD','HS','TR','AA'].map((led,i)=><span key={led} data-led={led} className="plate-led modem-light" style={{left:`${87.3+i*1.43}%`,top:'81.5%'}}/>)}

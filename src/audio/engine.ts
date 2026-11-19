@@ -37,6 +37,7 @@ class Synth {
     const limiter = c.createDynamicsCompressor();
     limiter.threshold.value = -8; limiter.knee.value = 2; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.12;
     limiter.connect(c.destination);
+    bus.tapNode = limiter;
     this.master = c.createGain();
     this.master.connect(limiter);
     const verb = c.createConvolver();
@@ -85,6 +86,17 @@ class Synth {
     bus.on("keyDown", (k) => this.keyDown(k));
     bus.on("keyUp", (k) => this.keyUp(k));
     bus.on("beep", () => this.beep());
+    let motor: { src: AudioBufferSourceNode; osc: OscillatorNode; gain: GainNode } | null = null;
+    bus.on("tapeMotor", (on) => {
+      if (motor) { const m = motor; motor = null; m.gain.gain.setTargetAtTime(0, this.now, 0.05); setTimeout(() => { try { m.src.stop(); m.osc.stop(); } catch { /* stopped */ } }, 300); }
+      if (!on) return;
+      const src = c.createBufferSource(); src.buffer = this.brown; src.loop = true;
+      const lp = c.createBiquadFilter(); lp.type = "bandpass"; lp.frequency.value = 180; lp.Q.value = 1.4;
+      const osc = c.createOscillator(); osc.frequency.value = 52; const og = c.createGain(); og.gain.value = 0.25;
+      const gain = c.createGain(); gain.gain.value = 0; gain.gain.setTargetAtTime(0.05, this.now, 0.08);
+      src.connect(lp).connect(gain); osc.connect(og).connect(gain); gain.connect(this.buses.pc);
+      src.start(); osc.start(); motor = { src, osc, gain };
+    });
     bus.on("printer",(on)=>{clearInterval(this.printerTimer);if(on){let n=0;this.printerTimer=setInterval(()=>{this.tones([900+(n%7)*130],this.now,.035,.04,this.buses.pc);if(++n>=60)clearInterval(this.printerTimer);},35);}});
     bus.on("diskSeek", () => this.diskSeek());
     bus.on("floppySeek", () => this.floppySeek());
