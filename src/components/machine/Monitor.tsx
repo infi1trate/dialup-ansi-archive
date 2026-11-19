@@ -28,6 +28,9 @@ export const Monitor = forwardRef<HTMLCanvasElement, MonitorProps>(function Moni
   const b = p.brightness ?? localB, c = p.contrast ?? localC;
   const setB = (v: number) => { setLocalB(v); p.onBrightnessKnob?.(v); p.onBrightness?.(0.6 + v * 0.65); };
   const setC = (v: number) => { setLocalC(v); p.onContrastKnob?.(v); p.onContrast?.(0.7 + v * 0.55); };
+  if (p.glass) return <div className="photo-monitor">
+    <canvas ref={ref} className="monitor-screen" aria-label="CRT screen" />
+  </div>;
   return (
     <div className="monitor-case">
       <span className="monitor-screw monitor-screw-l" aria-hidden />

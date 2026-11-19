@@ -1,6 +1,9 @@
+import { Knob } from "@/components/room/Knob";
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Monitor } from "./Monitor";
+
 import { ContextBar } from "./ContextBar";
 import type { KeyHint } from "@/bbs/io";
 import { Room } from "@/components/room/Room";
@@ -47,7 +50,7 @@ export function Computer({ deepLink, lost }: Props) {
     const narrow = window.innerWidth < 900 || window.innerHeight > window.innerWidth;
     const touch = window.matchMedia("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 820;
     setLayout(touch || window.innerWidth < 640 ? "tube" : "room");
-    setLeaned(s.lean ?? narrow);
+    setLeaned(s.lean ?? false);
     audio.setMix({ muted: s.muted, modemVolume: s.modemVolume, musicVolume: s.musicVolume });
     void import("@/data/net").then((n) => n.count("landed"));
   }, []);
@@ -127,14 +130,6 @@ export function Computer({ deepLink, lost }: Props) {
       onBrightnessKnob={(v) => { update({ brightness: v }); if (machine.current) machine.current.engine.crt.brightness = brightnessGain(v); }}
       onContrastKnob={(v) => { update({ contrast: v }); if (machine.current) machine.current.engine.crt.contrast = contrastGain(v); }}
     >
-      <div className="sticky-note" aria-label="Sticky note">
-        <p>PWR ON.</p>
-        <p>ENTER = dial.</p>
-        <p>login: GUEST</p>
-        <p>ENTER skips anything.</p>
-        <p>I = who made it.</p>
-        <p>Then kill the lamp.</p>
-      </div>
     </Monitor>
   );
 
@@ -152,29 +147,10 @@ export function Computer({ deepLink, lost }: Props) {
 
   if (!layout) return <main className="room" aria-busy="true"><h1 className="sr-only">Dial-Up: a 486 in a dark basement</h1></main>;
 
-  if (layout === "tube") return (
-    <main className={`tube-only ${reduced ? "reduce" : ""}`}>
-      <h1 className="sr-only">Dial-Up: a 1992 PC calling DEAD CARRIER</h1>
-      <div className="tube-frame">
-        <canvas ref={canvas} className="monitor-screen" aria-label="CRT screen" onPointerDown={onTubePointerDown} onPointerUp={onTubePointerUp} />
-      </div>
-      <div className="phone-note" aria-label="Sticky note">
-        <p>PWR ON · ENTER = dial · login: GUEST</p>
-        <p>ENTER skips anything · I = who made it</p>
-      </div>
-      <ContextBar
-        hints={hints} powered={powered}
-        onPower={() => machine.current?.pressPcPower()}
-        onKey={(h) => machine.current?.pressHint(h)}
-        onText={(t) => machine.current?.typeText(t)}
-      />
-      {hatch}
-    </main>
-  );
-
   return (
     <Room
       monitor={monitor}
+      controls={<><div className="plate-controls" style={{left:"55.73%",top:"59.72%",width:"5.73%",height:"4.17%"}}><Knob label="Contrast knob" value={cfg.contrast} onChange={v=>{update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/><Knob label="Brightness knob" value={cfg.brightness} onChange={v=>{update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></div><Button variant="ghost" className="plate-monitor-power" data-touch aria-label={tube?"Monitor off":"Monitor on"} style={{left:"62.63%",top:"59.26%",width:"3.26%",height:"4.17%"}} onClick={()=>machine.current?.pressMonitorPower()}/></>}
       powered={powered}
       turbo={turbo}
       lamp={cfg.lamp}
@@ -190,6 +166,7 @@ export function Computer({ deepLink, lost }: Props) {
       onModemVolume={(v) => { update({ modemVolume: v }); audio.setMix({ modemVolume: v }); }}
       onLean={lean}
     >
+      {layout === "tube" && <ContextBar hints={hints} powered={powered} onPower={() => machine.current?.pressPcPower()} onKey={h => machine.current?.pressHint(h)} onText={t => machine.current?.typeText(t)} />}
       {hatch}
     </Room>
   );

@@ -1,72 +1,24 @@
-import { useEffect } from "react";
-import { audio } from "@/audio/bus";
-import { screenAverageColor } from "@/machine/signals";
-
-interface Opts { root: React.RefObject<HTMLElement | null>; getState: () => string; reduced: boolean }
-
-/**
- * Drives everything that changes in the room without React re-renders: screen-spill light
- * (CSS variables, display-frame-rate with 300 ms smoothing), modem/HDD LEDs, the occasional headlight sweep.
- */
-export function useRoomLive({ root, getState, reduced }: Opts) {
-  useEffect(() => {
-    const el = root.current; if (!el) return;
-    const led = (n: string) => el.querySelector<HTMLElement>(`[data-led="${n}"]`);
-    const leds = Object.fromEntries(["HS", "AA", "CD", "OH", "RD", "SD", "TR", "MR", "hdd", "spk"].map((n) => [n, led(n)])) as Record<string, HTMLElement | null>;
-    const set = (n: string, on: boolean) => { const l = leds[n]; if (l && l.classList.contains("is-on") !== on) l.classList.toggle("is-on", on); };
-    let oh = false, cd = false, hs = false, rdUntil = 0, sdUntil = 0, hddUntil = 0, pc = audio.status.pc;
-    const offs = [
-      audio.on("offHook", () => { oh = true; }),
-      audio.on("connect", (bps) => { cd = true; hs = bps >= 14400; }),
-      audio.on("hangup", () => { oh = false; cd = false; hs = false; }),
-      audio.on("powerOn", () => { pc = true; }),
-      audio.on("powerOff", () => { pc = false; oh = cd = hs = false; audio.musicOn = false; }),
-      audio.on("byteFlow", () => { rdUntil = performance.now() + 300; }),
-      audio.on("keyDown", () => { if (cd) sdUntil = performance.now() + 70; }),
-      audio.on("diskSeek", () => { if (pc) hddUntil = performance.now() + 160 + Math.random() * 360; }),
-      audio.on("floppySeek", () => { if (pc) hddUntil = performance.now() + 120; }),
-    ];
-    // smoothed screen light
-    const cur = [0, 0, 0];
-    let tgt: [number, number, number] = [0, 0, 0];
-    const unsub = screenAverageColor.subscribe((v) => { tgt = v; });
-    let raf = 0, lastLight = performance.now();
-    const tick = (now: number) => {
-      raf = requestAnimationFrame(tick);
-      const st = getState();
-      set("MR", pc); set("TR", pc && st !== "off" && st !== "boot" && st !== "dos");
-      set("OH", pc && oh); set("CD", pc && cd); set("HS", pc && hs); set("AA", false);
-      set("RD", pc && cd && now < rdUntil && Math.random() < 0.6);
-      set("SD", pc && now < sdUntil);
-      set("hdd", pc && now < hddUntil && Math.random() < 0.7);
-      set("spk", pc && audio.musicOn);
-      const alpha = lightAlpha(now - lastLight);
-      lastLight = now;
-      for (let i = 0; i < 3; i++) cur[i] += (tgt[i] - cur[i]) * alpha;
-      // light colour: hue of the screen, intensity grows with its brightness (soft knee)
-      const mx = Math.max(cur[0], cur[1], cur[2], 0.001);
-      const lum = (cur[0] * 0.3 + cur[1] * 0.55 + cur[2] * 0.15) / 255;
-      const k = Math.min(1, Math.pow(mx / 255, 0.5) * 2.2);
-      const s = el.style;
-      s.setProperty("--sr", String(Math.round((cur[0] / mx) * 255 * k)));
-      s.setProperty("--sg", String(Math.round((cur[1] / mx) * 255 * k)));
-      s.setProperty("--sb", String(Math.round((cur[2] / mx) * 255 * k)));
-      s.setProperty("--sk", k.toFixed(3));
-      s.setProperty("--refl", (0.55 * (1 - Math.min(1, lum * 4))).toFixed(3));
-    };
-    raf = requestAnimationFrame(tick);
-    // a car goes past now and then
-    let sweepT: ReturnType<typeof setTimeout>;
-    const sweep = () => {
-      sweepT = setTimeout(() => {
-        if (!reduced) { el.classList.remove("headlight"); void el.offsetWidth; el.classList.add("headlight"); }
-        sweep();
-      }, 18000 + Math.random() * 40000);
-    };
-    sweep();
-    return () => { cancelAnimationFrame(raf); unsub(); offs.forEach((f) => f()); clearTimeout(sweepT); };
-  }, [root, getState, reduced]);
+import { useEffect, useRef } from 'react';
+import { audio } from '@/audio/bus';
+import { screenAverageColor } from '@/machine/signals';
+import { lampEase, screenLightOpacity } from './plate-layout';
+interface Opts {root:React.RefObject<HTMLElement|null>;getState:()=>string;reduced:boolean;lamp?:boolean}
+export function useRoomLive({root,getState,reduced,lamp=true}:Opts){
+ const lampTarget=useRef(lamp);lampTarget.current=lamp;
+ useEffect(()=>{const el=root.current;if(!el)return;let raf=0,last=performance.now(),level=lampTarget.current?1:0,from=level,start=last,on=lampTarget.current;
+ let monitor=audio.status.tube,warmStart=monitor?last-1600:last;let tgt=[0,0,0],cur=[0,0,0],velocity=[0,0,0];
+ const unsub=screenAverageColor.subscribe(v=>{tgt=v;});
+ const off=[audio.on('monitorOn',()=>{monitor=true;warmStart=performance.now();}),audio.on('monitorOff',()=>{monitor=false;})];
+ const tick=(now:number)=>{raf=requestAnimationFrame(tick);const dt=Math.min(.04,(now-last)/1000);last=now;
+ if(on!==lampTarget.current){on=lampTarget.current;from=level;start=now;}level=lampEase(from,on,now-start);
+ const omega= reduced?4/1.5:4/.25;
+ for(let i=0;i<3;i++){const delta=cur[i]-tgt[i],c=velocity[i]+omega*delta,e=Math.exp(-omega*dt);const next=tgt[i]+(delta+c*dt)*e;velocity[i]=(velocity[i]-omega*c*dt)*e;cur[i]+=Math.max(-255*dt,Math.min(255*dt,next-cur[i]));}
+ const mx=Math.max(...cur,0),brightness=Math.min(1,mx/255),warm=Math.min(1,Math.max(0,(now-warmStart-250)/1350));
+ el.style.setProperty('--lamp-level',String(level));el.style.setProperty('--screen-opacity',String(screenLightOpacity(monitor,brightness,level,warm)));
+ el.style.setProperty('--screen-tint',`rgb(${cur.map(v=>mx>0?Math.round(v/mx*255):0).join(' ')})`);
+ el.style.setProperty('--reflection',String(Math.min(1,level)*(.35-.25*brightness)));
+ void getState;
+ };raf=requestAnimationFrame(tick);return()=>{cancelAnimationFrame(raf);unsub();off.forEach(f=>f());};},[root,getState,reduced]);
 }
-
-/** Frame-rate-independent room spill low-pass, milliseconds. */
-export function lightAlpha(dt: number) { return 1 - Math.exp(-Math.max(0, dt) / 300); }
+// Retained exported compatibility function for the previous regression suite.
+export function lightAlpha(dt:number){return 1-Math.exp(-Math.max(0,dt)/300);}

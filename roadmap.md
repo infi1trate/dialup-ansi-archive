@@ -1,3 +1,12 @@
+# Sprint B
+- [ ] 1/2/4/5: photographic stage, plate light, physical controls and registered lean transform
+- [ ] First six private evidence pictures uploaded and committed
+- [ ] Live LEDs, paper notes and window rain; clock match or documented fallback
+- [ ] Decode-safe loading and all nine viewport checks
+- [ ] Regression tests, Sprint A checks and DEAD CARRIER call
+- [ ] Twelve private evidence links and four-state comparison
+- [ ] Sprint B status blocks and final commit
+
 # Sprint C
 - [x] Five distinct public boards and two unlockable boards
 - [ ] Shared tags, quick scan, search, new scans and favorites — DEAD CARRIER tagging and search reached live screens, but the favorite assertion failed and the remaining board combinations were not completed.
