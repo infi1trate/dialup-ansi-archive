@@ -89,6 +89,8 @@ export function Computer({ deepLink, lost, postcard }: Props) {
     let disposed = false;
     let cleanup = () => {};
     void (async () => {
+      let film: typeof import("@/film/film") | null = null;
+      if (import.meta.env.DEV && /[?&]film\b/.test(location.search)) { film = await import("@/film/film"); if (!(await film.prepare())) return; } // test-only film mode, absent from production builds
       const [{ Engine }, { Machine }] = await Promise.all([import("@/machine/engine"), import("@/machine/machine")]);
       if (disposed || !canvas.current) return;
       const engine = new Engine(canvas.current);
@@ -116,6 +118,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
         deck.current = t.deck; setTapeOk(true);
         unsubs.push(t.destroy, tapeState.subscribe(setTape), tapeArmRequest.subscribe(() => { if (t.deck.state === "armed") t.deck.disarm(); else t.deck.arm(); }));
       }
+      if (import.meta.env.DEV && film) film.attach(m, engine, filmApi);
       const orient = () => m.setPortrait(window.innerHeight > window.innerWidth);
       orient();
       window.addEventListener("resize", orient);
@@ -284,6 +287,8 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       let s = ""; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s);
     };
   }, []);
+  const filmApi = useRef<{ lean: (v: boolean) => void; setLamp: (on: boolean) => void; takePhoto: () => Promise<void> }>({ lean: () => {}, setLamp: () => {}, takePhoto: async () => {} });
+  if (import.meta.env.DEV) filmApi.current = { lean, setLamp: (on) => { audio.unlock(); audio.emit("lampToggle", on); update({ lamp: on }); }, takePhoto }; // test-only film mode
   const dropPrint = useCallback(() => setPrintJob((old) => { if (old) URL.revokeObjectURL(old.url); return null; }), []);
   const toggleLamp = () => { audio.unlock(); audio.emit("lampToggle", !cfg.lamp); update({ lamp: !cfg.lamp }); };
 

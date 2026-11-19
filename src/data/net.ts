@@ -20,6 +20,8 @@ export interface NetResult { [k: string]: any; error?: string; status?: number }
 export async function net(action: string, body: Record<string, unknown> = {}, timeoutMs = 7000): Promise<NetResult | null> {
   // ?debug=offline simulates an unreachable message base
   if (typeof location !== "undefined" && /[?&]debug=[^&]*offline/.test(location.search)) return null;
+  // film mode (dev/test builds only): a fixed invented cast answers, so no real caller is ever filmed
+  if (import.meta.env.DEV && typeof location !== "undefined" && /[?&]film\b/.test(location.search)) { const f = (globalThis as { __filmNet?: (a: string, b: Record<string, unknown>) => NetResult | null | undefined }).__filmNet; const r = f ? f(action, body) : null; if (r !== undefined) return r; }
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {

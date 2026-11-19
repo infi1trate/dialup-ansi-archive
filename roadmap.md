@@ -1,3 +1,8 @@
+# Film pass
+- [x] 1. Test-only film mode: virtual clock, 1920x1080/30 fps compositor, offline audio, stubbed callers, window.__film helpers
+- [ ] 2. Seven clips recorded and checked (film-a to film-g)
+- [ ] 3. Clips and mid-clip frames uploaded privately, listed in docs/shots/film.txt; STATUS block
+
 # Sprint D
 - [x] 0. REC chip removed; recording lives in the escape hatch and F9; g00
 - [x] 1. Degauss badge: thunk, hum, wobble, 20 s recharge; g01
