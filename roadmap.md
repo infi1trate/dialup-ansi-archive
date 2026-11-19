@@ -6,7 +6,7 @@
 - [x] THE CORNER economy, daily scored run and shared scores
 - [ ] Regression tests, full calls, runnable releases and scored game verification
 - [x] Sprint C status blocks
-- [ ] Fifteen private review pictures: captured locally; upload/signing remains
+- [x] Fifteen private review pictures: recreated at 1600x900, uploaded privately, seven-day URLs verified HTTP 200/image/jpeg
 - [ ] True nested warez directories and exhaustive trainer/saver/tag flows
 
 # Sprint A
