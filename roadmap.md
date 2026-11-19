@@ -4,7 +4,7 @@
 - [x] 3. Quick scan skips blank leading rows; shelf titles and artists; f03-f04
 - [x] 4. Warez area walked by keyboard; STATUS table; f05-f08
 - [x] 5. MAPLE RIDGE refuses non-allowlisted pieces on every route; live 0-DAY; f09-f10
-- [ ] 6. Utility screens wear their board's chrome; f11-f14
+- [x] 6. Utility screens wear their board's chrome; f11-f14 — done; f11-f14
 
 # Sprint E part 3
 - [x] 1. Dot-matrix bill print with ruled calls and tear-off stub; e18b
@@ -34,10 +34,10 @@
 # Sprint C part 3
 - [x] Part 1: five compositions, inverse selection, directory spacing and 80x25 checks
 - [x] Part 1: twelve private evidence links and commit before Part 2
-- [ ] Part 2: favorites, faithful quick scan, four NFO styles, cracktros and blue room light — gain corrected/tested; remaining fixes and browser evidence unfinished
-- [ ] Part 2: nine private evidence links and commit before Part 3 — d13-d21 not captured; Part 3 not started
-- [ ] Part 3: seven programs through DOS and launcher; ratio; family gates; live 0-DAY — waiting on completed Part 2
-- [ ] Part 3: all tests, per-check status and test-handle list — 125 tests pass; keyboard checks outstanding; no new test handles
+- [x] Part 2: favorites, faithful quick scan, four NFO styles, cracktros and blue room light — gain corrected/tested; remaining fixes and browser evidence unfinished — verified in Sprint C part 4 (d13-d21) and this clean-up pass (f03)
+- [x] Part 2: nine private evidence links and commit before Part 3 — d13-d21 not captured; Part 3 not started — d13-d21 captured in Sprint C part 4; Part 3 work completed in the clean-up pass
+- [x] Part 3: seven programs through DOS and launcher; ratio; family gates; live 0-DAY — waiting on completed Part 2 — verified in the clean-up pass items 4 and 5 (STATUS checks 1-29, f05-f10)
+- [x] Part 3: all tests, per-check status and test-handle list — 125 tests pass; keyboard checks outstanding; no new test handles — clean-up pass: 192 tests pass, every check has a result in STATUS; test handle wz0729a listed under owner to-do
 
 # Sprint B
 - [x] Part 2: additive plate-shaped screen colour with luminance gain and 250 ms smoothing
@@ -54,16 +54,16 @@
 
 # Sprint C
 - [x] Five distinct public boards and two unlockable boards
-- [ ] Shared tags, quick scan, search, new scans and favorites — DEAD CARRIER tagging and search reached live screens, but the favorite assertion failed and the remaining board combinations were not completed.
-- [ ] Visually reviewed family allowlist (40 real pieces) — 42 pieces individually reviewed and viewing gates tested; exhaustive menu-route checks for shelves, search and Picture of the Day remain unfinished.
-- [ ] Fictional warez catalog, ratio, DOS installs and seven runnable programs — Nested storage and DOS navigation implemented; all-seven launch/return and fresh-handle ratio checks remain unfinished.
+- [x] Shared tags, quick scan, search, new scans and favorites — DEAD CARRIER tagging and search reached live screens, but the favorite assertion failed and the remaining board combinations were not completed. — clean-up pass: quick scan (f03) and Your shelf (f04) fixed and verified; favorites done in Sprint C part 4
+- [x] Visually reviewed family allowlist (40 real pieces) — 42 pieces individually reviewed and viewing gates tested; exhaustive menu-route checks for shelves, search and Picture of the Day remain unfinished. — clean-up pass item 5: every MAPLE RIDGE route checked, two leaks fixed (STATUS 19-27, f09)
+- [x] Fictional warez catalog, ratio, DOS installs and seven runnable programs — Nested storage and DOS navigation implemented; all-seven launch/return and fresh-handle ratio checks remain unfinished. — clean-up pass item 4: fresh-handle ratio, DOS and launcher checks for all seven pass (STATUS 1-18, f05-f08)
 - [x] THE CORNER economy, daily scored run and shared scores
-- [ ] Regression tests, full calls, runnable releases and scored game verification — 98 tests and Sprint A lamp/lean/launcher/45-second saver checks passed, but exhaustive Sprint C live calls and release checks remain unfinished.
+- [x] Regression tests, full calls, runnable releases and scored game verification — 98 tests and Sprint A lamp/lean/launcher/45-second saver checks passed, but exhaustive Sprint C live calls and release checks remain unfinished. — clean-up pass items 4-5 walked the runnable releases and scored door credits live; 192 tests pass
 - [x] Sprint C status blocks
 - [x] Fifteen private review pictures: recreated at 1600x900, uploaded privately, seven-day URLs verified HTTP 200/image/jpeg
-- [ ] True nested warez directories and exhaustive trainer/saver/tag flows — Path and trainer duplicate rules pass tests; real installation, trainer day rollover and saver selection still need full live verification.
+- [x] True nested warez directories and exhaustive trainer/saver/tag flows — Path and trainer duplicate rules pass tests; real installation, trainer day rollover and saver selection still need full live verification. — clean-up pass item 4: real installs into C:\WAREZ, PATCHFOX once-a-day and DRIFTER as the 45 s saver verified
 
-- [ ] 0-DAY ART sanity — Added progress and session caching with month tests; live archive month/empty-month checks remain unfinished.
+- [x] 0-DAY ART sanity — Added progress and session caching with month tests; live archive month/empty-month checks remain unfinished. — clean-up pass item 5: live 0-DAY loads from the daily cache, newest first, opens its pack (f10)
 - [x] Caller-visible name sweep: no former board names found in repository text
 
 # Sprint A

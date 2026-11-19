@@ -12,6 +12,12 @@ export function earnedLevel(a:Activity):AccessLevel {
   return 'NEW USER';
 }
 export function accessLevel(v:unknown):AccessLevel { return v==='ELITE'||v==='VALIDATED'?v:'NEW USER'; }
+/** The same requirements as nextChecklist, as numbers for progress bars. */
+export function checklistItems(level:AccessLevel,a:Activity):{label:string;n:number;target:number}[] {
+  if(level==='ELITE')return [];
+  if(level==='NEW USER')return [{label:'UTC call days (OR pieces)',n:a.days,target:2},{label:'pieces viewed (OR days)',n:a.pieces,target:15},{label:'oneliners posted',n:a.oneliners,target:1}];
+  return [{label:'UTC call days',n:a.days,target:6},{label:'pieces viewed',n:a.pieces,target:60},{label:'finished scored runs',n:a.finishedRuns,target:1},{label:'pieces rated',n:a.ratings,target:3}];
+}
 export function nextChecklist(level:AccessLevel,a:Activity):string[] {
   const check=(label:string,n:number,target:number)=>`${n>=target?'[x]':'[ ]'} ${label} ${n} / ${target}`;
   if(level==='ELITE')return ['[x] Highest access earned. Nothing for sale.'];

@@ -39,6 +39,9 @@ Test browser: Playwright Chromium, software GL, 1600x900. Fresh handle **wz0729a
 | 28 | DEAD CARRIER 0-DAY ART against the live archive | PASS (list on screen 0.3 s after Z from the daily cache; newest year first; Enter opened BMB-1196) (f10) |
 | 29 | DEAD CARRIER "This week in the scene" | PASS (shown on logon from the same cache, 1996 before 1995). Also fixed: long lines were cut mid-word ("30 years la"); they now shorten to "30y late." |
 
+### Utility screens (item 6)
+Your record, mailbox, mail, THE WALL, INNER CIRCLE, the new-since-last-call scan and Time bank now draw inside their board's chrome through one shared helper (panels, label/value lines with dot leaders on LINE NOISE, text-mode progress bars, FULL BLOCK stat tiles). Wording and keys are unchanged; the letter view moves the sysop's existing "-- name" sign-off into a signature slot below a ruled body. Checked live: Your record on DEAD CARRIER (f11) and FULL BLOCK (f12), a mail on MAPLE RIDGE (f13), Time bank on STROBE (f14) and DEAD CARRIER. THE WALL, INNER CIRCLE and the new scan were not photographed.
+
 Item 3 note: the 1991.ANS strip was blank because that piece draws itself column by column with cursor jumps; the scan stopped reading at the first byte placed below row 8. It now reads the whole piece, keeps only the eight rows from the first visible row, and the caption says "from row N".
 
 ## Sprint E
