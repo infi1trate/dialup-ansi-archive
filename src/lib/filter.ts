@@ -45,4 +45,6 @@ export function checkOneliner(raw: string): Verdict {
 /** Speed unlocked by number of distinct files viewed (shared with the client rule). */
 export function speedFor(files: number) { return files >= 15 ? 28800 : files >= 5 ? 14400 : 9600; }
 
-export const FUNNEL = ["landed", "powered_on", "dialed", "connected", "logged_in", "first_art", "third_art", "called_back"] as const;
+export const FUNNEL = ["landed", "powered_on", "dialed", "connected", "logged_in", "first_art", "third_art", "called_back", "postcard_sent", "postcard_opened", "postcard_skipped", "postcard_replied", "postcard_entered", "tape_recorded", "bill_printed", "promoted"] as const;
+/** Steps the browser may report through the count action (server-only steps excluded). */
+export const CLIENT_STEPS = ["landed", "powered_on", "dialed", "connected", "first_art", "third_art", "tape_recorded", "bill_printed"] as const;

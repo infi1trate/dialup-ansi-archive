@@ -12,7 +12,7 @@ import { ACCESS, accessLevel } from "@/lib/access";
 import { sprintC } from "./sprint-c";
 import { CREDIT_AWARDS } from "@/bbs/warez-catalog";
 import { allow, type HitStore } from "@/lib/ratelimit";
-import { checkHandle, checkOneliner, FUNNEL, speedFor } from "@/lib/filter";
+import { checkHandle, checkOneliner, FUNNEL, CLIENT_STEPS, speedFor } from "@/lib/filter";
 
 type Json = Record<string, any>;
 export class NetError extends Error { constructor(public status: number, msg: string) { super(msg); } }
@@ -106,6 +106,10 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
   const ip = await ipHash(req);
   const now=requestClock(req);
   const action = str(b.action, 20);
+  if(action==="postcardSend"){const th=await tokenHash(b.token);await limit([th,ip],"postcard",8,600);const c=b.guest?null:await callerByToken(th);const {sendPostcard}=await import("./postcard");return sendPostcard(s,c,th,ip,b,now);}
+  if(action==="postcardGet"){await limit([ip],"postcardGet",120,600);const {readPostcard}=await import("./postcard");return readPostcard(s,str(b.id,20),now);}
+  if(action==="postcardReport"){const th=await tokenHash(b.token);await limit([th,ip],"report",5,600);const c=await callerByToken(th);const {reportPostcard}=await import("./postcard");return reportPostcard(s,str(b.id,20),th,ip,c?.handle??null);}
+  if(action==="postcardEvent"){const th=await tokenHash(b.token);await limit([th,ip],"pcEvent:"+str(b.kind,10),30,3600);const {postcardEvent}=await import("./postcard");return postcardEvent(s,str(b.id,20),str(b.kind,10),th,now);}
   if(action==="bill"||action==="bills"){const th=await tokenHash(b.token);await limit([th,ip],"billing",120,600);return billAction(s,b.guest?null:await callerByToken(th),b,now);}
   if(action==="timeBank"||action==="withdraw"){const th=await tokenHash(b.token);await limit([th,ip],"bank",120,600);return bankAction(s,b.guest?null:await callerByToken(th),b,now);}
   if(action==="scene"){await limit([ip],"scene",120,600);return sceneAction(s,now,defer);}
@@ -269,6 +273,7 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
       return { ok: true };
     }
     case "count": {
+      if (!(CLIENT_STEPS as readonly string[]).includes(str(b.step, 20))) throw new NetError(400, "bad step");
       await limit([ip], "count:" + str(b.step, 20), 20, 3600);
       await bump(str(b.step, 20));
       return { ok: true };

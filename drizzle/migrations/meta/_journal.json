@@ -57,6 +57,13 @@
       "when": 1795066723150,
       "tag": "0007_bellwire_monthly_bills",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795068267658,
+      "tag": "0008_postcards",
+      "breakpoints": true
     }
   ]
 }

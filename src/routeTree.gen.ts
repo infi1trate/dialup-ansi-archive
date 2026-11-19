@@ -13,8 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CreditsRouteImport } from './routes/credits'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as LabRouteImport } from './routes/lab'
+import { Route as PIdRouteImport } from './routes/p.$id'
 import { Route as ApiPublicCardRouteImport } from './routes/api/public/card'
 import { Route as ApiPublicNetRouteImport } from './routes/api/public/net'
+import { Route as ApiPublicPostcardCardRouteImport } from './routes/api/public/postcard-card'
 import { Route as GalleryYearPackRouteImport } from './routes/gallery_.$year.$pack'
 import { Route as ApiPublicArchiveJsonRouteImport } from './routes/api/public/archive.json'
 import { Route as ApiPublicArchiveRawRouteImport } from './routes/api/public/archive.raw'
@@ -40,6 +42,11 @@ const LabRoute = LabRouteImport.update({
   path: '/lab',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PIdRoute = PIdRouteImport.update({
+  id: '/p/$id',
+  path: '/p/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCardRoute = ApiPublicCardRouteImport.update({
   id: '/api/public/card',
   path: '/api/public/card',
@@ -48,6 +55,11 @@ const ApiPublicCardRoute = ApiPublicCardRouteImport.update({
 const ApiPublicNetRoute = ApiPublicNetRouteImport.update({
   id: '/api/public/net',
   path: '/api/public/net',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicPostcardCardRoute = ApiPublicPostcardCardRouteImport.update({
+  id: '/api/public/postcard-card',
+  path: '/api/public/postcard-card',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GalleryYearPackRoute = GalleryYearPackRouteImport.update({
@@ -76,8 +88,10 @@ export interface FileRoutesByFullPath {
   '/credits': typeof CreditsRoute
   '/gallery': typeof GalleryRoute
   '/lab': typeof LabRoute
+  '/p/$id': typeof PIdRoute
   '/api/public/card': typeof ApiPublicCardRoute
   '/api/public/net': typeof ApiPublicNetRoute
+  '/api/public/postcard-card': typeof ApiPublicPostcardCardRoute
   '/gallery/$year/$pack': typeof GalleryYearPackRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
@@ -88,8 +102,10 @@ export interface FileRoutesByTo {
   '/credits': typeof CreditsRoute
   '/gallery': typeof GalleryRoute
   '/lab': typeof LabRoute
+  '/p/$id': typeof PIdRoute
   '/api/public/card': typeof ApiPublicCardRoute
   '/api/public/net': typeof ApiPublicNetRoute
+  '/api/public/postcard-card': typeof ApiPublicPostcardCardRoute
   '/gallery/$year/$pack': typeof GalleryYearPackRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
@@ -101,8 +117,10 @@ export interface FileRoutesById {
   '/credits': typeof CreditsRoute
   '/gallery': typeof GalleryRoute
   '/lab': typeof LabRoute
+  '/p/$id': typeof PIdRoute
   '/api/public/card': typeof ApiPublicCardRoute
   '/api/public/net': typeof ApiPublicNetRoute
+  '/api/public/postcard-card': typeof ApiPublicPostcardCardRoute
   '/gallery_/$year/$pack': typeof GalleryYearPackRoute
   '/api/public/archive/json': typeof ApiPublicArchiveJsonRoute
   '/api/public/archive/raw': typeof ApiPublicArchiveRawRoute
@@ -115,8 +133,10 @@ export interface FileRouteTypes {
     | '/credits'
     | '/gallery'
     | '/lab'
+    | '/p/$id'
     | '/api/public/card'
     | '/api/public/net'
+    | '/api/public/postcard-card'
     | '/gallery/$year/$pack'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
@@ -127,8 +147,10 @@ export interface FileRouteTypes {
     | '/credits'
     | '/gallery'
     | '/lab'
+    | '/p/$id'
     | '/api/public/card'
     | '/api/public/net'
+    | '/api/public/postcard-card'
     | '/gallery/$year/$pack'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
@@ -139,8 +161,10 @@ export interface FileRouteTypes {
     | '/credits'
     | '/gallery'
     | '/lab'
+    | '/p/$id'
     | '/api/public/card'
     | '/api/public/net'
+    | '/api/public/postcard-card'
     | '/gallery_/$year/$pack'
     | '/api/public/archive/json'
     | '/api/public/archive/raw'
@@ -152,8 +176,10 @@ export interface RootRouteChildren {
   CreditsRoute: typeof CreditsRoute
   GalleryRoute: typeof GalleryRoute
   LabRoute: typeof LabRoute
+  PIdRoute: typeof PIdRoute
   ApiPublicCardRoute: typeof ApiPublicCardRoute
   ApiPublicNetRoute: typeof ApiPublicNetRoute
+  ApiPublicPostcardCardRoute: typeof ApiPublicPostcardCardRoute
   GalleryYearPackRoute: typeof GalleryYearPackRoute
   ApiPublicArchiveJsonRoute: typeof ApiPublicArchiveJsonRoute
   ApiPublicArchiveRawRoute: typeof ApiPublicArchiveRawRoute
@@ -190,6 +216,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$id': {
+      id: '/p/$id'
+      path: '/p/$id'
+      fullPath: '/p/$id'
+      preLoaderRoute: typeof PIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/card': {
       id: '/api/public/card'
       path: '/api/public/card'
@@ -202,6 +235,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/net'
       fullPath: '/api/public/net'
       preLoaderRoute: typeof ApiPublicNetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/postcard-card': {
+      id: '/api/public/postcard-card'
+      path: '/api/public/postcard-card'
+      fullPath: '/api/public/postcard-card'
+      preLoaderRoute: typeof ApiPublicPostcardCardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gallery_/$year/$pack': {
@@ -240,8 +280,10 @@ const rootRouteChildren: RootRouteChildren = {
   CreditsRoute: CreditsRoute,
   GalleryRoute: GalleryRoute,
   LabRoute: LabRoute,
+  PIdRoute: PIdRoute,
   ApiPublicCardRoute: ApiPublicCardRoute,
   ApiPublicNetRoute: ApiPublicNetRoute,
+  ApiPublicPostcardCardRoute: ApiPublicPostcardCardRoute,
   GalleryYearPackRoute: GalleryYearPackRoute,
   ApiPublicArchiveJsonRoute: ApiPublicArchiveJsonRoute,
   ApiPublicArchiveRawRoute: ApiPublicArchiveRawRoute,

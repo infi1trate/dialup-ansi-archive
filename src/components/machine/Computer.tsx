@@ -15,12 +15,19 @@ import type { DeepLink } from "@/bbs/io";
 // literal, not imported: the house pack (and the terminal it pulls in) must stay out of the first frame
 const HOUSE_PACK = "crawl-01";
 
-interface Props { deepLink?: DeepLink & { number: string }; /** a wrong URL: dial it, get NO CARRIER, land at DOS */ lost?: string }
+import type { Postcard } from "@/lib/postcard";
+import { fractionStyle, GLASS } from "@/components/room/plate-layout";
+type PostcardProp = { card: Postcard & { id: string }; number: string } | { missing: string };
+interface Props { postcard?: PostcardProp; deepLink?: DeepLink & { number: string }; /** a wrong URL: dial it, get NO CARRIER, land at DOS */ lost?: string }
 
 export const SKIP_TO_ART = `/dial/555-0142/1994/${HOUSE_PACK}/CRWL-LGO.ANS`;
 
 /** The Kestrel 486 in its basement. All canvas/WebGL/audio/storage work starts in effects only. */
-export function Computer({ deepLink, lost }: Props) {
+export function Computer({ deepLink, lost, postcard }: Props) {
+  const pendingCard = postcard && "card" in postcard ? postcard : null;
+  const [cardWaiting, setCardWaiting] = useState(!!pendingCard);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [reported, setReported] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
   const machine = useRef<Machine | null>(null);
   const navigate = useNavigate();
@@ -49,7 +56,8 @@ export function Computer({ deepLink, lost }: Props) {
     setOsReduced(mq.matches);
     const touch = window.matchMedia("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 820;
     setLayout(touch || window.innerWidth < 640 || window.innerHeight>window.innerWidth ? "tube" : "room");
-    setLeaned(s.lean ?? false);
+    setLeaned(pendingCard ? true : s.lean ?? false);
+    if (pendingCard) setCfg({ ...s, lamp: false }); // the card arrives in the dark; not saved
     audio.setMix({ muted: s.muted, modemVolume: s.modemVolume, musicVolume: s.musicVolume });
     void import("@/data/net").then((n) => n.count("landed"));
   }, []);
@@ -69,7 +77,7 @@ export function Computer({ deepLink, lost }: Props) {
       engine.crt.brightness = brightnessGain(c.brightness);
       engine.crt.contrast = contrastGain(c.contrast);
       if (c.turbo) m.toggleTurbo(); // the turbo button stays where you left it
-      const unsubs = [m.powered.subscribe(setPowered), m.tube.subscribe(setTube), m.turbo.subscribe((t) => { setTurbo(t); if (t !== cfgRef.current.turbo) update({ turbo: t }); }), m.hints.subscribe(setHints)];
+      const unsubs = [m.powered.subscribe(setPowered), m.tube.subscribe(setTube), m.turbo.subscribe((t) => { setTurbo(t); if (t !== cfgRef.current.turbo) update({ turbo: t }); }), m.hints.subscribe(setHints), m.shareUrl.subscribe(setShareUrl), m.exitHome.subscribe((v) => { if (v) void navigate({ to: "/" }); })];
       const orient = () => m.setPortrait(window.innerHeight > window.innerWidth);
       orient();
       window.addEventListener("resize", orient);
@@ -82,7 +90,8 @@ export function Computer({ deepLink, lost }: Props) {
       const up = (e: KeyboardEvent) => m.handleKeyUp(e);
       window.addEventListener("keydown", down);
       window.addEventListener("keyup", up);
-      if (deepLink) m.powerOn(deepLink);
+      if (postcard && "missing" in postcard) { m.lostAt = "POSTCARD"; m.lostNote = postcard.missing === "withdrawn" ? "This card was withdrawn." : "That postcard has expired, or was never sent."; m.powerOn(); }
+      else if (deepLink) m.powerOn(deepLink);
       else if (lost) { m.lostAt = lost; m.powerOn(); }
       cleanup = () => { unsubs.forEach((u) => u()); window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); m.powerOff(); engine.destroy(); };
     })();
@@ -116,6 +125,19 @@ export function Computer({ deepLink, lost }: Props) {
   const toggleLean = () => lean(!leanRef.current);
   const getState = useCallback(() => machine.current?.state.value ?? "off", []);
 
+  const pickUp = useCallback(() => {
+    if (!pendingCard || !cardWaiting) return;
+    const m = machine.current; if (!m) return;
+    audio.unlock(); setCardWaiting(false); m.openPostcard(pendingCard);
+  }, [pendingCard, cardWaiting]);
+  useEffect(() => {
+    if (!cardWaiting) return;
+    const go = (e: Event) => { if ((e.target as HTMLElement)?.closest?.(".hatch") || !machine.current) return; e.preventDefault(); e.stopPropagation(); pickUp(); };
+    window.addEventListener("keydown", go, { capture: true }); window.addEventListener("pointerdown", go);
+    return () => { window.removeEventListener("keydown", go, { capture: true }); window.removeEventListener("pointerdown", go); };
+  }, [cardWaiting, pickUp]);
+  const reportCard = async () => { if (!pendingCard || reported) return; const { net } = await import("@/data/net"); await net("postcardReport", { id: pendingCard.card.id }); setReported(true); };
+
   const toggleLamp = () => { audio.unlock(); audio.emit("lampToggle", !cfg.lamp); update({ lamp: !cfg.lamp }); };
 
   const monitor = (
@@ -136,7 +158,8 @@ export function Computer({ deepLink, lost }: Props) {
 
   const hatch = (
       <EscapeHatch
-      physical={<><li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
+      share={shareUrl}
+      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
       lamp={cfg.lamp}
@@ -152,7 +175,7 @@ export function Computer({ deepLink, lost }: Props) {
   return (
     <Room
       monitor={monitor}
-      controls={<><div className="plate-controls" style={{left:"55.73%",top:"59.72%",width:"5.73%",height:"4.17%"}}><Knob label="Contrast knob" value={cfg.contrast} onChange={v=>{update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/><Knob label="Brightness knob" value={cfg.brightness} onChange={v=>{update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></div><Button variant="ghost" className="plate-monitor-power" data-touch aria-label={tube?"Monitor off":"Monitor on"} style={{left:"62.63%",top:"59.26%",width:"3.26%",height:"4.17%"}} onClick={()=>machine.current?.pressMonitorPower()}/></>}
+      controls={<>{cardWaiting && <button type="button" data-touch className="postcard-note" style={fractionStyle(GLASS)} onClick={pickUp}><span>you have mail.<br/>tap to pick up.</span></button>}<div className="plate-controls" style={{left:"55.73%",top:"59.72%",width:"5.73%",height:"4.17%"}}><Knob label="Contrast knob" value={cfg.contrast} onChange={v=>{update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/><Knob label="Brightness knob" value={cfg.brightness} onChange={v=>{update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></div><Button variant="ghost" className="plate-monitor-power" data-touch aria-label={tube?"Monitor off":"Monitor on"} style={{left:"62.63%",top:"59.26%",width:"3.26%",height:"4.17%"}} onClick={()=>machine.current?.pressMonitorPower()}/></>}
       powered={powered}
       turbo={turbo}
       lamp={cfg.lamp}

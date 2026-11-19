@@ -449,6 +449,75 @@ export type Database = {
         }
         Relationships: []
       }
+      postcard_opens: {
+        Row: {
+          card_id: string
+          day: string
+          device: string
+        }
+        Insert: {
+          card_id: string
+          day: string
+          device: string
+        }
+        Update: {
+          card_id?: string
+          day?: string
+          device?: string
+        }
+        Relationships: []
+      }
+      postcards: {
+        Row: {
+          board: string
+          caller_id: string | null
+          clean: boolean
+          created_at: string
+          design: string
+          enclosed: Json | null
+          expires_at: string
+          hidden: boolean
+          id: string
+          ip_hash: string
+          lines: string[]
+          reply_to: string | null
+          signature: string
+          token_hash: string
+        }
+        Insert: {
+          board: string
+          caller_id?: string | null
+          clean?: boolean
+          created_at?: string
+          design: string
+          enclosed?: Json | null
+          expires_at?: string
+          hidden?: boolean
+          id: string
+          ip_hash: string
+          lines: string[]
+          reply_to?: string | null
+          signature: string
+          token_hash: string
+        }
+        Update: {
+          board?: string
+          caller_id?: string | null
+          clean?: boolean
+          created_at?: string
+          design?: string
+          enclosed?: Json | null
+          expires_at?: string
+          hidden?: boolean
+          id?: string
+          ip_hash?: string
+          lines?: string[]
+          reply_to?: string | null
+          signature?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
       presence: {
         Row: {
           city: string

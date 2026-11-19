@@ -59,6 +59,8 @@ export interface HostIO {
     access?(v:{speed:number;remainingSeconds:number;level:string;exempt?:boolean}):void;
     active?():boolean;
     printBill?(bill:import("@/lib/bill").Bill):Promise<void>;
+    /** Out-of-band: offer the modern copy/share control for a link (null hides it). */
+    shareLink?(url:string|null):void;
     setMode(m: Partial<TermMode>): void;
     scroll(delta: number): void;
     scrollTo(where: "top" | "bottom"): void;
@@ -81,4 +83,6 @@ export interface HostIO {
   save(): void;
   timeLeftMs(): number;
   deepLink?: DeepLink;
+  /** Arrived from a postcard's [R]/[E] choice. */
+  postcardEntry?: { mode: "reply" | "enter"; pack?: string; file?: string; year?: number; replyTo?: string };
 }

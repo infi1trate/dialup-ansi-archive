@@ -27,6 +27,7 @@ import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
 import {phoneBills} from "./bill";
 import {timeBank} from "./time-bank";
+import {composePostcard} from "./postcard";
 import {sceneBulletin} from "./scene";
 import type {ScenePack} from "@/lib/scene";
 import {mailbox} from "./mail";
@@ -94,6 +95,8 @@ export class Board {
   async clockCheck(){if(!this.clockExempt&&this.io.timeLeftMs()<=0)throw new Aborted("timeup");const left=this.io.timeLeftMs()/60000;if(!this.clockExempt&&left<=5&&(this.clockWarning===0||(left<=1&&this.clockWarning===5))){this.clockWarning=left<=1?1:5;this.send(a().at(25,1).k(14,pad(`${this.config.sysop}: ${this.clockWarning} minute${this.clockWarning===1?"":"s"} left. Time bank is K.`,79)));}}
   async mail(){await mailbox(this);}
   ioEntryId(){return this.io.entry.id;}
+  clientOverlay(b:Uint8Array|null){this.io.client.overlay(b);}
+  shareLink(url:string|null){this.io.client.shareLink?.(url);}
   ioTimeout(ms:number){return this.io.keyTimeout(ms);}
   clearPending(){this.io.clearOutput();}
   async newPacks(names:string[]){if(!names.length)return;await this.pagedPacks("Packs new to you","archive",async()=>({items:names.map(name=>({name,year:1993,groups:[]})),page:1,pages:1,total:names.length}));}
@@ -524,11 +527,11 @@ export class Board {
 
   // ── main menu ──────────────────────────────────────────────────
   menuItems():[string,string][] {
-    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye'],['0','Your record'],['M','Mail'],['K','Time bank']];
-    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record'],['M','Mail'],['K','Time bank']];
-    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank']];
-    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank']];
-    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','This week / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank']];
+    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye'],['0','Your record'],['M','Mail'],['K','Time bank'],['P','Send a postcard']];
+    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record'],['M','Mail'],['K','Time bank'],['P','Send a postcard']];
+    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank'],['P','Send a postcard']];
+    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank'],['P','Send a postcard']];
+    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','This week / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank'],['L','Send a postcard']];
   }
   private menuCallers = CALLERS.slice(0,3).map(c=>c[0]);
   private menuOneliner = ONELINERS[0][1];
@@ -564,9 +567,9 @@ export class Board {
         if(items.some(([v])=>v===c)||c==='!')break;
       }
       this.io.clearOutput();
-      if(this.io.entry.id==='maple'){if(c==='K')await timeBank(this);else if(c==='M')await this.mail();else if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
-      if(this.io.entry.id==='c93'){if(c==='K')await timeBank(this);else if(c==='M')await this.mail();else if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
-      switch(c){case 'K':await timeBank(this);break;case 'M':await this.mail();break;case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':if(this.io.entry.id==='crawl')await sceneBulletin(this);else await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
+      if(this.io.entry.id==='maple'){if(c==='P')await composePostcard(this);else if(c==='K')await timeBank(this);else if(c==='M')await this.mail();else if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
+      if(this.io.entry.id==='c93'){if(c==='P')await composePostcard(this);else if(c==='K')await timeBank(this);else if(c==='M')await this.mail();else if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
+      switch(c){case 'K':await timeBank(this);break;case 'M':await this.mail();break;case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':if(this.io.entry.id==='crawl')await sceneBulletin(this);else await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':if(this.io.entry.id==='crawl')await this.pageSysop();else await composePostcard(this);break;case 'L':await composePostcard(this);break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
     }
   }
 
@@ -1073,7 +1076,7 @@ export class Board {
       const viewHints = (done: boolean) => this.hint([
         ...(done ? [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "PGUP", key: "PageUp" }, { label: "PGDN", key: "PageDown" }]
           : [{ label: "SPACE pause", key: " " }, ...(opts.animation ? [] : [{ label: "ENTER finish", key: "Enter" }])]),
-        hk("F","F favorite"),hk("E","E rate 1-5"),...(this.io.entry.id==="c93"?[hk("C","C color")]:[]),hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), ...(opts.local ? [] : [hk("R", "R report")]), { label: "ESC back", key: "Escape" },
+        hk("F","F favorite"),hk("E","E rate 1-5"),...(opts.local?[]:[hk("C","C card")]),...(this.io.entry.id==="c93"?[hk("O","O color")]:[]),hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), ...(opts.local ? [] : [hk("R", "R report")]), { label: "ESC back", key: "Escape" },
       ]);
       viewHints(false);
       const showInfo = () => io.client.overlay(info ? infoPanel(pack, f, art.sauce, bytes.length, mode, unlocked, url) : null);
@@ -1096,7 +1099,8 @@ export class Board {
           noticeTimer=setTimeout(()=>{noticeTimer=undefined;showInfo();},2000);
           continue;
         }
-        if(c === "C" && this.io.entry.id === "c93"){this.colorBack=!this.colorBack;io.clearOutput();this.screenMode(mode);io.send(stream);finished=false;continue;}
+        if(c === "C" && !opts.local){clearNotice();io.clearOutput();io.resume();io.client.overlay(null);await composePostcard(this,{pack:pack.name,file:f.name,year:pack.year,artist:(prep.sauce?.author||f.artists[0]||"unknown artist").trim()});this.screenMode(mode);io.send(stream);finished=false;viewHints(false);continue;}
+        if(c === "O" && this.io.entry.id === "c93"){this.colorBack=!this.colorBack;io.clearOutput();this.screenMode(mode);io.send(stream);finished=false;continue;}
         if(c === "E" && !opts.local){const k=await io.key();const rating=(k.ch??0)-48;if(rating>=1&&rating<=5)await net("rating",{pack:pack.name,file:f.name,rating,board:this.io.entry.id,guest:this.guest});continue;}
         if (c === "I") { clearNotice(); info = !info; showInfo(); continue; }
         if (c === "R" && !opts.local) { await this.report(pack, f); showInfo(); viewHints(finished); continue; }
@@ -1261,6 +1265,7 @@ export class Board {
   async run(): Promise<void> {
     try {
       if (this.io.deepLink) return await this.runDeepLink(this.io.deepLink);
+      if (this.io.postcardEntry) return await this.runPostcardEntry(this.io.postcardEntry);
       if (this.io.entry.mode === "void") await this.voidGate();
       await this.login();
       await this.logon();
@@ -1275,6 +1280,18 @@ export class Board {
       if (e instanceof Aborted && e.reason === "timeup") { await this.timesUp(); return; }
       throw e;
     } finally { this.stopPresence(); }
+  }
+
+  /** Arrived from a postcard: logged straight in as GUEST, then reply or browse the enclosed pack. */
+  async runPostcardEntry(pe: NonNullable<HostIO["postcardEntry"]>) {
+    this.send(this.logo(a()).at(19, 8).k(15, "login: ").k(14, "GUEST").at(20, 8).k(7, "Postcard delivery: express guest login..."));
+    await this.io.drain(); await sleep(900);
+    this.guest = true; this.user = "Guest";
+    await this.logon();
+    if (pe.mode === "reply") await composePostcard(this, null, pe.replyTo);
+    else if (pe.pack) await this.packScreen({ name: pe.pack, year: pe.year ?? 1994, groups: [] }, pe.file);
+    await this.mainMenu();
+    await this.goodbye();
   }
 
   async runDeepLink(dl: DeepLink) {

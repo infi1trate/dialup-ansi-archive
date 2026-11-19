@@ -16,6 +16,8 @@ import { Signal } from "./signals";
 import { handshakeMs, DTMF_OFF_MS, DTMF_ON_MS } from "@/audio/tables";
 import { Terminal } from "@/term/terminal";
 import type { Speed } from "@/modem/modem";
+import { net } from "@/data/net";
+import type { Postcard } from "@/lib/postcard";
 
 export type MachineState = "off" | "boot" | "dos" | "comm" | "dialing" | "handshake" | "session" | "hangup";
 
@@ -38,6 +40,14 @@ export class Machine {
   state = new Signal<MachineState>("off");
   powered = new Signal(false);
   tube = new Signal(false);
+  /** Out-of-band link the board wants offered through the modern copy/share control. */
+  shareUrl = new Signal<string | null>(null);
+  /** Set when a postcard visitor hangs up: the page returns to the normal first-visit room. */
+  exitHome = new Signal(false);
+  private postcard: { card: Postcard & { id: string }; number: string } | null = null;
+  private anyKeySkips = false;
+  private postcardSkipped = false;
+  private postcardEntry: HostIO["postcardEntry"] | undefined;
   turbo = new Signal(false);
   private everOn = false;
   keys = new KeyQueue();
@@ -50,6 +60,8 @@ export class Machine {
   private deepLink: (DeepLink & { number: string }) | null = null;
   /** Set before powerOn for a wrong URL: TELEWIRE dials it, gets NO CARRIER, drops to the launcher. */
   lostAt: string | null = null;
+  /** With lostAt: a postcard that is gone; TELEWIRE reports NO ANSWER with this line. */
+  lostNote: string | null = null;
   private timeTimer: ReturnType<typeof setInterval> | null = null;
   private boardOverlay: Terminal | null = null;
   private artOpen = false;
@@ -143,6 +155,9 @@ export class Machine {
   // ── power ──────────────────────────────────────────────────────
   togglePower() { if (this.powered.value) this.powerOff(); else this.powerOn(); }
 
+  /** /p/<id>: the PC powers on by itself and dials the sending board to deliver the card. */
+  openPostcard(p: { card: Postcard & { id: string }; number: string }) { this.postcard = p; this.powerOn(); }
+
   powerOn(deepLink?: DeepLink & { number: string }) {
     if (this.powered.value) return;
     audio.unlock();
@@ -234,14 +249,82 @@ export class Machine {
     for (;;) {
       const k = await this.keys.nextOr(timer);
       if (k === null) return false;
-      if (k.key === "Escape" || k.key === " ") { this.skipping = true; return true; }
+      if (k.key === "Escape" || k.key === " " || this.anyKeySkips) { this.skipping = true; this.notePostcardSkip(); return true; }
     }
   }
   private sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
+  private notePostcardSkip() { if (this.anyKeySkips && !this.postcardSkipped && this.postcardId) { this.postcardSkipped = true; void net("postcardEvent", { id: this.postcardId, kind: "skipped" }); } }
+  private postcardId: string | null = null;
+
+  private async postcardRun(g: number) {
+    const pc = this.postcard!; this.postcard = null;
+    this.postcardId = pc.card.id; this.anyKeySkips = true; this.postcardSkipped = false;
+    void net("postcardEvent", { id: pc.card.id, kind: "opened" });
+    this.state.set("boot");
+    this.hints.set([{ label: "SKIP", key: "Escape" }]);
+    this.skipping = false;
+    audio.emit("diskSeek");
+    this.out(a().reset().cls());
+    for (const l of ["Kestrel BIOS v4.03  (C) 1992 Kestrel Microsystems", "640K Base Memory, 3456K Extended ... OK", "Kestrel VGA BIOS v1.2   Fixed disk 0: 120MB", "", "Starting Kestrel DOS...", "", "C:\\> TELEWIRE /MAIL"]) { this.out(a().k(7, l).nl()); await this.wait(420); this.alive(g); }
+    const entry = boardAt(pc.number) ?? DIRECTORY[0];
+    await this.call(entry, g, false, { speed: 2400, onConnect: () => this.deliverPostcard(pc, entry, g) });
+  }
+
+  private async deliverPostcard(pc: { card: Postcard & { id: string } }, entry: DirEntry, g: number) {
+    const { cardScreen, cardChoices } = await import("@/bbs/postcard-art");
+    const term = this.engine.term, modem = this.engine.modem, card = pc.card;
+    this.state.set("session");
+    modem.bps = 2400;
+    const stream = async () => { if (this.skipping) { modem.flush(); return; } const k = await this.keys.nextOr(modem.drain()); this.alive(g); if (k) { this.skipping = true; this.notePostcardSkip(); modem.flush(); } };
+    term.setMode({ cols: 80, ice: false, ninePixel: true }); term.reset(); term.cursorVisible = false;
+    modem.write(cardScreen(card).build());
+    await stream();
+    if (card.enclosed) {
+      await this.wait(1500); this.alive(g);
+      try {
+        const [{ getFile }, { prepareArt }] = await Promise.all([import("@/data/archive"), import("@/term/prepare")]);
+        const bytes = await getFile(card.enclosed.pack, card.enclosed.file); this.alive(g);
+        const prep = prepareArt(card.enclosed.file, bytes);
+        term.setMode(prep.mode); term.reset();
+        modem.write(a().reset().k(11, "ENCLOSED: ").k(15, `${card.enclosed.file.toUpperCase()} by ${card.enclosed.artist}`).nl().build());
+        modem.write(prep.stream);
+        modem.write(a().reset().nl().k(8, `${card.enclosed.file} / ${prep.sauce?.author || card.enclosed.artist}${prep.sauce?.group ? " / " + prep.sauce.group : ""} / ${card.enclosed.pack} (${card.enclosed.year})`.slice(0, 79)).nl().build());
+        await stream();
+      } catch { modem.write(a().reset().nl().k(12, "ENCLOSED file could not be retrieved from the stacks.").nl().build()); await stream(); }
+    }
+    this.anyKeySkips = false;
+    const choices = cardChoices(card.design).build();
+    if (card.enclosed) { const ov = new Terminal({ cols: 80 }, { masked: true }); ov.feed(choices); this.boardOverlay = ov; this.applyOverlay(); }
+    else { modem.write(choices); modem.flush(); }
+    this.hints.set([{ label: "R reply", key: "R", ch: "R" }, { label: "E enter board", key: "E", ch: "E" }, { label: "H hang up", key: "H", ch: "H" }]);
+    for (;;) {
+      const k = await this.key(); this.alive(g);
+      const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
+      if (c !== "R" && c !== "E" && c !== "H") continue;
+      this.boardOverlay = null; this.applyOverlay(); term.cursorVisible = true;
+      if (c === "H") {
+        this.hints.set([]);
+        this.out(a().reset().nl(2).k(7, "NO CARRIER").nl()); audio.emit("hangup");
+        await this.sleep(1300); this.postcardId = null;
+        this.exitHome.set(true); return;
+      }
+      void net("postcardEvent", { id: card.id, kind: c === "R" ? "replied" : "entered" });
+      this.postcardEntry = c === "R" ? { mode: "reply", replyTo: card.id } : { mode: "enter", pack: card.enclosed?.pack, year: card.enclosed?.year };
+      this.postcardId = null; this.skipping = false;
+      const speed = Math.min(9600, Math.max(...allowedSpeeds(this.profile))) as Speed;
+      this.out(a().reset().cls().k(7, `Line retrains to ${speed}...`).nl()); modem.bps = speed;
+      await this.session(entry, speed, g);
+      return;
+    }
+  }
+
   private async run(g: number) {
     try {
-      if (this.deepLink) {
+      if (this.postcard) {
+        await this.postcardRun(g);
+        if (!this.exitHome.value) { await this.comm(g); await this.dos(g, false); }
+      } else if (this.deepLink) {
         await this.sleep(500); this.alive(g);
         const entry = boardAt(this.deepLink!.number) ?? DIRECTORY[0];
         await this.call(entry, g, true);
@@ -255,9 +338,11 @@ export class Machine {
         this.out(a().k(7, `ATDT ${path}`).nl());
         audio.emit("offHook");
         await this.wait(1400); this.alive(g);
-        this.out(a().nl().k(15, "NO CARRIER").nl(2));
+        const note = this.lostNote; this.lostNote = null;
+        this.out(a().nl().k(15, note ? "NO ANSWER" : "NO CARRIER").nl(2));
         audio.emit("hangup");
-        this.out(a().k(7, "TELEWIRE: nobody answers at that number. It may have been disconnected.").nl()
+        if (note) { this.out(a().k(7, note).nl(2).k(7, "TELEWIRE v2.1 · line closed.").nl(2).k(15, "Press any key").k(7, " to start the computer and dial a board yourself.").nl()); this.hints.set([{ label: "ANY KEY", key: "Enter" }]); await this.key(); this.alive(g); }
+        else this.out(a().k(7, "TELEWIRE: nobody answers at that number. It may have been disconnected.").nl()
           .k(8, "(error 404: the page you dialed is not in service)").nl(2).k(7, "TELEWIRE v2.1 · line closed.").nl(2));
         this.skipping = false;
         await this.dos(g, false);
@@ -662,8 +747,8 @@ export class Machine {
   }
 
   // ── the call ───────────────────────────────────────────────────
-  private async call(entry: DirEntry, g: number, express: boolean) {
-    const speed = allowedSpeeds(this.profile).includes(this.profile.speed) ? this.profile.speed : 9600;
+  private async call(entry: DirEntry, g: number, express: boolean, opts?: { speed?: number; onConnect?: () => Promise<void> }) {
+    const speed = opts?.speed ?? (allowedSpeeds(this.profile).includes(this.profile.speed) ? this.profile.speed : 9600);
     this.state.set("dialing");
     count("dialed");
     this.skipping = false;
@@ -684,7 +769,7 @@ export class Machine {
         this.out(a().k(7, "NO ANSWER").nl()); audio.emit("hangup");
         this.skipping = false; await this.sleep(1200); return;
       }
-      const busy = attempt === 0 && !express && !this.lastBusy && (this.debug.busy ? this.callsThisPower === 0 : this.callsThisPower === 0 && Math.random() < 0.2);
+      const busy = !opts && attempt === 0 && !express && !this.lastBusy && (this.debug.busy ? this.callsThisPower === 0 : this.callsThisPower === 0 && Math.random() < 0.2);
       for (let r = 0; r < (busy ? 1 : 2); r++) { await this.wait(r === 0 ? 900 * t : 2600 * t); this.alive(g); if (!busy) audio.emit("ring"); }
       if (busy) {
         this.lastBusy = true;
@@ -715,6 +800,7 @@ export class Machine {
     audio.emit("connect", speed);
     count("connected");
     this.engine.modem.bps = speed;
+    if (opts?.onConnect) return opts.onConnect();
     await this.session(entry, speed, g);
   }
 
@@ -742,6 +828,7 @@ export class Machine {
       client: {
         access: (v) => {modem.bps=v.speed;this.sessionSeconds=Math.max(0,v.remainingSeconds);this.clockRemaining=this.sessionSeconds;this.clockExempt=v.exempt??this.clockExempt;},
         printBill:async(b)=>{await (await import("./bill-print")).printBill(b);},
+        shareLink:(u)=>this.shareUrl.set(u),
         active:()=>this.tube.value,
         setMode: (m) => { term.setMode(m); term.reset(); },
         scroll: (d) => term.scrollView(d),
@@ -762,8 +849,9 @@ export class Machine {
       save: () => saveProfile(this.profile),
       timeLeftMs: () => Math.max(0,this.clockRemaining*1000),
       deepLink: this.deepLink ?? undefined,
+      postcardEntry: this.postcardEntry,
     };
-    this.deepLink = null;
+    this.deepLink = null; this.postcardEntry = undefined;
     try {
       await runBoard(io);
       await modem.drain();

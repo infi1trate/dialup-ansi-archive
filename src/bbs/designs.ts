@@ -13,7 +13,7 @@ export const CLUB_TIPS = [
 const day = () => Math.floor(Date.now()/86400000);
 export function menuPosition(id:string,i:number) {
   if(id==='vault')return {row:10+Math.floor(i/6)*5,col:3+(i%6)*13,width:12};
-  if(id==='strobe') { const positions=[[11,4],[11,31],[11,57],[15,4],[15,57],[19,4],[19,31],[19,57],[22,16],[22,48],[13,4],[13,57],[21,57],[13,4],[21,4]];const [row,col]=positions[i]??[22,4];return {row,col,width:22}; }
+  if(id==='strobe') { const positions=[[11,4],[11,31],[11,57],[15,4],[15,57],[19,4],[19,31],[19,57],[22,16],[22,48],[13,4],[13,57],[21,57],[17,4],[17,57]];const [row,col]=positions[i]??[22,4];return {row,col,width:22}; }
   if(id==='crawl')return {row:8+(i%13),col:i<13?3+(i%3):21,width:i<13?18:18};
   return {row:9+Math.floor(i/2),col:6+(i%2)*36,width:32};
 }
