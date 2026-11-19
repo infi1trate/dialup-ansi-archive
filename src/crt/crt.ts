@@ -63,11 +63,22 @@ void main(){
 const FS_OUT = `#version 300 es
 precision highp float;
 in vec2 uv; out vec4 o;
-uniform sampler2D scene; uniform vec2 srcSize; uniform vec2 outSize; uniform float time, motion, bright, contrast;
+uniform sampler2D scene; uniform vec2 srcSize; uniform vec2 outSize; uniform float time, motion, bright, contrast, dg;
 vec2 curve(vec2 u){ u = u*2.-1.; vec2 off = abs(u.yx)/vec2(9.,7.); u = u + u*off*off; return u*0.5+0.5; }
 float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
 void main(){
-  vec3 col = texture(scene, gl_FragCoord.xy / outSize).rgb;
+  vec2 fc = gl_FragCoord.xy / outSize;
+  vec3 col;
+  // Degauss: a decaying horizontal/vertical wobble with a brief colour-purity smear (dg = seconds since the coil fired).
+  float k = (dg >= 0. && dg < 1.6 && motion > 0.5) ? exp(-dg*2.6)*(dg < 1.3 ? 1. : 1.-(dg-1.3)/0.3) : 0.;
+  if (k > 0.001) {
+    vec2 s = fc + vec2(sin(dg*44. + fc.y*9.)*0.04, sin(dg*31. + fc.x*7.)*0.028)*k;
+    float sm = 0.012*k;
+    col = vec3(texture(scene, s+vec2(sm,0.)).r, texture(scene, s).g, texture(scene, s-vec2(sm,0.)).b);
+    vec3 hue = 0.5+0.5*cos(6.28318*(fc.x*0.8+fc.y*0.6+dg*0.9+vec3(0.,0.33,0.67)));
+    col = mix(col, col*hue*1.7 + hue*0.06*k, 0.6*k);
+  } else col = texture(scene, fc).rgb;
+  if (dg >= 0. && dg < 0.3 && motion < 0.5) col *= 0.55; // reduced motion: a brief dim instead
   vec2 u = curve(uv);
   // scanlines, only when there is room for them
   float lines = outSize.y / srcSize.y;
@@ -99,6 +110,10 @@ export class CRTDisplay {
   brightness = 1;
   /** Picture (gain) knob. */
   contrast = 1;
+  /** Render-clock seconds when the degauss coil last fired (-1 = never). */
+  private degaussAt = -1;
+  private clock = 0;
+  degauss() { this.degaussAt = this.clock; }
 
   constructor(private canvas: HTMLCanvasElement, public reducedMotion: boolean) {
     const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
@@ -162,6 +177,7 @@ export class CRTDisplay {
 
   private lastT = 0;
   render(src: HTMLCanvasElement, srcChanged: boolean, power: PowerState, time: number) {
+    this.clock = time;
     this.resize();
     const W = this.canvas.width, H = this.canvas.height;
     if (!this.gl) return this.render2d(src, power);
@@ -205,6 +221,7 @@ export class CRTDisplay {
     gl.uniform1f(u(this.progOut, "motion"), motion);
     gl.uniform1f(u(this.progOut, "bright"), this.brightness);
     gl.uniform1f(u(this.progOut, "contrast"), this.contrast);
+    gl.uniform1f(u(this.progOut, "dg"), this.degaussAt >= 0 ? time - this.degaussAt : -1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     this.ping = 1 - this.ping;
   }

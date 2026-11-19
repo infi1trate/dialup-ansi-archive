@@ -2,6 +2,8 @@
 // (src/audio/engine.ts) subscribes. The bus itself stays tiny so it can ship in the first frame.
 export interface AudioEvents {
   printer: boolean;
+  /** The monitor's degauss coil: a full cycle, the dull click of an uncharged coil, or the reduced-motion thunk. */
+  degauss: "full" | "click" | "reduced";
   /** The PC's tape-drive motor while the ten-second tape records. */
   tapeMotor: boolean;
   introMusic: boolean;

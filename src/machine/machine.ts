@@ -15,6 +15,7 @@ import { allowedSpeeds, loadProfile, maxSpeed, saveProfile, type Profile } from 
 import { Signal, currentBoardName, tapeArmRequest, tapeState } from "./signals";
 import { handshakeMs, DTMF_OFF_MS, DTMF_ON_MS } from "@/audio/tables";
 import { Terminal } from "@/term/terminal";
+import { DegaussCoil } from "@/lib/degauss";
 import type { Speed } from "@/modem/modem";
 import { net } from "@/data/net";
 import type { Postcard } from "@/lib/postcard";
@@ -149,6 +150,17 @@ export class Machine {
     this.engine.setTube(on);
     this.tube.set(on);
     audio.emit(on ? "monitorOn" : "monitorOff");
+  }
+  private coil = new DegaussCoil();
+  /** The blank badge on the bezel: degausses a lit tube; always live, even on a first call. */
+  pressDegauss(now = Date.now()) {
+    audio.unlock();
+    const r = this.coil.press(now, this.tube.value);
+    if (r === "none") return r;
+    if (r === "click") { audio.emit("degauss", "click"); return r; }
+    this.engine.crt.degauss();
+    audio.emit("degauss", this.engine.crt.reducedMotion ? "reduced" : "full");
+    return r;
   }
   toggleTurbo() { this.turbo.set(!this.turbo.value); this.engine.turbo = this.turbo.value; }
 

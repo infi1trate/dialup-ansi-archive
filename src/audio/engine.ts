@@ -98,6 +98,7 @@ class Synth {
       src.start(); osc.start(); motor = { src, osc, gain };
     });
     bus.on("printer",(on)=>{clearInterval(this.printerTimer);if(on){let n=0;this.printerTimer=setInterval(()=>{this.tones([900+(n%7)*130],this.now,.035,.04,this.buses.pc);if(++n>=60)clearInterval(this.printerTimer);},35);}});
+    bus.on("degauss", (kind) => this.degauss(kind));
     bus.on("diskSeek", () => this.diskSeek());
     bus.on("floppySeek", () => this.floppySeek());
     bus.on("offHook", () => this.offHook());
@@ -322,6 +323,23 @@ class Synth {
     // static crackle as the tube charges
     const s = this.buf(this.crackle), hp = this.biquad("highpass", 1800), cg = this.gain(0.5);
     s.connect(hp).connect(cg).connect(m); this.start(s, t + 0.2);
+  }
+  /** Deep thunk of the relay, then the coil's 60 Hz hum decaying over about 1.6 s. */
+  degauss(kind: "full" | "click" | "reduced") {
+    const m = this.buses.monitor, t = this.now;
+    if (kind === "click") { this.burst(m, t, 0.012, 900, 3, 0.18); this.burst(m, t + 0.003, 0.03, 260, 4, 0.12); return; }
+    const o = this.osc("sine", 70), g = this.gain(); o.connect(g).connect(m);
+    o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(32, t + 0.35);
+    this.env(g.gain, t, 0.95, 0.003, 0.4); o.start(t); o.stop(t + 0.45);
+    this.burst(m, t, 0.02, 420, 2, 0.5); this.burst(m, t, 0.008, 2200, 2, 0.25);
+    if (kind === "reduced") return;
+    const hum = this.gain(); hum.connect(m);
+    [[60, 0.5, "sawtooth"], [120, 0.35, "sine"], [180, 0.12, "triangle"]].forEach(([f, a, type]) => {
+      const h = this.osc(type as OscillatorType, f as number), hg = this.gain(a as number); h.connect(hg).connect(hum);
+      h.start(t + 0.02); h.stop(t + 1.75);
+    });
+    const lp = this.biquad("lowpass", 900, 0.7); hum.disconnect(); hum.connect(lp).connect(m);
+    hum.gain.setValueAtTime(0, t); hum.gain.linearRampToValueAtTime(0.42, t + 0.04); hum.gain.exponentialRampToValueAtTime(0.002, t + 1.65);
   }
   monitorOff() {
     this.thunk(0.35);

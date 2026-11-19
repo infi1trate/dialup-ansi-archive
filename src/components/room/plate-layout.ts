@@ -10,6 +10,8 @@ export const HOTSPOTS = {
   modem: [.8047,.7292,.1784,.1227], modem_leds: [.8464,.8009,.1237,.0301],
   keyboard: [.1693,.8981,.6641,.1019], window: [0,0,.1432,.1736],
   cork_note: [.947,.447,.042,.096], alarm_clock: [0,.713,.1354,.1319],
+  // Blank badge at the lower left of the monitor bezel: the degauss button.
+  monitor_degauss: [.3191,.6021,.0449,.0271],
 } satisfies Record<string, Box>;
 export const fractionStyle = ([x,y,w,h]: Box) => ({ left: `${x*100}%`, top: `${y*100}%`, width: `${w*100}%`, height: `${h*100}%` });
 export const pixelBox = ([x,y,w,h]: Box, width: number, height: number) => ({x:x*width,y:y*height,w:w*width,h:h*height});

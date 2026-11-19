@@ -9,7 +9,7 @@ import { Clock } from './Clock';
 export interface RoomProps {
  monitor: ReactNode; controls?: ReactNode; powered: boolean; turbo: boolean; lamp: boolean; leaned: boolean; reduced: boolean;
  modemVolume: number; musicVolume: number; onMusicVolume:(v:number)=>void; getState:()=>string;
- onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode; recording?:boolean;
+ onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode; recording?:boolean; onDegauss?:()=>void;
 }
 export const NOTE = ['PWR ON.','ENTER = dial.','login: GUEST','ENTER skips anything.','I = who made it.','Then kill the lamp.'];
 export function Room(p: RoomProps) {
@@ -42,6 +42,7 @@ export function Room(p: RoomProps) {
  <div className="plate-glass" style={{...fractionStyle(GLASS),maskImage:`url(${plates.mask})`}} onClick={()=>p.onLean(true)}>{p.monitor}<img className="plate-reflection" src={plates.reflection} alt="" draggable={false}/></div>
  {p.controls}
  {hotspot('lamp','Desk lamp',p.onLamp)}
+ {p.onDegauss&&hotspot('monitor_degauss','Degauss button',p.onDegauss)}
  {hotspot('sticky_note','Sticky note',()=>setNote(1))}
  {hotspot('cork_note','Pinned paper',()=>setNote(2),'secret-paper')}
  {hotspot('pc_buttons',p.powered?'PC power off':'PC power on',p.onPcPower)}
