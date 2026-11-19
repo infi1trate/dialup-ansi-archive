@@ -11,6 +11,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Printed paper is fixed output, independent of the room's lamp/theme. */
+:root {
+  --bill-paper: oklch(95% 0.025 115);
+  --bill-bar: oklch(89% 0.025 140);
+  --bill-ink: oklch(38% 0.025 220);
+  --bill-edge: oklch(80% 0.015 140);
+}
+
 /*
  * Design system definition.
  *

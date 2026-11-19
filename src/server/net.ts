@@ -1,5 +1,6 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import {billAction,deliverBill} from "./bill";
 import {bankAction} from "./time-bank";
 import {sceneAction} from "./scene";
 import {dailyScores} from "./daily";
@@ -105,6 +106,7 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
   const ip = await ipHash(req);
   const now=requestClock(req);
   const action = str(b.action, 20);
+  if(action==="bill"||action==="bills"){const th=await tokenHash(b.token);await limit([th,ip],"billing",120,600);return billAction(s,b.guest?null:await callerByToken(th),b,now);}
   if(action==="timeBank"||action==="withdraw"){const th=await tokenHash(b.token);await limit([th,ip],"bank",120,600);return bankAction(s,b.guest?null:await callerByToken(th),b,now);}
   if(action==="scene"){await limit([ip],"scene",120,600);return sceneAction(s,now,defer);}
   if(action==="mail"||action==="mailRead"){const th=await tokenHash(b.token);await limit([th,ip],"mail",120,600);return mailAction(s,b.guest?null:await callerByToken(th),b);}
@@ -179,9 +181,10 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
       if(c)await s.from("call_log").insert({ caller_id: c?.id ?? null, token_hash: th, handle: c?.handle ?? null, city: c?.city ?? "", speed,board:str(b.board,20)||"crawl",session_id:access.callSession,created_at:now.toISOString() });
       if (c) await s.from("callers").update({ calls: c.calls + 1, last_call_at: now.toISOString() }).eq("id", c.id);
       if(c){await s.rpc("deliver_sysop_mail",{_caller:c.id,_call:c.calls+1});await queueMail(s,{...c,calls:c.calls+1},"first",str(b.board,20)||"crawl");}
+      const billWaiting=await deliverBill(s,c,now);
       await bump("logged_in");
       if (calledBack) await bump("called_back");
-      return { caller: c ? {...pub({ ...c, calls: c.calls + 1 }),level:access.level,speed:access.speed} : null, calledBack,...access };
+      return { caller: c ? {...pub({ ...c, calls: c.calls + 1 }),level:access.level,speed:access.speed} : null, calledBack,billWaiting,...access };
     }
     case "callers": {
       await limit([ip], "read", 120, 600);

@@ -8,7 +8,8 @@ export async function yourRecord(b:Board){
   const x=b.header(a(),'Your record',level);
   const lines=[`${b.user} / ${level} / earned, never bought`,`${cap.minutes} min per UTC day / ${cap.speed} bps cap`,`${r.calls} calls / ${r.days} UTC days / ${r.pieces} pieces viewed`,`${r.oneliners} oneliners / ${r.wallPosts} wall posts / ${r.ratings} pieces rated`,`Ratio credits ${r.credits} / BASEMENT best ${r.crawlBest}`,`THE CORNER best ${r.cornerBest} / finishes ${r.finishedRuns} / streak ${r.streak??0} UTC days`,`Next level: ${level==='NEW USER'?'VALIDATED':level==='VALIDATED'?'ELITE':'complete'}`,...nextChecklist(level,r),...(b.guest?['GUEST activity is not saved. Apply for a handle.']:[])];
   lines.forEach((l,i)=>x.at(5+i,5).k(i===0?(b.ioEntryId()==='maple'?14:b.sk.a):15,pad(l,70),b.ioEntryId()==='maple'?1:0));
-  b.send(x);await b.anyKey(22);
+  x.at(20,5).k(14,b.guest?"GUEST has no bill: no retained telephone account.":"B  phone bills / ENTER returns",b.ioEntryId()==='maple'?1:0);
+  b.send(x);b.hint([{key:"B",ch:"B",label:"PHONE BILLS"},{key:"Enter",label:"BACK"}]);const k=await b.key();b.clearPending();if(k.ch===66||k.ch===98)await b.bills();
 }
 export async function promotionNotice(b:Board,level:string){
   const cap=ACCESS[accessLevel(level)];

@@ -25,6 +25,7 @@ class Synth {
   white: AudioBuffer; pink: AudioBuffer; brown: AudioBuffer; crackle: AudioBuffer;
   modemIn: GainNode; modemVol: GainNode; musicVol: GainNode;
   line: Src[] = [];
+  private printerTimer:ReturnType<typeof setInterval>|undefined;
   private introTimer: ReturnType<typeof setInterval> | undefined;
   private introSources: OscillatorNode[]=[];
   private introGain: GainNode | null=null;
@@ -84,6 +85,7 @@ class Synth {
     bus.on("keyDown", (k) => this.keyDown(k));
     bus.on("keyUp", (k) => this.keyUp(k));
     bus.on("beep", () => this.beep());
+    bus.on("printer",(on)=>{clearInterval(this.printerTimer);if(on){let n=0;this.printerTimer=setInterval(()=>{this.tones([900+(n%7)*130],this.now,.035,.04,this.buses.pc);if(++n>=60)clearInterval(this.printerTimer);},35);}});
     bus.on("diskSeek", () => this.diskSeek());
     bus.on("floppySeek", () => this.floppySeek());
     bus.on("offHook", () => this.offHook());

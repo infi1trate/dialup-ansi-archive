@@ -25,6 +25,7 @@ import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
+import {phoneBills} from "./bill";
 import {timeBank} from "./time-bank";
 import {sceneBulletin} from "./scene";
 import type {ScenePack} from "@/lib/scene";
@@ -85,8 +86,11 @@ export class Board {
   private callSession: string | undefined;
   mailWaiting=0;
   clockExempt=false;
+  billWaiting=false;
+  async bills(waiting=false){await phoneBills(this,waiting);}
+  async printBill(b:import("@/lib/bill").Bill){await this.io.client.printBill?.(b);}
   private clockWarning=0;
-  async bankRead(withdraw=false){const r=await net(withdraw?"withdraw":"timeBank",{guest:this.guest,callSession:this.callSession,minutes:15,active:this.io.client.active?.()??true});if(r&&!r.error){this.clockExempt=r.exempt??this.clockExempt;this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.remainingSeconds,level:this.level,exempt:this.clockExempt});}return r;}
+  async bankRead(withdraw=false){const r=await net(withdraw?"withdraw":"timeBank",{guest:this.guest,callSession:this.callSession,minutes:15,active:this.io.client.active?.()??true});if(r&&!r.error&&!this.guest){this.clockExempt=r.exempt??this.clockExempt;this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.remainingSeconds,level:this.level,exempt:this.clockExempt});}return r;}
   async clockCheck(){if(!this.clockExempt&&this.io.timeLeftMs()<=0)throw new Aborted("timeup");const left=this.io.timeLeftMs()/60000;if(!this.clockExempt&&left<=5&&(this.clockWarning===0||(left<=1&&this.clockWarning===5))){this.clockWarning=left<=1?1:5;this.send(a().at(25,1).k(14,pad(`${this.config.sysop}: ${this.clockWarning} minute${this.clockWarning===1?"":"s"} left. Time bank is K.`,79)));}}
   async mail(){await mailbox(this);}
   ioEntryId(){return this.io.entry.id;}
@@ -117,7 +121,7 @@ export class Board {
     if (doing) this.doing = doing;
     this.lastBeat = Date.now();
     const r = await net("beat", { session: this.session, doing: this.doing, speed: this.io.speed, guest: this.guest,board:this.io.entry.id, callSession:this.callSession,active:this.io.client.active?.()??true });
-    if(r?.time)this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.time.remainingSeconds,level:this.level,exempt:this.clockExempt});
+    if(r?.time&&!(this.guest))this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.time.remainingSeconds,level:this.level,exempt:this.clockExempt});
     if (r?.online) { const me = r.online.findIndex((o: any) => o.me); if (me >= 0) this.node = me + 1; }
     return r;
   }
@@ -162,7 +166,7 @@ export class Board {
 
   // ── output helpers ─────────────────────────────────────────────
   send(x: Ansi | Uint8Array) { this.io.send(x instanceof Ansi ? x.build() : x); }
-  async key(): Promise<Key> {const k=await this.io.key();if(!this.clockExempt&&this.io.timeLeftMs()<=0)throw new Aborted("timeup");return k;}
+  async key(): Promise<Key> {for(;;){const k=await this.io.keyTimeout(1000);if(!this.clockExempt&&this.io.timeLeftMs()<=0)throw new Aborted("timeup");if(k)return k;}}
 
   async anyKey(row?: number) {
     const x = a();
@@ -440,7 +444,7 @@ export class Board {
       const r = await net("logon", { speed: this.io.speed, guest: this.guest,board:this.io.entry.id, callSession:this.callSession,active:this.io.client.active?.()??true });
       if (!r || r.error) this.online = !!r;
       else if (r.banned) await this.suspended();
-      else {this.clockExempt=r.exempt===true; if(r.caller)this.become(r.caller);this.callSession=r.callSession;
+      else {this.billWaiting=r.billWaiting===true;this.clockExempt=r.exempt===true; if(r.caller)this.become(r.caller);this.callSession=r.callSession;
         this.io.speed=r.speed??9600;this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.remainingSeconds??1800,level:this.level,exempt:this.clockExempt});
         if(!this.clockExempt&&r.remainingSeconds<=0&&!(await timeBank(this,true)))throw new Aborted("timeup");
         if(r.promotion)await promotionNotice(this,r.promotion);
@@ -1075,7 +1079,7 @@ export class Board {
       const showInfo = () => io.client.overlay(info ? infoPanel(pack, f, art.sauce, bytes.length, mode, unlocked, url) : null);
       let next = 0;
       while (!next) {
-        const k = finished ? await io.key() : await io.keyOrDrain();
+        const k = finished ? await this.key() : await io.keyOrDrain();
         if (k === null) { finished = true;await this.clockCheck();viewHints(true);continue; }
         const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
         if (k.key === " " && !finished) { if (io.isPaused()) io.resume(); else io.pause(); continue; }
@@ -1262,6 +1266,7 @@ export class Board {
       await this.logon();
       if(this.io.entry.id==='crawl')await sceneBulletin(this);
       await this.newScan();
+      if(this.billWaiting){this.send(this.header(a(),"Mail from TRI-COUNTY BELLWIRE BILLING").at(8,5).k(15,"Last month's telephone statement is waiting. B reads / ENTER menu"));this.hint([{key:"B",ch:"B",label:"BILL"},{key:"Enter",label:"MENU"}]);const k=await this.key();this.clearPending();if(k.ch===66||k.ch===98)await this.bills(true);}
       if(this.mailWaiting){this.send(this.header(a(),"Mail waiting").at(8,5).k(this.sk.a,`${this.mailWaiting} private notes waiting. M reads / ENTER menu`));this.hint([{key:"M",ch:"M",label:"MAIL"},{key:"Enter",label:"MENU"}]);const k=await this.key();this.io.clearOutput();if(String.fromCharCode(k.ch??0).toUpperCase()==="M")await this.mail();}
       
       await this.mainMenu();

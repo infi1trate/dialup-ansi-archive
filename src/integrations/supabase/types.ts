@@ -425,6 +425,30 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_bills: {
+        Row: {
+          caller_id: string
+          delivered_at: string | null
+          month: string
+          payload: Json
+          read_at: string | null
+        }
+        Insert: {
+          caller_id: string
+          delivered_at?: string | null
+          month: string
+          payload: Json
+          read_at?: string | null
+        }
+        Update: {
+          caller_id?: string
+          delivered_at?: string | null
+          month?: string
+          payload?: Json
+          read_at?: string | null
+        }
+        Relationships: []
+      }
       presence: {
         Row: {
           city: string

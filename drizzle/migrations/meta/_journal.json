@@ -50,6 +50,13 @@
       "when": 1795066501564,
       "tag": "0006_daily_time_bank",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795066723150,
+      "tag": "0007_bellwire_monthly_bills",
+      "breakpoints": true
     }
   ]
 }

@@ -211,6 +211,7 @@ export class Machine {
       keyTimeout: (ms) => this.keys.nextOr(this.sleep(ms)), hint: (k) => this.hints.set(k), drain: async () => {}, flush: () => {},
       pause: () => {}, resume: () => {}, isPaused: () => false, clearOutput: () => {},
       client: {
+        printBill:async(b)=>{await (await import("./bill-print")).printBill(b);},
         active:()=>this.tube.value,
         setMode: (m) => { term.setMode(m); term.reset(); }, scroll: (d) => term.scrollView(d),
         scrollTo: (w) => term.scrollViewTo(w === "top" ? term.scrollbackLines : 0), markTop: () => {},
@@ -740,6 +741,7 @@ export class Machine {
       clearOutput: () => modem.clear(),
       client: {
         access: (v) => {modem.bps=v.speed;this.sessionSeconds=Math.max(0,v.remainingSeconds);this.clockRemaining=this.sessionSeconds;this.clockExempt=v.exempt??this.clockExempt;},
+        printBill:async(b)=>{await (await import("./bill-print")).printBill(b);},
         active:()=>this.tube.value,
         setMode: (m) => { term.setMode(m); term.reset(); },
         scroll: (d) => term.scrollView(d),

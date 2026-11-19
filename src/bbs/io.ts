@@ -58,6 +58,7 @@ export interface HostIO {
   client: {
     access?(v:{speed:number;remainingSeconds:number;level:string;exempt?:boolean}):void;
     active?():boolean;
+    printBill?(bill:import("@/lib/bill").Bill):Promise<void>;
     setMode(m: Partial<TermMode>): void;
     scroll(delta: number): void;
     scrollTo(where: "top" | "bottom"): void;
