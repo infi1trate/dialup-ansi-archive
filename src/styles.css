@@ -16,6 +16,7 @@
   --bill-paper: oklch(95% 0.025 115);
   --bill-bar: oklch(89% 0.025 140);
   --bill-ink: oklch(38% 0.025 220);
+  --print-ink: oklch(24% 0.03 255);
   --bill-edge: oklch(80% 0.015 140);
 }
 
@@ -346,6 +347,15 @@
 .floppy-photo.is-dark::after { content:''; position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse at 50% -10%, oklch(.6 .08 240 / .22), transparent 70%); mix-blend-mode:screen; }
 .floppy-label { position:absolute; display:flex; flex-direction:column; justify-content:center; padding:0 0 0 .9cqw; font-family:'Nanum Pen Script',cursive; font-size:3.3cqw; line-height:1; color:var(--note-ink); mix-blend-mode:multiply; opacity:.88; pointer-events:none; }
 .floppy-disk { border-radius:1.2cqw; }
+.printout { position:fixed; right:3vw; bottom:0; z-index:12; width:min(24vw, 300px); aspect-ratio:1080/1350; padding:0; border:0; background:transparent; cursor:pointer; transform:translateY(100%); filter:brightness(var(--paper-light)) sepia(.12) drop-shadow(0 -6px 18px oklch(0 0 0 / .45)); }
+.printout img { display:block; width:100%; height:100%; }
+.printout::after { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(to bottom, oklch(1 0 0 / .05), transparent 30%, oklch(.2 .02 60 / .28) 58%), linear-gradient(to right, oklch(.2 .02 60 / .12), transparent 12%, transparent 88%, oklch(.2 .02 60 / .16)); mix-blend-mode:multiply; }
+.printout.is-rising { animation:printout-rise 4s steps(30, end) forwards; }
+.printout.is-up { transform:translateY(44%); }
+.printout.is-falling { transform:translateY(100%); transition:transform .5s cubic-bezier(.5,0,.8,.4); }
+@keyframes printout-rise { from { transform:translateY(100%); } to { transform:translateY(44%); } }
+.reduce .printout.is-falling { transition:none; }
+@media (orientation:portrait) { .printout { width:min(46vw, 260px); } }
 @media (hover:hover) and (pointer:fine) { .floppy-disk:hover::after { opacity:.06; } }
 .photo-room .ctxbar { position:fixed; bottom:48px; left:0; right:0; z-index:15; }
 .photo-room .plate-controls, .photo-room .plate-monitor-power { z-index:4; }

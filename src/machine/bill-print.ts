@@ -7,7 +7,7 @@ import {audio} from '@/audio/bus';
 // 9-pin printer emulation: each glyph is a 7x9 dot grid sampled from the VGA ROM font.
 const COLS=66,W=1080,H=1350,LEFT=66,PITCH=(W-LEFT*2)/COLS/8,ROWH=PITCH*12;
 let glyphs:boolean[][][]|null=null;
-function dotFont(){if(glyphs)return glyphs;const raw=atob(VGA_8X16_B64);glyphs=[];for(let ch=0;ch<256;ch++){const g:boolean[][]=[];for(let r=0;r<9;r++){let row=0;for(let y=2+Math.floor(r*12/9);y<2+Math.floor((r+1)*12/9);y++)row|=raw.charCodeAt(ch*16+y);g.push(Array.from({length:7},(_,x)=>!!(row&(0x80>>x))));}glyphs.push(g);}return glyphs;}
+export function dotFont(){if(glyphs)return glyphs;const raw=atob(VGA_8X16_B64);glyphs=[];for(let ch=0;ch<256;ch++){const g:boolean[][]=[];for(let r=0;r<9;r++){let row=0;for(let y=2+Math.floor(r*12/9);y<2+Math.floor((r+1)*12/9);y++)row|=raw.charCodeAt(ch*16+y);g.push(Array.from({length:7},(_,x)=>!!(row&(0x80>>x))));}glyphs.push(g);}return glyphs;}
 function hash(s:string){let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0;}
 
 export function renderBill(b:Bill){const tokens=getComputedStyle(document.documentElement);const P={paper:tokens.getPropertyValue('--bill-paper').trim(),bar:tokens.getPropertyValue('--bill-bar').trim(),ink:tokens.getPropertyValue('--bill-ink').trim(),edge:tokens.getPropertyValue('--bill-edge').trim()};

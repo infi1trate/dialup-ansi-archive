@@ -101,6 +101,7 @@ class Synth {
     bus.on("degauss", (kind) => this.degauss(kind));
     bus.on("diskSeek", () => this.diskSeek());
     bus.on("floppySeek", () => this.floppySeek());
+    bus.on("printScreen", (sec) => this.printScreen(sec));
     bus.on("floppyInsert", () => this.floppyLatch(false));
     bus.on("floppyEject", () => this.floppyLatch(true));
     bus.on("offHook", () => this.offHook());
@@ -279,6 +280,22 @@ class Synth {
       this.burst(this.buses.pc, t, 0.004, rnd(2400, 3600), 9, rnd(0.25, 0.45));
       this.burst(this.buses.pc, t, 0.01, rnd(300, 420), 6, rnd(0.08, 0.15));
       t += rnd(0.015, 0.06);
+    }
+  }
+  private printOut: GainNode | null = null;
+  /** The 9-pin printer under the desk (right, low and muffled): needle passes line by line, carriage thunks, paper feed. */
+  printScreen(sec: number) {
+    const t = this.now;
+    if (this.printOut) { const o = this.printOut; o.gain.cancelScheduledValues(t); o.gain.setValueAtTime(o.gain.value, t); o.gain.linearRampToValueAtTime(0, t + 0.05); setTimeout(() => o.disconnect(), 200); this.printOut = null; }
+    if (sec <= 0) return;
+    const out = this.gain(1), lp = this.biquad("lowpass", 2600, 0.7), p = this.panner(0.72);
+    out.connect(lp).connect(p).connect(this.buses.room); this.printOut = out;
+    const lines = Math.round(sec / 0.14);
+    for (let i = 0; i < lines; i++) {
+      const l0 = t + 0.02 + i * 0.14, pass = i % 2 ? 0.085 : 0.1;
+      for (let k = 0; k * 0.0042 < pass; k++) if (Math.random() < 0.78) this.burst(out, l0 + k * 0.0042, 0.0025, rnd(2100, 3300), 7, rnd(0.08, 0.16));
+      this.burst(out, l0 + pass + 0.006, 0.03, rnd(150, 210), 3, 0.32);
+      this.burst(out, l0 + pass + 0.02, 0.02, 900, 2, 0.05);
     }
   }
   /** Shutter slide and latch clack going in; the eject button's clunk and spring coming out. */

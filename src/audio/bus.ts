@@ -3,6 +3,8 @@
 export interface AudioEvents {
   printer: boolean;
   /** A floppy pushed into drive A: (latch clack), or ejected (clunk and spring). */
+  /** PRINT SCREEN on the dot-matrix printer under the desk: seconds of printing, 0 = stop (skipped). */
+  printScreen: number;
   floppyInsert: void;
   floppyEject: void;
   /** The monitor's degauss coil: a full cycle, the dull click of an uncharged coil, or the reduced-motion thunk. */

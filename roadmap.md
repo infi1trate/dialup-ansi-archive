@@ -2,7 +2,7 @@
 - [x] 0. REC chip removed; recording lives in the escape hatch and F9; g00
 - [x] 1. Degauss badge: thunk, hum, wobble, 20 s recharge; g01
 - [x] 2. Floppy disks: close-up, A: drive, BRICKS, diary, drawings, number; g02-g04
-- [ ] 3. Print Screen: tractor-feed printout rising in the room, PNG; g05-g06
+- [x] 3. Print Screen: tractor-feed printout rising in the room, PNG; g05-g06
 - [ ] 4. Instant photo: flash, developing print, PNG, cork board print; g07-g09
 - [ ] 5. The tapes: mixtape through the speaker, sides, ducking, WAV renders; g10 + tunes
 - [ ] 6. Weather and the house: storms, line noise, upstairs phone; g11-g13

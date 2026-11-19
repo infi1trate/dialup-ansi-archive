@@ -10,6 +10,10 @@ import { Room } from "@/components/room/Room";
 import { EscapeHatch } from "@/components/room/EscapeHatch";
 import { FloppyCloseup } from "@/components/room/FloppyCloseup";
 import { useToys } from "@/components/room/useToys";
+import { Printout, type PrintJob } from "@/components/room/Printout";
+import { captureScreen } from "@/lib/printscreen";
+import { deliverFile } from "@/lib/deliver";
+import { currentBoardName } from "@/machine/signals";
 import { loadFloppy, saveFloppy, type DiskId } from "@/machine/floppy-state";
 import { floppyDisk } from "@/machine/signals";
 import { DEFAULTS, brightnessGain, contrastGain, loadRoom, saveRoom, type RoomSettings } from "@/components/room/settings";
@@ -110,14 +114,18 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       orient();
       window.addEventListener("resize", orient);
       unsubs.push(() => window.removeEventListener("resize", orient));
+      let printDownAt = 0;
       const down = (e: KeyboardEvent) => {
         if (e.key === "`" && !e.ctrlKey && !e.altKey) { e.preventDefault(); toggleLean(); return; }
+        if (e.key === "PrintScreen") { e.preventDefault(); printDownAt = Date.now(); void printRef.current(); return; }
+        if (printUp.current && printSkipOpen.current) { printSkipOpen.current = false; skipRef.current(); e.preventDefault(); return; } // any key finishes the printout
         if (e.key === "F9") { e.preventDefault(); if (!e.repeat) { if (deck.current?.state === "rec") deck.current.finish(); else deck.current?.record(); } return; } // F9 records ten seconds, F9 again stops
         if (e.key === "Escape" && deck.current?.state === "rec") { e.preventDefault(); deck.current.finish(); return; }
         if ((e.target as HTMLElement)?.closest?.(".hatch")) return;
         m.handleKeyDown(e);
       };
-      const up = (e: KeyboardEvent) => { if (e.key === "F9") { e.preventDefault(); return; } m.handleKeyUp(e); };
+      const up = (e: KeyboardEvent) => { if (e.key === "PrintScreen") { e.preventDefault(); if (Date.now() - printDownAt > 800) void printRef.current(); return; } // Windows only sends keyup for Print Screen
+        if (e.key === "F9") { e.preventDefault(); return; } m.handleKeyUp(e); };
       window.addEventListener("keydown", down);
       window.addEventListener("keyup", up);
       if (postcard && "missing" in postcard) { m.lostAt = "POSTCARD"; m.lostNote = postcard.missing === "withdrawn" ? "This card was withdrawn." : "That postcard has expired, or was never sent."; m.powerOn(); }
@@ -180,6 +188,34 @@ export function Computer({ deepLink, lost, postcard }: Props) {
     if (machine.current?.powered.value) [250, 620, 980, 1320].forEach((t) => setTimeout(() => audio.emit("floppySeek"), t)); // the drive reads the new disk: ~1.5 s grind, LED blinking
   }, []);
   const floppySlot = useCallback(() => { if (floppyDisk.value) setFloppy(null); else { audio.unlock(); setFloppyOpen(true); } }, [setFloppy]);
+  const reducedRef = useRef(reduced); reducedRef.current = reduced;
+  const toysRef = useRef(toys); toysRef.current = toys;
+  const printSkipOpen = useRef(false);
+  const [printJob, setPrintJob] = useState<PrintJob | null>(null);
+  const [printSkip, setPrintSkip] = useState(0);
+  const printing = useRef(false);
+  /** PRINT SCREEN: snapshot the CRT now (never mid-stream bytes later), then print it on the dot-matrix under the desk. */
+  const printScreen = useCallback(async () => {
+    const m = machine.current; if (!m || !m.powered.value || printing.current || !toysRef.current) return;
+    audio.unlock();
+    const shot = captureScreen(m.engine.term), board = currentBoardName.value;
+    printing.current = true;
+    try {
+      const { printScreen: render } = await import("@/machine/screen-print");
+      const { blob, name } = await render(shot, board);
+      setPrintJob((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(blob), blob, name, id: Date.now() }; });
+      setPrintSkip(0); printSkipOpen.current = !reducedRef.current;
+      audio.emit("printScreen", reducedRef.current ? 1.2 : 4);
+      setTimeout(() => { printing.current = false; }, 400);
+      void import("@/data/net").then((n) => n.count("screen_printed")).catch(() => {});
+    } catch { printing.current = false; }
+  }, []);
+  const printRef = useRef(printScreen); printRef.current = printScreen;
+  const printUp = useRef(false); printUp.current = !!printJob;
+  const skipPrint = useCallback(() => { setPrintSkip((n) => n + 1); audio.emit("printScreen", 0); }, []);
+  const skipRef = useRef(skipPrint); skipRef.current = skipPrint;
+  const savePrint = useCallback(() => { if (printJob) void deliverFile(printJob.blob, printJob.name, "Dial-Up printout"); }, [printJob]);
+  const dropPrint = useCallback(() => setPrintJob((old) => { if (old) URL.revokeObjectURL(old.url); return null; }), []);
   const toggleLamp = () => { audio.unlock(); audio.emit("lampToggle", !cfg.lamp); update({ lamp: !cfg.lamp }); };
 
   const monitor = (
@@ -209,7 +245,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
         {tapeFile && tape !== "rec" && <li><Button variant="ghost" type="button" onClick={(e) => { void saveTapeFile(tapeFile); e.currentTarget.blur(); }}>Save tape</Button></li>}
         {tapeNote && <li className="hatch-note">{tapeNote}</li>}
       </> : null}
-      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li>{toys&&<li><Button variant="ghost" onClick={floppySlot}>{floppy?"Eject floppy":"Floppy disks"}</Button></li>}<li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
+      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li>{toys&&powered&&<li><Button variant="ghost" onClick={()=>void printScreen()}>Print</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>{savePrint();window.dispatchEvent(new Event("dialup:printout-away"));}}>Save printout</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>window.dispatchEvent(new Event("dialup:printout-away"))}>Put printout away</Button></li>}{toys&&<li><Button variant="ghost" onClick={floppySlot}>{floppy?"Eject floppy":"Floppy disks"}</Button></li>}<li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
       lamp={cfg.lamp}
@@ -244,6 +280,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       onDegauss={() => machine.current?.pressDegauss()}
       toys={{ live: toys, floppyIn: floppy !== null, onFloppySlot: floppySlot }}
     >
+      {printJob && <Printout key={printJob.id} job={printJob} lamp={cfg.lamp} reduced={reduced} skip={printSkip} onSave={savePrint} onRisen={() => { printSkipOpen.current = false; }} onGone={dropPrint} />}
       {floppyOpen && toys && <FloppyCloseup lamp={cfg.lamp} onPick={setFloppy} onClose={() => setFloppyOpen(false)} />}
       {layout === "tube" && <ContextBar hints={hints} powered={powered} onPower={() => machine.current?.pressPcPower()} onKey={h => machine.current?.pressHint(h)} onText={t => machine.current?.typeText(t)} />}
       {hatch}
