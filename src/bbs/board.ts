@@ -217,6 +217,20 @@ export class Board {
     return x;
   }
 
+  /** MAPLE RIDGE's one answer for anything off the reviewed shelf, in Mr. Hutchins's voice. */
+  async clubRefusal() {
+    const x = a().reset().c(15, 1).cls();
+    box(x, 7, 10, 60, 10, 15, "CLUB SHELF", true, 1);
+    x.at(9, 14).c(14, 1).t("Mr. Hutchins:");
+    x.at(11, 14).c(15, 1).t("I'm sorry, that picture isn't on our club-approved");
+    x.at(12, 14).c(15, 1).t("shelf. Our reviewers choose pieces the whole family");
+    x.at(13, 14).c(15, 1).t("can enjoy. Do try the Picture of the Day instead.");
+    x.at(15, 14).c(11, 1).t("Thank you for understanding.");
+    this.send(x);
+    await this.anyKey(18);
+    this.send(a().reset().cls());
+  }
+
   async errorScreen(what: string) {
     const x = a().cls();
     box(x, 7, 14, 52, 10, 12, "CARRIER TROUBLE");
@@ -936,8 +950,8 @@ export class Board {
   }
 
   async packScreen(s: PackSummary, startFile?: string) {
-    if(this.io.entry.id === "maple" && startFile && !familyAllowed(s.name,startFile)){await this.errorScreen("Not on the club-approved shelf.");return;}
-    if(this.io.entry.id === "maple" && !FAMILY_SHELF.some(f=>f.pack===s.name)){await this.errorScreen("That disk is not on the club-approved shelf.");return;}
+    if(this.io.entry.id === "maple" && startFile && !familyAllowed(s.name,startFile)){await this.clubRefusal();return;}
+    if(this.io.entry.id === "maple" && !FAMILY_SHELF.some(f=>f.pack===s.name)){await this.clubRefusal();return;}
     this.send(this.header(a(), `Pack ${s.name.toUpperCase()}`, String(s.year)));
     if (!packCached(s.name)) await this.loading("Retrieving pack listing...");
     let pack: PackInfo;
@@ -1153,7 +1167,7 @@ export class Board {
     io.client.overlay(null);
   }
 
-  async openPath(path:string){const [pack,file]=path.split('/');if(!pack||!file)return;if(this.io.entry.id==='maple'&&!familyAllowed(pack,file)){await this.errorScreen('Not on the club-approved shelf.');return;}try{const p=await getPack(pack);const i=p.files.filter(f=>f.viewable).findIndex(f=>f.name.toLowerCase()===file.toLowerCase());if(i<0){await this.errorScreen('That file is not viewable.');return;}await this.viewer(p,p.files.filter(f=>f.viewable),i);}catch(e){await this.errorScreen(String(e));}}
+  async openPath(path:string){const [pack,file]=path.split('/');if(!pack||!file)return;if(this.io.entry.id==='maple'&&!familyAllowed(pack,file)){await this.clubRefusal();return;}try{const p=await getPack(pack);const i=p.files.filter(f=>f.viewable).findIndex(f=>f.name.toLowerCase()===file.toLowerCase());if(i<0){await this.errorScreen('That file is not viewable.');return;}await this.viewer(p,p.files.filter(f=>f.viewable),i);}catch(e){await this.errorScreen(String(e));}}
   async openFamily(piece:typeof FAMILY_SHELF[number]|undefined){if(!piece)return;await this.openPath(`${piece.pack}/${piece.file}`);}
   async familyList(){for(;;){this.send(this.header(a(),'Club-approved shelf').at(23,3).k(8,'ENTER picture / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:FAMILY_SHELF.map(f=>({text:`${pad(f.file,18)}${pad(f.pack,18)}${f.artist}`,color:9}))});if(!r)return;await this.openFamily(FAMILY_SHELF[r.index]);}}
   async fileResults(title:string,rows:{pack:string;file:string;year?:number;title?:string;artist?:string}[]){if(this.io.entry.id==='maple')rows=rows.filter(r=>familyAllowed(r.pack,r.file));if(!rows.length){this.send(this.header(a(),title).at(7,5).k(8,'No results found.'));await this.anyKey(22);return;}for(;;){this.send(this.header(a(),title).at(4,3).k(this.sk.a,`   ${pad('File',13)}${pad('Pack',12)}${pad('Title',28)}Artist`).at(23,3).k(8,'ENTER view / SPACE tag / V queue / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:rows.map(f=>({text:`${this.tagged.has(`${f.pack}/${f.file}`)?'*':' '} ${pad(f.file,13)}${pad(f.pack,12)}${pad(f.title||'(untitled)',28)}${pad(f.artist||'unknown',18)}`,color:this.sk.a})),hotkeys:' V'});if(!r)return;if(r.key==='V'){await this.playTags();continue;}const f=rows[r.index];if(!f)continue;if(r.key===' '){const id=`${f.pack}/${f.file}`;if(this.tagged.has(id))this.tagged.delete(id);else this.tagged.add(id);continue;}await this.openPath(`${f.pack}/${f.file}`);}}

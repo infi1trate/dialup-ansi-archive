@@ -1,0 +1,13 @@
+import {it,expect,vi} from 'vitest';
+import {Board} from '@/bbs/board';
+import {DIRECTORY} from '@/bbs/io';
+import {FAMILY_SHELF,familyAllowed,pictureOfDay} from '@/data/family-shelf';
+import {checkPostcard} from '@/lib/postcard';
+const maple=()=>{const entry=DIRECTORY.find(d=>d.id==='maple');const send=vi.fn();const b=new Board({entry,profile:{filesSeen:[]},client:{setMode:vi.fn(),overlay:vi.fn()},send,clearOutput:vi.fn(),node:1} as any);(b as any).anyKey=vi.fn(async()=>{});(b as any).lightbar=vi.fn(async()=>null);return {b,send};};
+const sent=(send:any)=>send.mock.calls.map((c:any)=>new TextDecoder('latin1').decode(c[0].build?c[0].build():c[0])).join('');
+it('Picture of the Day is on the shelf for every day of a year',()=>{for(let d=0;d<366;d++){const p=pictureOfDay(new Date(Date.UTC(2026,0,1+d)));expect(familyAllowed(p.pack,p.file)).toBe(true);}});
+it('every Surprise-me candidate is on the shelf',()=>{for(let i=0;i<100;i++){const p=FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)];expect(familyAllowed(p.pack,p.file)).toBe(true);}});
+it('search and shelf results silently omit off-shelf pieces',async()=>{const {b,send}=maple();await b.fileResults('Search',[{pack:'unreviewed',file:'X.ANS'}]);expect(sent(send)).not.toContain('X.ANS');expect(sent(send)).toContain('No results');});
+it('a typed path to an off-shelf piece gets Mr. Hutchins, not the art',async()=>{const {b,send}=maple();await b.openPath('unreviewed/X.ANS');expect(sent(send)).toContain('Mr. Hutchins');});
+it('a MAPLE RIDGE postcard cannot enclose an off-shelf piece',()=>{const card={board:'maple',design:'maple',lines:['hello','',''],signature:'GUEST',enclosed:{pack:'unreviewed',file:'X.ANS',year:1994,artist:'x'}};const r=checkPostcard(card as any,'GUEST');expect(r.ok).toBe(false);expect((r as any).why).toContain('Hutchins');const ok=checkPostcard({...card,board:'crawl'} as any,'GUEST');expect(ok.ok).toBe(true);});
+it('scene lines fit the 72-column list row without cutting a word',async()=>{const {sceneLine}=await import('@/lib/scene');const l=sceneLine({name:'out-1196',year:1996,groups:['outworld arts'],files:25} as any,new Date('2026-11-19T12:00:00Z'));expect(l.length).toBeLessThanOrEqual(72);expect(l).toMatch(/\.$/);});

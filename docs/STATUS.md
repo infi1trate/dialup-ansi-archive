@@ -24,6 +24,21 @@ Test browser: Playwright Chromium, software GL, 1600x900. Fresh handle **wz0729a
 | 17 | TOUCHBOX: 0-9 touch tones, A/B/C tones, Esc exits | PASS (ten dialDigit events, 1000/440/2600 Hz tones) |
 | 18 | NFOLOOM pages through exactly the NFOs downloaded so far, each in its house style | PASS after fix: long NFOs scrolled their header off the screen. NFO LOOM now shows each NFO one page at a time (SPACE page, N/P next/previous); 7 of 7 downloaded NFOs, LATCHKEY lower-case, NULL FOUNDRY boxed sections, TIN SAINTS centred, MIDNIGHT RELAY title-case |
 
+### MAPLE RIDGE stays family-safe by every route; live 0-DAY (item 5)
+| # | Check | Result |
+|---|---|---|
+| 19 | Picture of the Day, forced to each of 366 dates | PASS (always a reviewed piece; unit test) |
+| 20 | Club-approved shelf lists only reviewed pieces | PASS (42 entries, all on the allowlist) |
+| 21 | Surprise me, 100 draws | PASS (draws only from the allowlist; unit test) |
+| 22 | Search the club shelf for an off-shelf piece ("boy" finds A_BOY.ANS on other boards) | PASS (silently omitted: "No results found.") |
+| 23 | Your shelf holding an off-shelf favourite saved on DEAD CARRIER (ensiart/A_BOY.ANS, wz0729a) | PASS (silently omitted) |
+| 24 | Tagged queue carried from another board | PASS (tags belong to one call and start empty on every new call; playTags also re-checks each tag, unit test) |
+| 25 | Quick scan of a mixed pack (ensiart: 211 files, 32 reviewed) | PASS (pack list shows 32 entries; every scanned caption was on the allowlist) |
+| 26 | Postcard reply flow with an enclosed off-shelf piece | PASS after fix: a MAPLE RIDGE card could carry any piece. Sending one is now refused in Mr. Hutchins's words, and pickup of an older or forged MAPLE RIDGE card drops the enclosure before anything is drawn; reply composes a blank card |
+| 27 | Typed pack/file path (/dial/555-0128/1991/ensiart/1991.ANS) | PASS after fix: refused, but on the DEAD CARRIER "CARRIER TROUBLE" screen. All club refusals now use a blue double-line CLUB SHELF box in Mr. Hutchins's voice (f09) |
+| 28 | DEAD CARRIER 0-DAY ART against the live archive | PASS (list on screen 0.3 s after Z from the daily cache; newest year first; Enter opened BMB-1196) (f10) |
+| 29 | DEAD CARRIER "This week in the scene" | PASS (shown on logon from the same cache, 1996 before 1995). Also fixed: long lines were cut mid-word ("30 years la"); they now shorten to "30y late." |
+
 Item 3 note: the 1991.ANS strip was blank because that piece draws itself column by column with cursor jumps; the scan stopped reading at the first byte placed below row 8. It now reads the whole piece, keeps only the eight rows from the first visible row, and the caption says "from row N".
 
 ## Sprint E

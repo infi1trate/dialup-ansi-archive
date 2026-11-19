@@ -274,6 +274,8 @@ export class Machine {
   private async deliverPostcard(pc: { card: Postcard & { id: string } }, entry: DirEntry, g: number) {
     const { cardScreen, cardChoices } = await import("@/bbs/postcard-art");
     const term = this.engine.term, modem = this.engine.modem, card = pc.card;
+    // A MAPLE RIDGE card only ever carries a reviewed piece; older or forged cards drop the enclosure.
+    if (card.enclosed && card.board === "maple" && !(await import("@/data/family-shelf")).familyAllowed(card.enclosed.pack, card.enclosed.file)) card.enclosed = null;
     this.state.set("session");
     modem.bps = 2400;
     const stream = async () => { if (this.skipping) { modem.flush(); return; } const k = await this.keys.nextOr(modem.drain()); this.alive(g); if (k) { this.skipping = true; this.notePostcardSkip(); modem.flush(); } };

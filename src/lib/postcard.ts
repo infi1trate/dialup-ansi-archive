@@ -1,3 +1,4 @@
+import { familyAllowed } from "@/data/family-shelf";
 // Shared postcard rules (server enforces; tests cover them).
 import { isProfane, hasUrl } from "./filter";
 /** 32 symbols, no vowels, so ids never spell words. */
@@ -38,6 +39,7 @@ export function checkPostcard(raw: any, handle: string): CardVerdict {
   const e = raw.enclosed;
   if (e) {
     if (typeof e.pack !== "string" || !/^[A-Za-z0-9._-]{1,80}$/.test(e.pack) || typeof e.file !== "string" || !e.file || e.file.length > 120 || e.file.includes("/")) return { ok: false, why: "Bad enclosure." };
+    if (raw.board === "maple" && !familyAllowed(e.pack, e.file)) return { ok: false, why: "Mr. Hutchins: only pieces from the club-approved shelf may ride in our mail." };
     enclosed = { pack: e.pack, file: e.file, year: Math.max(1980, Math.min(2030, Number(e.year) || 1994)), artist: String(e.artist ?? "").replace(/[^\x20-\x7e]/g, "").slice(0, 40) || "unknown artist" };
   }
   return { ok: true, clean: true, value: { board: raw.board, design: raw.design, lines: l3, signature: sig, enclosed } };
