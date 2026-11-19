@@ -11,6 +11,8 @@ import { EscapeHatch } from "@/components/room/EscapeHatch";
 import { FloppyCloseup } from "@/components/room/FloppyCloseup";
 import { useToys } from "@/components/room/useToys";
 import { Printout, type PrintJob } from "@/components/room/Printout";
+import { PhotoCloseup, type PhotoJob } from "@/components/room/PhotoCloseup";
+import { HOTSPOTS } from "@/components/room/plate-layout";
 import { captureScreen } from "@/lib/printscreen";
 import { deliverFile } from "@/lib/deliver";
 import { currentBoardName } from "@/machine/signals";
@@ -215,6 +217,38 @@ export function Computer({ deepLink, lost, postcard }: Props) {
   const skipPrint = useCallback(() => { setPrintSkip((n) => n + 1); audio.emit("printScreen", 0); }, []);
   const skipRef = useRef(skipPrint); skipRef.current = skipPrint;
   const savePrint = useCallback(() => { if (printJob) void deliverFile(printJob.blob, printJob.name, "Dial-Up printout"); }, [printJob]);
+  const [photo, setPhoto] = useState<PhotoJob | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [corkPrint, setCorkPrint] = useState<string | null>(null);
+  const [flash, setFlash] = useState<"" | "flash" | "dim">("");
+  const photoBusy = useRef(false);
+  useEffect(() => { try { setCorkPrint(localStorage.getItem("dialup.photo.last")); } catch { /* blocked */ } }, []);
+  /** The instant camera on the cork board: grab the room as it is, flash, then develop the print. */
+  const takePhoto = useCallback(async () => {
+    const m = machine.current, el = document.querySelector<HTMLElement>(".photo-room");
+    if (!m || !el || photoBusy.current || !toysRef.current) return;
+    audio.unlock(); photoBusy.current = true;
+    try {
+      const cam = await import("@/machine/instant-photo");
+      const snap = await cam.snapStage(m.engine, el, HOTSPOTS.monitor);
+      audio.emit("camera");
+      const dim = reducedRef.current; setFlash(dim ? "dim" : "flash"); setTimeout(() => setFlash(""), dim ? 300 : 120);
+      const print = await cam.renderPrint(snap, cam.captionFor(currentBoardName.value));
+      const thumb = cam.corkThumb(print);
+      try { localStorage.setItem("dialup.photo.last", thumb); } catch { /* full */ }
+      setCorkPrint(thumb);
+      const blob = await new Promise<Blob>((r) => print.toBlob((b) => r(b!), "image/jpeg", 0.92));
+      const now = new Date();
+      const id = now.getTime();
+      setPhoto((old) => { if (old) URL.revokeObjectURL(old.printUrl); return { printUrl: URL.createObjectURL(blob), png: null, printW: print.width, id, name: `dialup-photo-${now.toISOString().slice(0, 16).replace(/[-:T]/g, "")}.png` }; });
+      setPhotoOpen(true);
+      // the shareable PNG is made while the print develops, so a tap can hand it over without waiting
+      const png = await cam.renderPhotoPng(print, cfgRef.current.lamp);
+      setPhoto((cur) => (cur && cur.id === id ? { ...cur, png } : cur));
+      void import("@/data/net").then((n) => n.count("photo_taken")).catch(() => {});
+    } finally { photoBusy.current = false; }
+  }, []);
+  const savePhoto = useCallback(() => { if (photo?.png) void deliverFile(photo.png, photo.name, "Dial-Up instant photo"); }, [photo]);
   const dropPrint = useCallback(() => setPrintJob((old) => { if (old) URL.revokeObjectURL(old.url); return null; }), []);
   const toggleLamp = () => { audio.unlock(); audio.emit("lampToggle", !cfg.lamp); update({ lamp: !cfg.lamp }); };
 
@@ -245,7 +279,7 @@ export function Computer({ deepLink, lost, postcard }: Props) {
         {tapeFile && tape !== "rec" && <li><Button variant="ghost" type="button" onClick={(e) => { void saveTapeFile(tapeFile); e.currentTarget.blur(); }}>Save tape</Button></li>}
         {tapeNote && <li className="hatch-note">{tapeNote}</li>}
       </> : null}
-      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li>{toys&&powered&&<li><Button variant="ghost" onClick={()=>void printScreen()}>Print</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>{savePrint();window.dispatchEvent(new Event("dialup:printout-away"));}}>Save printout</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>window.dispatchEvent(new Event("dialup:printout-away"))}>Put printout away</Button></li>}{toys&&<li><Button variant="ghost" onClick={floppySlot}>{floppy?"Eject floppy":"Floppy disks"}</Button></li>}<li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
+      physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressDegauss()}>Degauss monitor</Button></li>{toys&&powered&&<li><Button variant="ghost" onClick={()=>void printScreen()}>Print</Button></li>}{toys&&<li><Button variant="ghost" onClick={()=>void takePhoto()}>Take a photo</Button></li>}{photo?.png&&<li><Button variant="ghost" onClick={savePhoto}>Save photo</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>{savePrint();window.dispatchEvent(new Event("dialup:printout-away"));}}>Save printout</Button></li>}{printJob&&<li><Button variant="ghost" onClick={()=>window.dispatchEvent(new Event("dialup:printout-away"))}>Put printout away</Button></li>}{toys&&<li><Button variant="ghost" onClick={floppySlot}>{floppy?"Eject floppy":"Floppy disks"}</Button></li>}<li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
       lamp={cfg.lamp}
@@ -278,8 +312,12 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       onModemVolume={(v) => { update({ modemVolume: v }); audio.setMix({ modemVolume: v }); }}
       onLean={lean}
       onDegauss={() => machine.current?.pressDegauss()}
-      toys={{ live: toys, floppyIn: floppy !== null, onFloppySlot: floppySlot }}
+      toys={{ live: toys, floppyIn: floppy !== null, onFloppySlot: floppySlot, onPhoto: () => void takePhoto() }}
+      corkPrint={corkPrint}
+      flash={flash === "flash"}
     >
+      {flash && <div className={`camera-flash ${flash === "dim" ? "is-dim" : ""}`} aria-hidden />}
+      {photoOpen && photo && <PhotoCloseup job={photo} lamp={cfg.lamp} onSave={savePhoto} onClose={() => setPhotoOpen(false)} />}
       {printJob && <Printout key={printJob.id} job={printJob} lamp={cfg.lamp} reduced={reduced} skip={printSkip} onSave={savePrint} onRisen={() => { printSkipOpen.current = false; }} onGone={dropPrint} />}
       {floppyOpen && toys && <FloppyCloseup lamp={cfg.lamp} onPick={setFloppy} onClose={() => setFloppyOpen(false)} />}
       {layout === "tube" && <ContextBar hints={hints} powered={powered} onPower={() => machine.current?.pressPcPower()} onKey={h => machine.current?.pressHint(h)} onText={t => machine.current?.typeText(t)} />}

@@ -102,6 +102,7 @@ class Synth {
     bus.on("diskSeek", () => this.diskSeek());
     bus.on("floppySeek", () => this.floppySeek());
     bus.on("printScreen", (sec) => this.printScreen(sec));
+    bus.on("camera", () => this.camera());
     bus.on("floppyInsert", () => this.floppyLatch(false));
     bus.on("floppyEject", () => this.floppyLatch(true));
     bus.on("offHook", () => this.offHook());
@@ -281,6 +282,16 @@ class Synth {
       this.burst(this.buses.pc, t, 0.01, rnd(300, 420), 6, rnd(0.08, 0.15));
       t += rnd(0.015, 0.06);
     }
+  }
+  /** Instant camera on the cork board (far right): shutter clack, then the print-eject motor whirr. */
+  camera() {
+    const t = this.now + 0.005, p = this.panner(0.9); p.connect(this.buses.room);
+    this.burst(p, t, 0.006, 3800, 3, 0.5); this.burst(p, t + 0.004, 0.03, 900, 2, 0.35); this.burst(p, t + 0.06, 0.012, 2400, 4, 0.25);
+    const o = this.osc("sawtooth", 140), bp = this.biquad("bandpass", 700, 1.4), g = this.gain(); o.connect(bp).connect(g).connect(p);
+    o.frequency.setValueAtTime(120, t + 0.18); o.frequency.linearRampToValueAtTime(175, t + 0.4); o.frequency.setValueAtTime(175, t + 1.05); o.frequency.linearRampToValueAtTime(110, t + 1.2);
+    g.gain.setValueAtTime(0, t + 0.18); g.gain.linearRampToValueAtTime(0.16, t + 0.26); g.gain.setValueAtTime(0.16, t + 1.08); g.gain.linearRampToValueAtTime(0, t + 1.22);
+    o.start(t + 0.18); o.stop(t + 1.25);
+    this.burst(p, t + 1.2, 0.02, 1200, 3, 0.18);
   }
   private printOut: GainNode | null = null;
   /** The 9-pin printer under the desk (right, low and muffled): needle passes line by line, carriage thunks, paper feed. */

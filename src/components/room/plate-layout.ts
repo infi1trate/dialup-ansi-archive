@@ -12,6 +12,8 @@ export const HOTSPOTS = {
   cork_note: [.947,.447,.042,.096], alarm_clock: [0,.713,.1354,.1319],
   // Blank badge at the lower left of the monitor bezel: the degauss button.
   monitor_degauss: [.3191,.6021,.0449,.0271],
+  // The instant print pinned to the cork board: the camera.
+  cork_photo: [.9258,.5167,.0492,.1563],
 } satisfies Record<string, Box>;
 export const fractionStyle = ([x,y,w,h]: Box) => ({ left: `${x*100}%`, top: `${y*100}%`, width: `${w*100}%`, height: `${h*100}%` });
 export const pixelBox = ([x,y,w,h]: Box, width: number, height: number) => ({x:x*width,y:y*height,w:w*width,h:h*height});

@@ -6,12 +6,15 @@ import { plates, plateSet } from './plates';
 import { useRoomLive } from './useRoomLive';
 import { Rain } from './Rain';
 import { Clock } from './Clock';
+import { CORK_PIN, CORK_PRINT, quadMatrix3d } from '@/lib/photo';
 export interface RoomProps {
  monitor: ReactNode; controls?: ReactNode; powered: boolean; turbo: boolean; lamp: boolean; leaned: boolean; reduced: boolean;
  modemVolume: number; musicVolume: number; onMusicVolume:(v:number)=>void; getState:()=>string;
  onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode; recording?:boolean; onDegauss?:()=>void;
  /** Visitor toys: hotspots render only once they are live (see useToys). */
- toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void };
+ toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void; onPhoto:()=>void };
+ /** The last instant print (small JPEG) laid over the photographed one on the cork board. */
+ corkPrint?:string|null; flash?:boolean;
 }
 export const NOTE = ['PWR ON.','ENTER = dial.','login: GUEST','ENTER skips anything.','I = who made it.','Then kill the lamp.'];
 export function Room(p: RoomProps) {
@@ -33,7 +36,7 @@ export function Room(p: RoomProps) {
  r.addEventListener('wheel',wheel,{passive:false});r.addEventListener('touchstart',start,{passive:true});r.addEventListener('touchmove',move,{passive:false});return()=>{r.removeEventListener('wheel',wheel);r.removeEventListener('touchstart',start);r.removeEventListener('touchmove',move);};},[p.onLean]);
  const hotspot=(name:keyof typeof HOTSPOTS,label:string,action:()=>void,extra='')=><Button key={name} variant="ghost" tabIndex={-1} data-touch aria-label={label} className={`plate-hotspot ${extra}`} style={fractionStyle(HOTSPOTS[name])} onPointerDown={e=>e.preventDefault()} onClick={action}/>;
  const volume=(name:'modem'|'speaker',value:number,set:(v:number)=>void)=><PlateVolume key={name} name={name} value={value} onChange={set}/>;
- return <main ref={root} className={`room photo-room ${ready?'plates-ready':''} ${p.lamp?'lamp-on':''} ${p.leaned?'leaned':''} ${p.reduced?'reduce':''} ${attract?'arrival-attract':''}`} onClick={e=>{if(!(e.target as HTMLElement).closest('[data-touch],.monitor-screen,.hatch,.ctxbar,.note-closeup')&&p.leaned)p.onLean(false);}}>
+ return <main ref={root} className={`room photo-room ${ready?'plates-ready':''} ${p.lamp?'lamp-on':''} ${p.leaned?'leaned':''} ${p.reduced?'reduce':''} ${attract?'arrival-attract':''} ${p.flash?'is-flash':''}`} onClick={e=>{if(!(e.target as HTMLElement).closest('[data-touch],.monitor-screen,.hatch,.ctxbar,.note-closeup')&&p.leaned)p.onLean(false);}}>
  <h1 className="sr-only">Dial-Up: DEAD CARRIER in a photographic basement</h1>
  <svg className="room-light-filter" aria-hidden><defs><filter id="room-light-tint" colorInterpolationFilters="sRGB"><feColorMatrix data-room-light type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"/></filter></defs></svg>
  <div className="desk-extension" aria-hidden><div className="desk-crop"><img className="desk-off" src={plates.off[large?1:0]} alt=""/><img className="desk-on" src={plates.on[large?1:0]} alt=""/><img className="desk-light" src={plates.light[large?1:0]} alt=""/></div></div>
@@ -45,6 +48,7 @@ export function Room(p: RoomProps) {
  {p.controls}
  {hotspot('lamp','Desk lamp',p.onLamp)}
  {p.onDegauss&&hotspot('monitor_degauss','Degauss button',p.onDegauss)}
+ {p.toys?.live&&hotspot('cork_photo','Instant camera',p.toys.onPhoto)}
  {p.toys?.live&&hotspot('floppy',p.toys.floppyIn?'Eject floppy':'Floppy drive',p.toys.onFloppySlot)}
  {hotspot('sticky_note','Sticky note',()=>setNote(1))}
  {hotspot('cork_note','Pinned paper',()=>setNote(2),'secret-paper')}
@@ -53,6 +57,7 @@ export function Room(p: RoomProps) {
  {hotspot('keyboard',p.leaned?'Lean back':'Keyboard',()=>p.onLean(!p.leaned))}
  {volume('modem',p.modemVolume,p.onModemVolume)}{volume('speaker',p.musicVolume,p.onMusicVolume)}
  <div className="plate-note-writing" style={fractionStyle(HOTSPOTS.sticky_note)} aria-hidden>{NOTE.map(line=><p key={line}>{line}</p>)}</div>
+ {p.corkPrint&&<CorkPrint src={p.corkPrint} large={large}/>}
  <div className="plate-rain" style={fractionStyle(HOTSPOTS.window)}><Rain still={p.reduced}/></div>
  <Clock reduced={p.reduced}/>
  <span className={`plate-led pc-power ${p.powered?'is-on':'is-standby'}`} style={{left:'68.1%',top:'77.6%'}}/>
@@ -71,4 +76,11 @@ function PlateVolume({name,value,onChange}:{name:'modem'|'speaker';value:number;
  const drag=useRef<{y:number,v:number}|null>(null),ref=useRef<HTMLButtonElement>(null);
  useEffect(()=>{const el=ref.current;if(!el)return;const wheel=(e:WheelEvent)=>{e.preventDefault();e.stopPropagation();onChange(Math.max(0,Math.min(1,value-e.deltaY*.001)));};el.addEventListener('wheel',wheel,{passive:false});return()=>el.removeEventListener('wheel',wheel);},[value,onChange]);
  return <Button ref={ref} variant="ghost" tabIndex={-1} data-touch aria-label={name==='modem'?'Modem volume knob':'Music volume knob'} className="plate-hotspot knob" style={fractionStyle(HOTSPOTS[name])} onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);drag.current={y:e.clientY,v:value};audio.unlock();}} onPointerMove={e=>{if(drag.current)onChange(Math.max(0,Math.min(1,drag.current.v+(drag.current.y-e.clientY)/120)));}} onPointerUp={()=>{drag.current=null;}}/>;
+}
+
+/** The newest instant print over the photographed one, mapped onto its curled corners, with the photographed pin cut back on top. */
+function CorkPrint({src,large}:{src:string;large:boolean}){
+ const W=176,H=214,q=quadMatrix3d(W,H,CORK_PRINT),[px,py,pw,ph]=CORK_PIN;
+ return <><img className="cork-print" src={src} alt="" aria-hidden data-quad={JSON.stringify(CORK_PRINT)} width={W} height={H} style={{width:W,height:H,transform:q.css}} draggable={false}/>
+ <div className="plate-cut" aria-hidden style={{left:px,top:py,width:pw,height:ph}}><img src={plates.off[large?1:0]} alt="" style={{left:-px,top:-py}}/><img className="cut-on" src={plates.on[large?1:0]} alt="" style={{left:-px,top:-py}}/></div></>;
 }
