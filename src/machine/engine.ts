@@ -31,6 +31,9 @@ export class Engine {
     this.crt = new CRTDisplay(canvas, reduce);
     this.modem = new Modem((b) => this.term.feed(b));
     this.term.onBell = () => audio.emit("beep");
+    // Development-only probe so scripted walkthroughs can read the 80x25 screen as text.
+    if (import.meta.env.DEV) { const log: string[] = []; (window as unknown as { __audioLog?: string[] }).__audioLog = log; for (const e of ["music", "introMusic", "dialDigit", "programTone"] as const) audio.on(e, (p: unknown) => { log.push(e + ":" + JSON.stringify(p)); if (log.length > 400) log.shift(); }); }
+    if (import.meta.env.DEV) (window as unknown as { __screenText?: () => string }).__screenText = () => { const out: string[] = []; for (let r = 0; r < 25; r++) { let l = ""; for (let c = 0; c < 80; c++) { const ch = this.term.cell(r, c) & 255; l += ch >= 32 && ch < 127 ? String.fromCharCode(ch) : " "; } out.push(l.trimEnd()); } return out.join("\n"); };
     this.last = performance.now();
     const loop = (now: number) => {
       this.raf = requestAnimationFrame(loop);

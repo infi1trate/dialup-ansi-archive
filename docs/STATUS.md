@@ -1,4 +1,31 @@
 # Dial-Up status (Sprint B photographic room)
+## Clean-up pass
+Test browser: Playwright Chromium, software GL, 1600x900. Fresh handle **wz0729a** on DEAD CARRIER, typed by keyboard through the board, TELEWIRE, KESTREL MENU and Kestrel DOS.
+
+### Warez area walked by keyboard (item 4)
+| # | Check | Result |
+|---|---|---|
+| 1 | Fresh handle starts with 6 ratio credits (main menu RATIO and WAREZ header) | PASS |
+| 2 | Download EMBER (3) and CHROMA (3) from CRACKTROS | PASS |
+| 3 | At 0 credits, requesting COILS shows "Leech warning. Earn credits before requesting another disk." and charges nothing | PASS |
+| 4 | Viewing (+1) and rating (+1, E then 1-5) art raises the ratio | PASS (9 views + 9 ratings = +18; later views were rate-limited by the shared write limiter, as designed) |
+| 5 | Download DRIFTER, PATCHFOX, TOUCHBOX, NFOLOOM (UTILS) and COILS (GAMEZ) | PASS after fix: the release list jumped back to the top after every download, so a second "down, D" bought PATCHFOX again; and a release could be paid for twice. The list now keeps its place and a release already paid for re-downloads free (verified: PATCHFOX re-fetch left the ledger unchanged) |
+| 6 | Hang up (G, Y) returns to TELEWIRE | PASS (also fixed: "Last call" column cut the time to one digit) |
+| 7 | DIR C:\WAREZ lists one &lt;DIR&gt; per release, seven in all | PASS (f05) |
+| 8 | CD into each release; DIR shows NAME.EXE, NAME.NFO, FILE_ID.DIZ | PASS for all seven (f06 EMBER) |
+| 9 | TYPE NAME.NFO prints the NFO | PASS |
+| 10 | Running by name starts the program; any key / Esc returns to the same prompt in the same directory, 80x25 restored | PASS after fix: PATCHFOX left its screen behind and the prompt was printed over it (any program not ending on a clear screen could). Every program now returns to a cleared 80x25 screen with the previous mode restored once |
+| 11 | Launcher Games / Programs lists all seven | PASS (f07) |
+| 12 | Each of the seven starts from the launcher and returns to that menu | PASS |
+| 13 | EMBER and CHROMA play their chiptune and it stops on exit | PASS (audio bus: music/introMusic on, then off on Esc, both from DOS and launcher) |
+| 14 | DRIFTER appears in the screen-saver list, can be set, and runs after 45 idle seconds | PASS (set as saver 4; appeared at the DOS prompt after 48 s) |
+| 15 | PATCHFOX grants exactly one extra BASEMENT CRAWL attempt; second run same day says already applied | PASS |
+| 16 | COILS steers with the arrow keys and ends cleanly | PASS ("Circuit broken. Any key returns." then the prompt) |
+| 17 | TOUCHBOX: 0-9 touch tones, A/B/C tones, Esc exits | PASS (ten dialDigit events, 1000/440/2600 Hz tones) |
+| 18 | NFOLOOM pages through exactly the NFOs downloaded so far, each in its house style | PASS after fix: long NFOs scrolled their header off the screen. NFO LOOM now shows each NFO one page at a time (SPACE page, N/P next/previous); 7 of 7 downloaded NFOs, LATCHKEY lower-case, NULL FOUNDRY boxed sections, TIN SAINTS centred, MIDNIGHT RELAY title-case |
+
+Item 3 note: the 1991.ANS strip was blank because that piece draws itself column by column with cursor jumps; the scan stopped reading at the first byte placed below row 8. It now reads the whole piece, keeps only the eight rows from the first visible row, and the caption says "from row N".
+
 ## Sprint E
 - Part 3 item 5 complete: daily counters and the sysop console (item 7, second page) show second-call rate (handles with a call on a later UTC day / handles created, server-side function), postcards sent/opened/skipped/replied/entered, tapes recorded (browser-reported, once per page, 20/hour per hashed IP), bills printed and level promotions. No new cookies, analytics or IP storage. Today's counters confirmed in the database.
 - Part 3 item 3 complete: hold F9 or the corner REC control records up to 10 s of the composited room + CRT (1280x720, 30 fps target) with the synth's own output; TELEWIRE R arms "record the next dial". Scripted armed dial: 636,751-byte VP9+Opus WebM, ~10.3 s, audible (mean -12 dB), REC LED lit (e28, tape). Headless software GL delivered ~6 fps; real-GPU frame rate and phone share sheet not checked. The live alarm-clock digits and sticky-note handwriting are not drawn into the tape (the photographed clock shows instead).
@@ -120,6 +147,7 @@ Fix made: the art deep link had no canonical or og:url; both now point at the pa
 - Screensaver after 45 seconds at local menus/prompt/directory; no call saver, warning at four minutes, hangup at five.
 - noindex is on site-wide; remove it at launch in the root route.
 ## 5. Owner to-do
+**Clean-up pass:** Test handle wz0729a (DEAD CARRIER) retained, with its credit ledger (including two duplicate PATCHFOX and one duplicate DRIFTER charge made before the fix), ratings and PATCHFOX bonus row. No data deleted.
 **Sprint C part 4:** Test handle C4ShelfRelay retained; no data deleted.
 **Sprint C part 3:** Part 1: review docs/shots/sprint-c3.txt within seven days; only GUEST calls used, no new handle created.
 **Sprint B, Part 2:** Review replaced b03/b04/b05/b06/b09/b10/b11/b12 and new b13/b14 within seven days of 2026-11-19 in docs/shots/sprint-b.txt. No new callers, secret prompts, approvals or database mutations. Native phone keyboard/audio review remains useful; portrait band resolved.

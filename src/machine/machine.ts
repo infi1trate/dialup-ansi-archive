@@ -662,7 +662,7 @@ export class Machine {
     x.at(6, 6).c(3, 1).t("─".repeat(68));
     this.book().forEach((d, i) => {
       const last = this.profile.lastCall[d.number] ?? "never";
-      const text = pad(String(i + 1), 4) + pad(d.id === "maple" ? "MAPLE RIDGE PC USERS GRP" : d.name, 26) + pad(d.number, 12) + pad(String(this.profile.speed), 8) + pad(last, 10);
+      const text = pad(String(i + 1), 4) + pad(d.id === "maple" ? "MAPLE RIDGE PC USERS GRP" : d.name, 26) + pad(d.number, 12) + pad(String(this.profile.speed), 8) + pad(last, 14);
       x.at(7 + i, 5);
       if (i === sel) x.c(1, 7).t(" " + text + " "); else x.c(15, 1).t(" " + text + " ");
 
