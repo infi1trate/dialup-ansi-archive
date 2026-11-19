@@ -193,3 +193,4 @@ Fix made: the art deep link had no canonical or og:url; both now point at the pa
 
 Toys in the room. Every toy except degauss stays inert until the device has finished one call, or has spent three minutes on the site while not on its first call.
 
+- 0 REC chip: the permanent corner REC/Save chip is gone. The hatch menu carries "Record 10 seconds", "Record the next dial" (arm/disarm), "Stop recording" while a tape runs, and "Save tape" afterwards; F9 starts and F9 or Esc stops. During a take the only room indicator is the red REC LED on the PC case (g00).

@@ -1,5 +1,5 @@
 # Sprint D
-- [ ] 0. REC chip removed; recording lives in the escape hatch and F9; g00
+- [x] 0. REC chip removed; recording lives in the escape hatch and F9; g00
 - [ ] 1. Degauss badge: thunk, hum, wobble, 20 s recharge; g01
 - [ ] 2. Floppy disks: close-up, A: drive, BRICKS, diary, drawings, number; g02-g04
 - [ ] 3. Print Screen: tractor-feed printout rising in the room, PNG; g05-g06
