@@ -353,8 +353,9 @@ async function sysop(b: Json, ip: string): Promise<Json> {
     }
     case "counters": {
       const since = new Date(Date.now() - 13 * 86400_000).toISOString().slice(0, 10);
-      const { data } = await s.from("daily_counters").select("day, step, count").gte("day", since).order("day");
-      return { rows: data ?? [] };
+      const [{ data }, { data: back }] = await Promise.all([s.from("daily_counters").select("day, step, count").gte("day", since).order("day"), s.rpc("second_call_rate")]);
+      const r = Array.isArray(back) ? back[0] : back;
+      return { rows: data ?? [], secondCall: { created: Number(r?.created ?? 0), returned: Number(r?.returned ?? 0) } };
     }
   }
   return { ok: false };

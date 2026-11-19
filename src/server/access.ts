@@ -54,6 +54,7 @@ export async function logonAccess(s:any,c:any,board:string,speed:number,now=new 
   if(!c)return {record:r,level,speed:Math.min(speed,cap.speed),minutes:cap.minutes,remainingSeconds:1800,exempt};
   const {data:a}=await s.from('caller_access').select('*').eq('caller_id',c.id).single();
   const promotion=a?.announced_level!==level?level:null;
+  if(promotion&&a?.announced_level&&level!=='NEW USER')await s.rpc('bump_counter',{_step:'promoted'});
   await s.from('caller_access').update({announced_level:level,previous_call_at:c.last_call_at}).eq('caller_id',c.id);
   const {data:session,error}=await s.from('call_sessions').insert({caller_id:c.id,board,day:now.toISOString().slice(0,10),started_at:now.toISOString(),charged_at:now.toISOString(),exempt}).select('id').single();if(error)throw new NetError(503,'Call timer offline.');
   const {data:bank}=await s.rpc('time_bank',{_session:session.id,_caller:c.id,_allowance:cap.minutes*60,_now:now.toISOString()});

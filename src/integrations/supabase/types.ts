@@ -763,6 +763,13 @@ export type Database = {
         Returns: number
       }
       first_device_call: { Args: { _hash: string }; Returns: boolean }
+      second_call_rate: {
+        Args: never
+        Returns: {
+          created: number
+          returned: number
+        }[]
+      }
       time_bank: {
         Args: {
           _active?: boolean

@@ -3,7 +3,7 @@
 - [x] 2. Postcards: composer, server, /p/<id> playback, share card; e20-e27
 - [x] 3. Ten-second tape recorder and armed dial; e28 + tape
 - [x] 4. Share cards checked against real crawler user agents
-- [ ] 5. Counters: second-call rate, postcards, tapes, bills, promotions
+- [x] 5. Counters: second-call rate, postcards, tapes, bills, promotions
 
 # Sprint E part 2
 - [x] 1. Calendar scene bulletin and daily cache; 155 tests; e12-e13 1600x900 leaned-in evidence; commit

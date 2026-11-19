@@ -702,6 +702,18 @@ export class Board {
           steps.forEach((st) => { const v = (res?.rows ?? []).find((r: any) => r.day === day && r.step === st)?.count ?? 0; row.k(v ? 15 : 8, rpad(String(v), 8)); });
         }
         this.send(y); await this.anyKey(22);
+        const more = ["postcard_sent", "postcard_opened", "postcard_skipped", "postcard_replied", "postcard_entered", "tape_recorded", "bill_printed", "promoted"];
+        const z = this.header(a(), "Daily counters", "sharing, 14 days");
+        const sc = res?.secondCall ?? { created: 0, returned: 0 };
+        z.at(4, 3).k(7, "Second-call rate: ").k(15, `${sc.returned} of ${sc.created} handles called back on a later UTC day`).k(14, sc.created ? `  ${Math.round((sc.returned / sc.created) * 100)}%` : "  -");
+        z.at(5, 3).k(13, pad("day", 12)); ["sent", "opened", "skip", "reply", "enter", "tapes", "bills", "promo"].forEach((h) => z.k(13, rpad(h, 8)));
+        z.at(6, 3).k(5, "─".repeat(76));
+        for (let d = 13; d >= 0; d--) {
+          const day = new Date(Date.now() - d * 86400_000).toISOString().slice(0, 10);
+          const row = z.at(7 + (13 - d), 3).k(7, pad(day, 12));
+          more.forEach((st) => { const v = (res?.rows ?? []).find((r: any) => r.day === day && r.step === st)?.count ?? 0; row.k(v ? 15 : 8, rpad(String(v), 8)); });
+        }
+        this.send(z); await this.anyKey(22);
       }
     }
   }
