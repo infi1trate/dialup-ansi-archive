@@ -187,3 +187,9 @@ Fix made: the art deep link had no canonical or og:url; both now point at the pa
 - After power click: about 55 KB JS (machine, board, house pack, terminal, CRT, font, archive client).
 - Music player: 518 KB gz (1.5 MB raw), fetched only on the first music play. KPLAY glue under 1 KB.
 - Backend client about 57 KB gz, loaded on the first server call.
+
+
+## Sprint D
+
+Toys in the room. Every toy except degauss stays inert until the device has finished one call, or has spent three minutes on the site while not on its first call.
+

@@ -7,7 +7,7 @@ interface Props {
   physical?: React.ReactNode;
   /** A link the board offered (postcards): Copy link, and Share where the Web Share API exists. */
   share?: string | null;
-  /** The ten-second tape control (REC / Save tape), when the browser can record. */
+  /** Ten-second tape entries (list items inside the menu), when the browser can record. */
   tape?: React.ReactNode;
   onMute: () => void; onReduced: () => void; onLamp: () => void; onSkip: () => void;
 }
@@ -19,11 +19,11 @@ export function EscapeHatch(p: Props) {
   return (
     <nav className={`hatch ${open ? "is-open" : ""}`} aria-label="Settings">
       {p.share && <ShareLink url={p.share} />}
-      {p.tape}
       <Button variant="ghost" className="hatch-toggle hatch-lamp-direct" aria-label="Toggle desk lamp" aria-pressed={p.lamp} onClick={act(p.onLamp)}>☼</Button>
       {open && (
         <ul className="hatch-menu">
           <li><Button variant="ghost" aria-pressed={p.lamp} onClick={act(p.onLamp)}>Lamp: {p.lamp ? "on" : "off"}</Button></li>
+          {p.tape}
           {p.physical}
           <li><Button variant="ghost" type="button" aria-pressed={p.muted} onClick={act(p.onMute)}>{p.muted ? "Unmute" : "Mute"}</Button></li>
           <li><Button variant="ghost" type="button" onClick={act(p.onSkip)}>Skip to art</Button></li>

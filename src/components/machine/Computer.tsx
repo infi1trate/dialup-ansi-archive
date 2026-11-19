@@ -108,11 +108,12 @@ export function Computer({ deepLink, lost, postcard }: Props) {
       unsubs.push(() => window.removeEventListener("resize", orient));
       const down = (e: KeyboardEvent) => {
         if (e.key === "`" && !e.ctrlKey && !e.altKey) { e.preventDefault(); toggleLean(); return; }
-        if (e.key === "F9") { e.preventDefault(); if (!e.repeat) deck.current?.record(); return; } // hold F9 to record
+        if (e.key === "F9") { e.preventDefault(); if (!e.repeat) { if (deck.current?.state === "rec") deck.current.finish(); else deck.current?.record(); } return; } // F9 records ten seconds, F9 again stops
+        if (e.key === "Escape" && deck.current?.state === "rec") { e.preventDefault(); deck.current.finish(); return; }
         if ((e.target as HTMLElement)?.closest?.(".hatch")) return;
         m.handleKeyDown(e);
       };
-      const up = (e: KeyboardEvent) => { if (e.key === "F9") { e.preventDefault(); deck.current?.finish(); return; } m.handleKeyUp(e); };
+      const up = (e: KeyboardEvent) => { if (e.key === "F9") { e.preventDefault(); return; } m.handleKeyUp(e); };
       window.addEventListener("keydown", down);
       window.addEventListener("keyup", up);
       if (postcard && "missing" in postcard) { m.lostAt = "POSTCARD"; m.lostNote = postcard.missing === "withdrawn" ? "This card was withdrawn." : "That postcard has expired, or was never sent."; m.powerOn(); }
@@ -185,11 +186,14 @@ export function Computer({ deepLink, lost, postcard }: Props) {
   const hatch = (
       <EscapeHatch
       share={shareUrl}
-      tape={tapeOk ? <div className="hatch-share hatch-tape" role="group" aria-label="Ten-second tape">
-        <Button variant="ghost" type="button" aria-pressed={tape === "rec"} onClick={(e) => { audio.unlock(); deck.current?.toggle(); e.currentTarget.blur(); }}>{tape === "rec" ? "■ Stop" : tape === "armed" ? "REC armed" : "● REC"}</Button>
-        {tapeFile && tape !== "rec" && <Button variant="ghost" type="button" onClick={(e) => { void saveTapeFile(tapeFile); e.currentTarget.blur(); }}>Save tape</Button>}
-        {tapeNote && <span className="hatch-note">{tapeNote}</span>}
-      </div> : null}
+      tape={tapeOk ? <>
+        {tape === "rec"
+          ? <li><Button variant="ghost" type="button" onClick={(e) => { deck.current?.finish(); e.currentTarget.blur(); }}>Stop recording</Button></li>
+          : <li><Button variant="ghost" type="button" onClick={(e) => { audio.unlock(); deck.current?.record(); e.currentTarget.blur(); }}>Record 10 seconds</Button></li>}
+        {tape !== "rec" && <li><Button variant="ghost" type="button" aria-pressed={tape === "armed"} onClick={(e) => { audio.unlock(); if (deck.current?.state === "armed") deck.current.disarm(); else deck.current?.arm(); e.currentTarget.blur(); }}>{tape === "armed" ? "Record the next dial: armed" : "Record the next dial"}</Button></li>}
+        {tapeFile && tape !== "rec" && <li><Button variant="ghost" type="button" onClick={(e) => { void saveTapeFile(tapeFile); e.currentTarget.blur(); }}>Save tape</Button></li>}
+        {tapeNote && <li className="hatch-note">{tapeNote}</li>}
+      </> : null}
       physical={<>{pendingCard && <li><Button variant="ghost" disabled={reported} onClick={() => void reportCard()}>{reported ? "Card reported, withdrawn" : "Report this card"}</Button></li>}<li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
