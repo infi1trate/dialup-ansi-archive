@@ -137,11 +137,6 @@ export const FAMILY_SHELF:FamilyPiece[]=[
   },
   {
     "pack": "ensiart",
-    "file": "HPNWYR.ANS",
-    "artist": "michele hamilton"
-  },
-  {
-    "pack": "ensiart",
     "file": "LIBERTY.ANS",
     "artist": "tom bradford"
   },
@@ -199,16 +194,6 @@ export const FAMILY_SHELF:FamilyPiece[]=[
     "pack": "ansicl20",
     "file": "THE_WOOD.ANS",
     "artist": "jan lobianco"
-  },
-  {
-    "pack": "ansicl20",
-    "file": "MARIOSCR.ANS",
-    "artist": "michael arnett"
-  },
-  {
-    "pack": "ansicl20",
-    "file": "SM-KIDS.ANS",
-    "artist": "michael arnett"
   },
   {
     "pack": "ansicl63",

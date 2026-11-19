@@ -1,6 +1,7 @@
 # Dial-Up status (Sprint C in progress)
 
 ## 1. Verified working (test browser = Playwright Chromium, software GL)
+**Sprint C, Part 2:** Fifteen 1600x900 quality-82 JPEGs recreated on the real terminal; private archive-cache/review-shots/c uploads and seven-day URLs verified HTTP 200/image/jpeg; links committed first. Forty-five native-size Terminal/rasterizer outputs opened individually; 42 retained, three conservatively removed; table in docs/family-shelf-review.md. 98 tests pass. Real browser verified first-visit lamp, wheel/outside/backtick lean-back, launcher and an actual 45-second idle saver/wake. DEAD CARRIER live tag marker, queue interruption and search results reached.
 **Sprint C:** 87 regression tests pass; latest preview build OK. Five keyboard-only calls completed. EARTH.ANS opened through all five board deep links. Thirty-day scored THE CORNER run completed as RivetC1964, score 0 read back from shared scores. Balance 14 then EMBER purchase reduced it to 11. Seven program entry points exercised; real guest transfer then launcher-run verified.
 **Sprint A:** 71 tests pass; preview build OK. Real guest loop, launcher/TELEWIRE Esc, wheel in/out, outside click/backtick, 4-minute warning and 5-minute hangup checked. Ten private review JPEG links verified HTTP 200/image/jpeg. Archive audit: 304 files, 37 years (1990–2026), zero unknown parser sequences.
 - Pass 1-3 loop: power on, boot, DOS, TELEWIRE, dial, GUEST, browse 1993, view ANSI, I info, logoff; deep links; /lab; /credits; cross-browser oneliners/logons/presence.
@@ -31,7 +32,8 @@
 - Pass 6: tests cover decay, SAUCE group fallback, DOS download dates (pack year) and word-wrapped sysop lines (58 tests pass).
 
 ## 2. Built but untested
-**Sprint C:** Tag/slideshow and new-scan combinations are not exhaustively checked. Trainer bonus and installed saver selection need full end-to-end verification. Family shelf has 45 contact-sheet-reviewed pieces, but individual full-resolution inspections remain outstanding. Sound not listened to.
+**Sprint C, Part 2:** All-board tag/search combinations, new scans, handle/guest shelf readback, all-seven DOS/launcher programs, trainer day rollover, full ratio and courier multi-call progression, and live 0-DAY month/empty-month remain unverified. Audio by ear remains unverified.
+**Sprint C:** Tag/slideshow and new-scan combinations are not exhaustively checked. Trainer bonus and installed saver selection need full end-to-end verification. Family shelf now has 42 individually reviewed pieces; menu-route verification remains outstanding. Sound not listened to.
 **Sprint A:** Native two-finger scrolling/pinch and DPR2 visual comparisons remain unverified. Saver selection preview checked; 45-second automatic wake is unit-covered, not waited in-browser. Physical GPU 60 fps and sound by ear remain unverified.
 - Esc-abort of a transfer, Enter-skip of a transfer; RD/HDD LED flicker during a transfer (one RD sample only).
 - DEL <file> (typed in the test; result not read back); info panel I inside a DOS VIEW.
@@ -46,7 +48,8 @@
 - Pass 6: sysop chat word wrap is unit-tested on the layout, not watched live in the browser.
 
 ## 3. Known bugs and gaps
-**Sprint C:** Sprint is not complete: fifteen JPEGs captured locally, but private upload/signing/HTTP verification and docs/shots/sprint-c.txt remain outstanding. Fictional disk files use the existing flat drive with pack markers, not true nested C:\WAREZ directories. No final first-load size measurement.
+**Sprint C, Part 2:** Favorite UI assertion failed during live search-result flow; no fix claim. Exhaustive family menu-route checks remain unfinished despite boundary denial tests. Nested warez keys, CD/parent/DIR/TYPE and distinct executable markers implemented but not fully exercised via live transfer. 0-DAY progress/cache implemented and month matching unit-tested, not live-verified.
+**Sprint C:** Sprint is not complete: fifteen JPEGs uploaded and links verified in Part 2. Nested fictional disk paths now implemented; live directory checks remain outstanding. No final first-load size measurement.
 **Sprint A:** 40 corpus entries refused as non-text/RIP; 21 remaining metric flags need interpretation. ALIVE.TRN remains unclassified; stale SAUCE heights and filled right margins create false positives. No claim of perfect archive coverage.
 - Door turns: one attempt is taken per floor entered; clearing all five floors uses five. The score route trusts a plausible client score (capped, but not replayed server-side).
 - Door turn and rate-limit tables use check-then-write, not transactions; heavy concurrency on one identity could race.
@@ -59,6 +62,7 @@
 - Phone portrait leaves an empty band between the tube and the note, because the tube is limited by the screen width.
 
 ## 4. Choices made
+**Sprint C, Part 2:** No new test handles created; checks used fresh GUEST profiles. Prior RivetC1964 scored run remains from Sprint C. No destructive cleanup performed. Review the unfinished checklist before calling Sprint C complete.
 **Sprint C:** Five skins share the byte-only board/terminal/modem path; legacy board IDs retained. Invented fictional releases only; real archive credits preserved. THE CORNER uses seeded server replay; daily scored slot is reserved at start. Guest runs never post. Ledger purchase events unique per request.
 **Sprint A:** First visit lamp on; stored setting wins. Spill follows a 300 ms frame-independent filter; lamp eases 180 ms. Static grain and no brightness oscillator. Three remembered savers; local Games launches the existing door. Fonts from BSD-licensed libansilove; legacy codes and Tundra convert to modem bytes.
 - Blink 1.875 Hz text / 2.5 Hz cursor; reduced motion = steady text, no flicker.
@@ -72,6 +76,7 @@
 - noindex is on site-wide; remove it at launch in the root route.
 
 ## 5. Owner to-do
+**Sprint C, Part 2:** Preserved byte-only board output and caching proxy. Added nested release keys to the existing capped IndexedDB store; allowlist gates at viewer/path/queue/quick-scan boundaries. Trainer duplicate insertion now checks the unique-key result instead of claiming success on failed writes.
 **Sprint C:** Review remaining checklist before calling Sprint C done. Test handles RivetProbeC and RivetC* remain; no destructive cleanup performed. Earlier test rows retained. Review JPEG links not delivered yet.
 **Sprint A:** Review docs/shots/sprint-a.txt within seven days. No secrets requested, approval tools used or database rows deleted. Physical touch/GPU verification remains a review item.
 - Set SYSOP_KEY (long random string) as a backend secret to enable the console; set IP_HASH_SALT for IP hashing.
@@ -79,6 +84,7 @@
 - Lift noindex at launch. Publish and check share cards and 60 fps on a real laptop.
 
 ## 6. Weight (production build, gzip -9)
+**Sprint C, Part 2:** No final first-load measurement this pass; no new dependencies. Preview build log reports build OK after edits; all 98 tests passed. Private review links were issued 2026-11-19 for seven days.
 **Sprint C:** Preview build OK, 87 tests pass. New content remains behind power-on paths. Production gzip weights have not been remeasured; historical figures below are not Sprint C certification.
 **Sprint A:** Current preview build OK; fresh production gzip totals were not measured. Extra bitmap font banks load with the power-on terminal chunk, not the dark first frame. Prior weights below are historical, not re-certified.
 - First load (dark room, before power): about 120 KB JS + 145 KB WebP images (lazy) + CSS. No terminal, CRT, audio, board, house pack or backend client.

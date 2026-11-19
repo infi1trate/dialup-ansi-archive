@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkHandle, checkOneliner, speedFor } from "@/lib/filter";
 
 describe("handles", () => {
-  it("rejects reserved names case-insensitively", () => { for (const h of ["Sysop", "STATIC", "admin", "root", "Guest", "crawlspace"]) expect(checkHandle(h).ok).toBe(false); });
+  it("rejects reserved names case-insensitively", () => { for (const h of ["Sysop", "STATIC", "admin", "root", "Guest", "dead carrier"]) expect(checkHandle(h).ok).toBe(false); });
   it("enforces 2-16 printable chars", () => {
     expect(checkHandle("a").ok).toBe(false);
     expect(checkHandle("a".repeat(17)).ok).toBe(false);

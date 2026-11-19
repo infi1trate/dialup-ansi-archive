@@ -22,3 +22,5 @@ export const CREDIT_AWARDS={art:1,rating:1,oneliner:2,door:5,corner:8};
 export const GUEST_CREDITS=6;
 export function ledgerBalance(entries:{event:string;amount:number}[]){const seen=new Set<string>();return entries.reduce((n,e)=>{if(seen.has(e.event))return n;seen.add(e.event);return n+e.amount;},0);}
 export const tagOrder=(files:string[],tags:Set<string>)=>files.filter(f=>tags.has(f));
+
+export const orderedTags=(tags:Set<string>)=>[...tags].sort((a,b)=>a.localeCompare(b));

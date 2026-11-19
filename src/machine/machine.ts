@@ -362,7 +362,7 @@ export class Machine {
     }
   }
   private async programMenu(g: number) {
-    for (;;) { const fs=await installed(); const x=a().cls();box(x,2,4,72,21,11,"GAMES / PROGRAMS");x.at(5,8).k(15,"0 BASEMENT CRAWL");fs.slice(0,9).forEach((f,i)=>x.at(7+i,8).k(11,`${i+1} ${f.name}`));x.at(21,8).k(8,"Number starts / ESC menu");this.out(x);const k=await this.key();if(k.key==="Escape")return;const n=(k.ch??0)-48;if(n===0)await doorMenu({io:this.localIO(),send:y=>this.out(y),user:"GUEST",guest:true,hint:h=>this.hints.set(h)});else if(fs[n-1])await runRelease(this.localEnv(),fs[n-1].name.replace(".EXE",""));this.alive(g);}
+    for (;;) { const fs=await installed(); const x=a().cls();box(x,2,4,72,21,11,"GAMES / PROGRAMS");x.at(5,8).k(15,"0 BASEMENT CRAWL");fs.slice(0,9).forEach((f,i)=>x.at(7+i,8).k(11,`${i+1} ${drive.dosName(f.name)}`));x.at(21,8).k(8,"Number starts / ESC menu");this.out(x);const k=await this.key();if(k.key==="Escape")return;const n=(k.ch??0)-48;if(n===0)await doorMenu({io:this.localIO(),send:y=>this.out(y),user:"GUEST",guest:true,hint:h=>this.hints.set(h)});else if(fs[n-1])await runRelease(this.localEnv(),drive.dosName(fs[n-1].name).replace(".EXE",""));this.alive(g);}
   }
   private async downloadMenu(g: number) {
     let sel = 0;
@@ -383,7 +383,7 @@ export class Machine {
   }
   private drifterInstalled=false;
   private async saverMenu(g: number) {
-    this.drifterInstalled=(await installed()).some(f=>f.name==="DRIFTER.EXE");
+    this.drifterInstalled=(await installed()).some(f=>drive.dosName(f.name)==="DRIFTER.EXE");
     for (;;) {
       const x=a().reset().cls();box(x,5,15,50,14,11,"SCREEN SAVERS");
       (SAVERS.filter(v=>v!=="drifter"||!!this.drifterInstalled)).forEach((v,i)=>x.at(8+i*2,19).k(15,`${i+1}  ${v === "drifter" ? "Drifter plasma" : v === "number" ? "Bouncing board number" : v === "rain" ? "Falling characters" : "Starfield"}${this.saver===v?" *":""}`));
@@ -429,7 +429,7 @@ export class Machine {
     const p = (t: string, c = 7) => this.out(a().k(c, t).nl());
     const now = new Date();
     const program=(cmd === "RUN" ? arg : cmd).replace(/\.EXE$/, "").replace(/^.*\\/, "");
-    if((await installed()).some(f=>f.name===program+".EXE")){await runRelease(this.localEnv(),program);return;}
+    if((await installed()).some(f=>drive.dosName(f.name)===program+".EXE")){await runRelease(this.localEnv(),program);return;}
     switch (cmd) {
       case "": return;
       case "CLS": this.out(a().cls()); return;
@@ -442,7 +442,7 @@ export class Machine {
          "RUN name   run an installed warez program", "DIR [dir]  list files", "VIEW file  read a download", "KPLAY file play tracker music",
          "DEL file   erase a download (ERASE)", "CD dir     change directory (CHDIR)",
          "CLS        clear the screen", "VER        DOS version", "DATE       date", "TIME       time",
-         "TYPE file  read AUTOEXEC.BAT, CONFIG.SYS or README.TXT", "MEM        memory report",
+         "TYPE file  read a collected NFO/DIZ or system text", "MEM        memory report",
          "WARDIAL    scan 555-0100 through 555-0199", "HELP       this list (/? )",
          "XYZZY      test the cave", "WIN        check window installation", "FORMAT     ask about formatting",
          "DIG/TETRA  test game installation", "SYSOP      locate Static"].forEach((l) => p("  " + l)); return;
@@ -451,15 +451,15 @@ export class Machine {
         p("   3407872 bytes total contiguous extended memory"); p("   3407872 bytes available XMS memory"); p("           Kestrel DOS resident in High Memory Area"); p(""); return;
       case "CD": case "CHDIR": {
         if (!arg) { p(this.cwd); return; }
-        const t = arg === ".." || arg === "\\" ? "C:\\" : arg.replace(/^C:\\?/, "").replace(/\\$/, "");
-        if (t === "C:\\") { this.cwd = "C:\\"; return; }
-        if (["TELEWIRE", "GAMES", "DOS", "DOWNLOAD", "WAREZ"].includes(t) && this.cwd === "C:\\") { this.cwd = `C:\\${t}`; return; }
+        const target=drive.resolvePath(arg,this.cwd);
+        const parent=target.slice(0,target.lastIndexOf("\\"))||"C:\\";
+        if(target==="C:\\"||["TELEWIRE","GAMES","DOS","DOWNLOAD","WAREZ"].some(n=>target==="C:\\"+n)||(await drive.list()).some(f=>f.pack==="fiction"&&f.name.startsWith(target+"\\"))){this.cwd=target;return;}
         p("Invalid directory"); return;
       }
       case "DIR": {
-        if(arg.includes("WAREZ")||this.cwd.includes("WAREZ")){p(" Directory of C:\\WAREZ");for(const f of await installed())p(`  <DIR> ${f.name.replace(".EXE","")} / ${f.name}`);return;}
+        if(arg.includes("WAREZ")||this.cwd.includes("WAREZ")){const path=drive.resolvePath(arg||this.cwd,this.cwd);p(` Directory of ${path}`);for(const e of drive.directoryEntries(await drive.list(),path))p(e.directory?`  <DIR> ${e.name}`:`  ${e.name.padEnd(14)} ${e.file?.bytes.length??0}`);return;}
         if (/^(C:)?\\?DOWNLOAD\\?$/.test(arg) || (!arg && this.cwd === "C:\\DOWNLOAD")) { await this.dirDownload(); return; }
-        const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["WARDIAL", "EXE", "21504"], ["VIEW", "COM", "8812"], ["KPLAY", "EXE", "61440"], ["DOS", "<DIR>", ""], ["DOWNLOAD", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
+        const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["WARDIAL", "EXE", "21504"], ["VIEW", "COM", "8812"], ["KPLAY", "EXE", "61440"], ["WAREZ", "<DIR>", ""], ["DOS", "<DIR>", ""], ["DOWNLOAD", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
           : this.cwd.endsWith("TELEWIRE") ? [["TELEWIRE", "EXE", "184320"], ["TELEWIRE", "DIR", "1024"], ["CAPTURE", "LOG", "0"]]
           : this.cwd.endsWith("GAMES") ? [["DIG", "EXE", "34012"], ["TETRA", "EXE", "41210"]]
           : [["HIMEM", "SYS", "11552"], ["KSMOUSE", "SYS", "32158"], ["EDIT", "COM", "413"]];
@@ -468,6 +468,7 @@ export class Machine {
         p(`${rpad(String(files.length), 9)} file(s)   ${rpad("88,342,528", 12)} bytes free`); p(""); return;
       }
       case "TYPE": {
+        const saved=await drive.get(drive.resolvePath(arg,this.cwd));if(saved){this.out(a().bytes(saved.bytes).nl());return;}
         const docs: Record<string, string[]> = {
           "AUTOEXEC.BAT": ["@ECHO OFF", "PROMPT $P$G", "PATH C:\\DOS;C:\\TELEWIRE", "MODE COM2:9600,N,8,1", "TELEWIRE"],
           "CONFIG.SYS": ["DEVICE=C:\\DOS\\HIMEM.SYS", "DOS=HIGH", "FILES=30", "BUFFERS=20"],

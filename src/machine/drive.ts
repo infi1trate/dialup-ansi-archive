@@ -35,11 +35,11 @@ export async function list(): Promise<DiskFile[]> {
   try { return ((await tx<DiskFile[]>("readonly", (s) => s.getAll())) ?? []).sort((p, q) => p.at - q.at); } catch { return []; }
 }
 export async function get(name: string): Promise<DiskFile | null> {
-  try { return (await tx<DiskFile>("readonly", (s) => s.get(dosName(name)))) ?? null; } catch { return null; }
+  try { return (await tx<DiskFile>("readonly", (s) => s.get(diskName(name)))) ?? null; } catch { return null; }
 }
 export async function del(name: string): Promise<boolean> {
   if (!(await get(name))) return false;
-  try { await tx("readwrite", (s) => { s.delete(dosName(name)); }); return true; } catch { return false; }
+  try { await tx("readwrite", (s) => { s.delete(diskName(name)); }); return true; } catch { return false; }
 }
 /** Pure: which existing files must go so `incoming` bytes fit under the cap (oldest first). */
 export function evictions(files: { name: string; size: number; at: number }[], incoming: number, cap = DRIVE_CAP): string[] {
@@ -52,7 +52,7 @@ export function evictions(files: { name: string; size: number; at: number }[], i
 export async function put(f: Omit<DiskFile, "name" | "at"> & { name: string }): Promise<{ name: string; dropped: string[] } | null> {
   if (f.bytes.length > DRIVE_CAP) return null;
   try {
-    const name = dosName(f.name);
+    const name = f.pack === "fiction" ? diskName(f.name) : dosName(f.name);
     const existing = (await list()).filter((x) => x.name !== name);
     const drop = evictions(existing.map((x) => ({ name: x.name, size: x.bytes.length, at: x.at })), f.bytes.length);
     await tx("readwrite", (s) => { for (const d of drop) s.delete(d); s.put({ ...f, name, at: Date.now() }); });
@@ -66,3 +66,8 @@ export function dosDate(year: number, d: Date): string {
   const yy = Number.isFinite(year) && year > 1900 ? year % 100 : 93;
   return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}-${String(yy).padStart(2, "0")}`;
 }
+
+/** Warez keys retain DOS directories; old downloads retain their flat 8.3 keys. */
+export function diskName(name:string){return name.includes("\\")||name.includes("/")?resolvePath(name):dosName(name);}
+export function resolvePath(input:string,cwd="C:\\"){const raw=input.replace(/\//g,"\\").toUpperCase();const absolute=/^C:/.test(raw)||raw.startsWith("\\");const parts=(absolute?raw.replace(/^C:/,""):cwd.slice(2)+"\\"+raw).split("\\");const out:string[]=[];for(const p of parts){if(!p||p===".")continue;if(p===".."){out.pop();continue;}out.push(dosName(p));}return "C:\\"+out.join("\\");}
+export function directoryEntries(files:DiskFile[],path:string){const root=resolvePath(path).replace(/\\$/,"")+"\\";const entries=new Map<string,{name:string;directory:boolean;file?:DiskFile}>();for(const f of files){const key=f.pack==="fiction"?resolvePath(f.name):"C:\\DOWNLOAD\\"+f.name;if(!key.startsWith(root))continue;const tail=key.slice(root.length),name=tail.split("\\")[0];if(!name)continue;entries.set(name,{name,directory:tail.includes("\\"),...(tail.includes("\\")?{}:{file:f})});}return [...entries.values()];}

@@ -17,7 +17,7 @@ import { doorMenu } from "./door";
 import { sysopChat } from "./chat";
 import { configFor, type BoardConfig } from "./config";
 import { cornerDoor } from "./corner";
-import { RELEASES, RELEASE_GROUPS, nfoBytes, dizBytes, GUEST_CREDITS, COURIER_LOGS, tagOrder } from "./warez-catalog";
+import { RELEASES, RELEASE_GROUPS, nfoBytes, dizBytes, GUEST_CREDITS, COURIER_LOGS, tagOrder, orderedTags } from "./warez-catalog";
 import { FAMILY_SHELF, familyAllowed, pictureOfDay } from "@/data/family-shelf";
 import { discovered, jukebox, guestShelf, toggleGuestFavorite } from "@/data/browsing";
 import { directLookup } from "@/data/archive";
@@ -25,6 +25,8 @@ import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 
+export function wrapCourier(text:string){const lines:string[]=[];let line="";for(const word of text.split(/\s+/)){if((line+" "+word).trim().length>70){lines.push(line);line=word;}else line=(line+" "+word).trim();}if(line)lines.push(line);return lines;}
+export function releasedInMonth(pack:PackSummary,month:number){if(pack.year<1990||pack.year>1996)return false;const date=/^\d{4}-(\d{2})/.exec(String(pack.released??""));if(date)return +date[1]===month;const suffix=/(\d{2})(\d{2})$/.exec(pack.name);return !!suffix&&+suffix[1]===month&&+suffix[2]===pack.year%100;}
 const SYSOP = "Static";
 /** VOID//NODE's new-user password. It is printed at the end of DEAD CARRIER credits screen. */
 export const VOID_NUP = "STAIRWELL";
@@ -195,7 +197,7 @@ export class Board {
   }
 
   // ── lightbar ───────────────────────────────────────────────────
-  async lightbar(o: { row: number; col: number; width: number; height: number; items: { text: string; color: number; dim?: boolean }[]; index?: number; hotkeys?: string; highlight?: (index:number) => void; refresh?: () => boolean }): Promise<{ index: number; key?: string } | null> {
+  async lightbar(o: { row: number; col: number; width: number; height: number; items: { text: string; color: number; dim?: boolean }[]; index?: number; hotkeys?: string; highlight?: (index:number) => void; refresh?: () => boolean; tag?: (index:number) => string }): Promise<{ index: number; key?: string } | null> {
     const { row, col, width, height, items } = o;
     if(this.config.style==='prompt') {
       let page=0;
@@ -227,6 +229,7 @@ export class Board {
         if(o.refresh?.()) page();
         continue;
       }
+      if(k.ch===32 && o.tag && items[i]){items[i].text=o.tag(i);this.send(line(i,true));continue;}
       const prev = i;
       if (k.key === "Tap" && k.tapRow) {
         const n = top + (k.tapRow - row);
@@ -871,19 +874,20 @@ export class Board {
   }
 
   async packScreen(s: PackSummary, startFile?: string) {
+    if(this.io.entry.id === "maple" && startFile && !familyAllowed(s.name,startFile)){await this.errorScreen("Not on the club-approved shelf.");return;}
     if(this.io.entry.id === "maple" && !FAMILY_SHELF.some(f=>f.pack===s.name)){await this.errorScreen("That disk is not on the club-approved shelf.");return;}
     this.send(this.header(a(), `Pack ${s.name.toUpperCase()}`, String(s.year)));
     if (!packCached(s.name)) await this.loading("Retrieving pack listing...");
     let pack: PackInfo;
     try { pack = await getPack(s.name, s.groups); } catch (e) { await this.errorScreen(String((e as Error).message)); return; }
     if (!pack.groups.length) pack.groups = s.groups;
-    if (!pack.groups.length) { // no group anywhere in the listing: try the SAUCE of the first art file, else omit
+    if (!pack.groups.length && this.io.entry.id!=="maple") { // no group anywhere in the listing: try the SAUCE of the first art file, else omit
       for (const f of pack.files.filter((x) => x.viewable && !/\.(diz|nfo|txt)$/i.test(x.name)).slice(0, 2)) {
         try { const g = (parseSauce(await getFile(pack.name, f.name)).sauce?.group || "").trim(); if (g) { pack.groups = [g]; break; } } catch { /* skip */ }
       }
     }
     let diz: Uint8Array | null = null;
-    if (pack.fileId && !startFile) { try { diz = parseSauce(await getFile(pack.name, pack.fileId)).body; } catch { diz = null; } }
+    if (pack.fileId && !startFile && this.io.entry.id!=="maple") { try { diz = parseSauce(await getFile(pack.name, pack.fileId)).body; } catch { diz = null; } }
     if(this.io.entry.id === "maple")pack={...pack,files:pack.files.filter(f=>familyAllowed(pack.name,f.name))};
     if(this.io.entry.id === "c93")pack.files.sort((a,b)=>Number(/\.(nfo|diz|asc|txt)$/i.test(b.name))-Number(/\.(nfo|diz|asc|txt)$/i.test(a.name)));
     const viewable = pack.files.filter((f) => f.viewable);
@@ -903,7 +907,7 @@ export class Board {
       } else x.at(5, 4).k(8, "(no FILE_ID.DIZ in this pack)");
       x.at(14, 3).k(13, pad("File", 16) + pad("SAUCE title / Artist", 36) + rpad("Size", 10)).at(15, 3).k(5, "─".repeat(64));
       x.at(23,4).eol().k(8,`${hidden} files this terminal can't show (H to ${showAll?"hide":"list"} them)`);
-      x.at(13,3).k(8,"SPC tag / V queue / L slideshow / Q scan / H others / D download / ESC");
+      x.at(13,3).k(8,"SPC tag / V queue / L show / Q scan / H others / D save / P music / ESC");
       this.status(x);
       this.send(x);
       const label = (f:PackFile) => `${pad(f.name,16)}${pad(f.title || fileTitle(pack.name,f.name) || f.artists.join(", ") || "—",36)}${rpad(String(f.size ?? "?"),10)}`;
@@ -911,14 +915,14 @@ export class Board {
         text: `${this.tagged.has(`${pack.name}/${f.name}`)?"*":" "}${label(f)}`,
         color: MUSIC.test(f.name) ? 10 : /\.(ans|ice|bin|xb)$/i.test(f.name) ? 11 : 3, dim: !f.viewable && !MUSIC.test(f.name),
       }));
-      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx, hotkeys: "DPVQLH ", refresh: () => {
+      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx, hotkeys: "DPVQLH ", tag: (i)=>{const f=listed[i],path=`${pack.name}/${f.name}`;if(f.viewable){if(this.tagged.has(path))this.tagged.delete(path);else this.tagged.add(path);}return `${this.tagged.has(path)?"*":" "}${label(f)}`;}, refresh: () => {
         let changed = false; listed.forEach((f,i)=>{const t=`${this.tagged.has(`${pack.name}/${f.name}`)?"*":" "}${label(f)}`; if(items[i].text!==t){items[i].text=t;changed=true;}});return changed;
       } });
       if (!r) return;
       idx = r.index;
       if(r.key === "H") { showAll=!showAll; idx=0; continue; }
       if(r.key === " "){const path=`${pack.name}/${listed[idx].name}`;if(this.tagged.has(path))this.tagged.delete(path);else this.tagged.add(path);continue;}
-      if(r.key === "V"){const fs=tagOrder(viewable.map(f=>f.name),new Set([...this.tagged].filter(t=>t.startsWith(pack.name+"/")).map(t=>t.slice(pack.name.length+1))));await this.autoQueue(pack,fs.map(n=>viewable.find(f=>f.name===n)).filter((f):f is PackFile=>!!f));continue;}
+      if(r.key === "V"){await this.playTags();continue;}
       if(r.key === "L"){await this.autoQueue(pack,viewable);continue;}
       if(r.key === "Q"){await this.quickScan(pack,viewable);continue;}
       const f = listed[r.index];
@@ -990,6 +994,7 @@ export class Board {
   }
 
   async viewer(pack: PackInfo, files: PackFile[], idx: number, opts: { animation?: boolean; local?: Uint8Array } = {}) {
+    if(this.io.entry.id==="maple"){files=files.filter(f=>familyAllowed(pack.name,f.name));idx=Math.min(idx,files.length-1);if(!files.length)return;}
     const io = this.io;
     const restore = () => { io.client.overlay(null); this.screenMode(); };
     for (;;) {
@@ -1009,8 +1014,7 @@ export class Board {
       if(!opts.local) for(const n of [idx-1,idx+1]) { const neighbor=files[n]; if(neighbor) prefetchFile(pack.name,neighbor.name); }
       const seen = `${pack.name}/${f.name}`;
       const before = maxSpeed(io.profile);
-      if (!opts.local && !io.profile.filesSeen.includes(seen)) { io.profile.filesSeen.push(seen); io.save(); }
-      if(!opts.local && this.guest)this.creditsLeft++;
+      if (!opts.local && !io.profile.filesSeen.includes(seen)) { if(this.guest)this.creditsLeft++;io.profile.filesSeen.push(seen); io.save(); }
       if (!opts.local) { this.setDoing(`viewing ${f.name}`.slice(0, 40)); artViewed(); }
       if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
       const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
@@ -1076,22 +1080,24 @@ export class Board {
     io.client.overlay(null);
   }
 
-  async openPath(path:string){const [pack,file]=path.split('/');if(!pack||!file)return;try{const p=await getPack(pack);if(this.io.entry.id==='maple'&&!familyAllowed(pack,file)){await this.errorScreen('Not on the club-approved shelf.');return;}await this.packScreen({name:pack,year:p.year,groups:p.groups},file);}catch(e){await this.errorScreen(String(e));}}
+  async openPath(path:string){const [pack,file]=path.split('/');if(!pack||!file)return;if(this.io.entry.id==='maple'&&!familyAllowed(pack,file)){await this.errorScreen('Not on the club-approved shelf.');return;}try{const p=await getPack(pack);await this.packScreen({name:pack,year:p.year,groups:p.groups},file);}catch(e){await this.errorScreen(String(e));}}
   async openFamily(piece:typeof FAMILY_SHELF[number]|undefined){if(!piece)return;await this.openPath(`${piece.pack}/${piece.file}`);}
   async familyList(){for(;;){this.send(this.header(a(),'Club-approved shelf').at(23,3).k(8,'ENTER picture / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:FAMILY_SHELF.map(f=>({text:`${pad(f.file,18)}${pad(f.pack,18)}${f.artist}`,color:9}))});if(!r)return;await this.openFamily(FAMILY_SHELF[r.index]);}}
-  async fileResults(title:string,rows:{pack:string;file:string;year?:number;title?:string;artist?:string}[]){if(this.io.entry.id==='maple')rows=rows.filter(r=>familyAllowed(r.pack,r.file));for(;;){this.send(this.header(a(),title).at(23,3).k(8,'ENTER view / SPACE tag / V queue / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:rows.map(f=>({text:`${this.tagged.has(`${f.pack}/${f.file}`)?'*':' '} ${pad(f.file,16)}${pad(f.pack,16)}${pad(f.title||f.artist||'',36)}`,color:this.sk.a})),hotkeys:' V'});if(!r)return;if(r.key==='V'){await this.playTags();continue;}const f=rows[r.index];if(!f)continue;if(r.key===' '){const id=`${f.pack}/${f.file}`;if(this.tagged.has(id))this.tagged.delete(id);else this.tagged.add(id);continue;}await this.openPath(`${f.pack}/${f.file}`);}}
+  async fileResults(title:string,rows:{pack:string;file:string;year?:number;title?:string;artist?:string}[]){if(this.io.entry.id==='maple')rows=rows.filter(r=>familyAllowed(r.pack,r.file));if(!rows.length){this.send(this.header(a(),title).at(7,5).k(8,'No results found.'));await this.anyKey(22);return;}for(;;){this.send(this.header(a(),title).at(23,3).k(8,'ENTER view / SPACE tag / V queue / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:rows.map(f=>({text:`${this.tagged.has(`${f.pack}/${f.file}`)?'*':' '} ${pad(f.file,16)}${pad(f.pack,16)}${pad(f.title||f.artist||'',36)}`,color:this.sk.a})),hotkeys:' V'});if(!r)return;if(r.key==='V'){await this.playTags();continue;}const f=rows[r.index];if(!f)continue;if(r.key===' '){const id=`${f.pack}/${f.file}`;if(this.tagged.has(id))this.tagged.delete(id);else this.tagged.add(id);continue;}await this.openPath(`${f.pack}/${f.file}`);}}
   async shelf(){const rows=this.guest?guestShelf():(await net('shelf'))?.rows??[];await this.fileResults('Your shelf',rows);}
   async search(){const query=await this.ask(22,'Artist / group / title',60);if(!query)return;this.send(this.header(a(),'Searching',query));let rows:any[]=[];if(this.io.entry.id==='maple')rows=FAMILY_SHELF.filter(f=>`${f.file} ${f.artist} ${f.pack}`.toLowerCase().includes(query.toLowerCase()));else{const r=await net('search',{query});rows=r?.rows??[];for(const p of discovered.values())for(const f of p.files)if(f.viewable&&`${f.name} ${f.title} ${f.artists.join(' ')} ${p.groups.join(' ')}`.toLowerCase().includes(query.toLowerCase())&&!rows.some(r=>r.pack===p.name&&r.file===f.name))rows.push({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')});if(!rows.length){try{const gs=await getGroupPacks(query,1990,1996);if(gs.length){await this.pagedPacks(`Group: ${query}`,'archive credits',async()=>({items:gs,page:1,pages:1,total:gs.length}));return;}const d=await directLookup('artist',query);const packs=d.results?.packs??{};for(const [year,names]of Object.entries(packs))for(const name of names as string[]){const p=await getPack(name);for(const f of p.files.filter(f=>f.artists.some(a=>a.toLowerCase().includes(query.toLowerCase()))))rows.push({pack:name,file:f.name,year:+year,artist:f.artists.join(', ')});if(rows.length>=80)break;}}catch{}}}await this.fileResults(`Search: ${query}`,rows);}
   async artistIndex(){const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';this.send(this.header(a(),'Artist index A-Z').at(5,4).k(11,letters.split('').join(' ')).at(8,4).k(8,'Pick an initial / ESC return'));const k=await this.key();if(k.key==='Escape')return;const letter=String.fromCharCode(k.ch??0).toUpperCase();if(!letters.includes(letter))return;const artists=[...new Set([...discovered.values()].flatMap(p=>p.files.flatMap(f=>f.artists)))].filter(a=>a.toUpperCase().startsWith(letter)).sort();this.send(this.header(a(),`Artists: ${letter}`).at(23,3).k(8,'ENTER search / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:artists.map(a=>({text:a,color:11}))});if(r){const result=await net('search',{query:artists[r.index]});await this.fileResults(artists[r.index],result?.rows??[]);}}
   async newScan(){const result=await net('newScan');const unviewed=[...discovered.values()].filter(p=>!this.io.profile.filesSeen.some(f=>f.startsWith(p.name+'/')));const x=this.header(a(),'New since your last call');x.at(6,5).k(this.sk.a,`${result?.lines??0} new oneliners / ${result?.scores??0} new THE CORNER scores`);x.at(8,5).k(15,`${unviewed.length} discovered packs new to you.`);unviewed.slice(0,8).forEach((p,i)=>x.at(10+i,5).k(this.sk.c,p.name));if(!this.guest){const b=await net('balance');this.creditsLeft=b?.balance??this.creditsLeft;if(this.creditsLeft===0)x.at(20,5).k(12,'Mail from Static: your ratio is empty. Art earns your way back.');}x.at(22,5).k(8,'Any key returns');this.send(x);await this.key();this.io.clearOutput();}
   async textList(){const packs=[...discovered.values()];if(!packs.length){try{packs.push(await getPack('ensiart'));}catch{}}const rows=packs.flatMap(p=>p.files.filter(f=>/\.(nfo|diz|asc|txt)$/i.test(f.name)).map(f=>({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')})));await this.fileResults('LINE NOISE / text first',rows);}
-  async zeroDay(){const month=new Date().getUTCMonth()+1;this.send(this.header(a(),'0-DAY ART',`month ${month} / 199x`));const packs:PackSummary[]=[];for(let year=1996;year>=1990;year--){let page=1;for(;;){const p=await getYearPacks(year,page,100);packs.push(...p.items.filter(p=>{const d=String(p.released??'');const m=/^\d{4}-(\d{2})/.exec(d);if(m)return +m[1]===month;const tail=/(\d{2})(\d{2})$/.exec(p.name);return !!tail&&+tail[1]===month;}));if(page>=p.pages)break;page++;}}packs.sort((a,b)=>b.year-a.year||b.name.localeCompare(a.name));await this.pagedPacks('0-DAY ART','this month in the scene, 199x',async()=>({items:packs,page:1,pages:1,total:packs.length}));}
+  private zeroDayCache: PackSummary[] | null=null;
+  async zeroDay(){const month=new Date().getUTCMonth()+1;this.send(this.header(a(),'0-DAY ART',`month ${month} / 199x`));if(!this.zeroDayCache){const packs:PackSummary[]=[];for(let year=1996;year>=1990;year--){this.send(a().at(6,4).eol().k(8,`Checking ${year} disks for month ${month}...`));let page=1;for(;;){const p=await getYearPacks(year,page,100);packs.push(...p.items.filter(p=>releasedInMonth(p,month)));if(page>=p.pages)break;page++;}}this.zeroDayCache=packs.sort((a,b)=>b.year-a.year||b.name.localeCompare(a.name));}if(!this.zeroDayCache.length){this.send(a().at(8,4).k(8,'No packs released in this calendar month.'));await this.anyKey(22);return;}await this.pagedPacks('0-DAY ART','this month in the scene, 199x',async()=>({items:this.zeroDayCache??[],page:1,pages:1,total:this.zeroDayCache?.length??0}));}
+
   async roulette(){try{const years=await getYears();const y=years[Math.floor(Math.random()*years.length)];const list=await getYearPacks(y.year,1);const chosen=list.items[Math.floor(Math.random()*list.items.length)];const pack=await getPack(chosen.name);const fs=pack.files.filter(f=>f.viewable);if(fs.length)await this.viewer(pack,fs,Math.floor(Math.random()*fs.length));}catch(e){await this.errorScreen(String(e));}}
   async autoQueue(pack:PackInfo,files:PackFile[]){for(let i=0;i<files.length;i++){const f=files[i];if(this.io.entry.id==='maple'&&!familyAllowed(pack.name,f.name))continue;try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));this.screenMode(prep.mode);this.io.client.markTop();this.send(prep.stream);if(files[i+1])prefetchFile(pack.name,files[i+1].name);const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();break;}await this.io.drain();if(await this.io.keyTimeout(3000))break;}catch{}}this.io.clearOutput();this.screenMode();}
-  async playTags(){for(const path of this.tagged){const [name,file]=path.split('/');try{const p=await getPack(name),f=p.files.find(f=>f.name===file&&f.viewable);if(!f)continue;const prep=prepareArt(f.name,await getFile(name,file));this.screenMode(prep.mode);this.send(prep.stream);for(;;){const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}if(await this.io.keyTimeout(3000))break;}catch{}}this.io.clearOutput();this.screenMode();}
-  async quickScan(pack:PackInfo,files:PackFile[]){for(const f of files){try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));const t=new Terminal(prep.mode);t.feed(prep.stream);this.screenMode({cols:t.cols,rows:25,ice:t.ice,ninePixel:t.ninePixel,font:t.font,palette:t.palette});const x=a().cls();for(let row=0;row<Math.min(8,t.lines.length);row++){x.at(row+2,1);for(const cell of t.lines[row])x.c((cell>>8)&15,((cell>>12)&7)).bytes([cell&255]);}x.at(12,1).k(15,pad(`${f.name} / ${prep.sauce?.title||f.title||''} / ${prep.sauce?.author||f.artists.join(', ')}`,t.cols));x.at(14,1).k(8,'QUICK SCAN / ESC stops');this.send(x);for(;;){const k=await this.io.keyOrDrain();if(k?.key==='Escape'){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}const k=await this.io.keyTimeout(750);if(k?.key==='Escape')break;}catch{}}this.io.clearOutput();this.screenMode();}
+  async playTags(){for(const path of orderedTags(this.tagged)){const [name,file]=path.split('/');try{const p=await getPack(name),f=p.files.find(f=>f.name===file&&f.viewable);if(!f||(this.io.entry.id==='maple'&&!familyAllowed(name,file)))continue;const prep=prepareArt(f.name,await getFile(name,file));this.screenMode(prep.mode);this.send(prep.stream);for(;;){const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}if(await this.io.keyTimeout(3000))break;}catch{}}this.io.clearOutput();this.screenMode();}
+  async quickScan(pack:PackInfo,files:PackFile[]){for(const f of files){if(this.io.entry.id==='maple'&&!familyAllowed(pack.name,f.name))continue;try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));const t=new Terminal(prep.mode);t.feed(prep.stream);this.screenMode({cols:t.cols,rows:25,ice:t.ice,ninePixel:t.ninePixel,font:t.font,palette:t.palette});const x=a().cls();for(let row=0;row<Math.min(8,t.lines.length);row++){x.at(row+2,1);for(const cell of t.lines[row])x.c((cell>>8)&15,((cell>>12)&7)).bytes([cell&255]);}x.at(12,1).k(15,pad(`${f.name} / ${prep.sauce?.title||f.title||''} / ${prep.sauce?.author||f.artists.join(', ')}`,t.cols));x.at(14,1).k(8,'QUICK SCAN / ESC stops');this.send(x);for(;;){const k=await this.io.keyOrDrain();if(k?.key==='Escape'){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}const k=await this.io.keyTimeout(750);if(k?.key==='Escape')break;}catch{}}this.io.clearOutput();this.screenMode();}
   async juke(){for(;;){this.send(this.header(a(),'STROBE / Jukebox').at(23,3).k(8,'ENTER play / SPACE queue / V play queue / ESC back'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:jukebox.map(t=>({text:`${pad(t.file,20)}${pad(t.pack,20)}${t.artist}`,color:13})),hotkeys:' V'});if(!r)return;if(r.key===' '){this.musicQueue.push(jukebox[r.index]);continue;}const tunes=r.key==='V'?this.musicQueue.splice(0):[jukebox[r.index]];for(const t of tunes){if(!t)continue;try{const bytes=await getFile(t.pack,t.file);await this.io.drain();await this.io.client.kplay(t.file,bytes);}catch(e){await this.errorScreen(String(e));}}}}
-  async warez(){for(;;){this.send(this.header(a(),'WAREZ / FICTION',`${this.creditsLeft} credits`).at(5,5).k(12,'1 0-DAY   2 UTILS   3 GAMEZ   4 CRACKTROS   5 COURIER.LOG').at(8,5).k(8,'Art +1 / rating +1 / oneliner +2 / doors +5 / THE CORNER +8').at(10,5).k(7,'All releases original fiction. No commercial software.').at(22,5).k(8,'ESC return'));const k=await this.key();this.io.clearOutput();if(k.key==='Escape')return;const n=(k.ch??0)-49;if(n===4){const calls=this.guest?1:this.caller?.calls??1;for(let i=0;i<Math.min(calls,8);i++){const x=this.header(a(),`COURIER.LOG / ${i+1} of 8`);x.at(6,5).k(7,COURIER_LOGS[i].slice(0,70)).at(7,5).k(7,COURIER_LOGS[i].slice(70));this.send(x);await this.anyKey(20);}continue;}const area=['0-DAY','UTILS','GAMEZ','CRACKTROS'][n];if(!area)continue;for(;;){const releases=RELEASES.filter(r=>r.area===area);this.send(this.header(a(),`WAREZ / ${area}`).at(23,3).k(8,'ENTER NFO / D download / ESC directories'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:releases.map(r=>({text:`${pad(r.id,10)}${pad(r.title,28)}${pad(r.group,18)}${r.cost} credits`,color:12})),hotkeys:'D'});if(!r)break;const rel=releases[r.index];if(r.key!=='D'){this.send(nfoBytes(rel.id));await this.anyKey(24);continue;}if(this.guest){if(this.creditsLeft<rel.cost){this.send(a().at(23,3).eol().k(12,'Static: no ratio, no disk. View some art.'));await this.key();continue;}this.creditsLeft-=rel.cost;}else{const buy=await net('warezBuy',{id:rel.id});if(!buy?.ok){this.send(a().at(23,3).eol().k(12,buy?.why??'Ledger offline. Transfer refused.'));await this.key();continue;}this.creditsLeft=buy.balance;}this.send(a().cls());box(a(),7,12,56,11,11);this.send(a().at(8,14).k(11,'TELEWIRE / ZMODEM RECEIVE').at(11,14).k(15,`${rel.id}.ZIP`).at(13,14).k(11,'████████████████████████████████████').at(16,14).k(8,'ENTER completes / ESC aborts'));await this.io.drain();const key=await this.io.key();if(key.key==='Escape')continue;const bytes=nfoBytes(rel.id);if(rel.runnable)await this.io.client.saveDownload({name:rel.id+'.EXE',bytes,pack:'fiction',year:1993,file:'PROGRAM',artists:[rel.group],groups:[rel.group]});await this.io.client.saveDownload({name:rel.id+'.NFO',bytes,pack:'fiction',year:1993,file:'NFO',artists:[rel.group],groups:[rel.group]});await this.io.client.saveDownload({name:rel.id+'.DIZ',bytes:dizBytes(rel.id),pack:'fiction',year:1993,file:'DIZ',artists:[rel.group],groups:[rel.group]});this.send(a().at(18,3).k(10,`Unpacked C:\\WAREZ\\${rel.id} / ${rel.runnable?'RUN '+rel.id:'NFO collector release'}`));await this.anyKey(20);}}}
+  async warez(){for(;;){this.send(this.header(a(),'WAREZ / FICTION',`${this.creditsLeft} credits`).at(5,5).k(12,'1 0-DAY   2 UTILS   3 GAMEZ   4 CRACKTROS   5 COURIER.LOG').at(8,5).k(8,'Art +1 / rating +1 / oneliner +2 / doors +5 / THE CORNER +8').at(10,5).k(7,'All releases original fiction. No commercial software.').at(22,5).k(8,'ESC return'));const k=await this.key();this.io.clearOutput();if(k.key==='Escape')return;const n=(k.ch??0)-49;if(n===4){const calls=this.guest?1:this.caller?.calls??1;for(let i=0;i<Math.min(calls,8);i++){const x=this.header(a(),`COURIER.LOG / ${i+1} of 8`);x.at(6,5).k(7,wrapCourier(COURIER_LOGS[i])[0]??'').at(7,5).k(7,wrapCourier(COURIER_LOGS[i])[1]??'');this.send(x);await this.anyKey(20);}continue;}const area=['0-DAY','UTILS','GAMEZ','CRACKTROS'][n];if(!area)continue;for(;;){const releases=RELEASES.filter(r=>r.area===area);this.send(this.header(a(),`WAREZ / ${area}`).at(23,3).k(8,'ENTER NFO / D download / ESC directories'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:releases.map(r=>({text:`${pad(r.id,10)}${pad(r.title,28)}${pad(r.group,18)}${r.cost} credits`,color:12})),hotkeys:'D'});if(!r)break;const rel=releases[r.index];if(r.key!=='D'){this.send(nfoBytes(rel.id));await this.anyKey(24);continue;}if(this.guest){if(this.creditsLeft<rel.cost){this.send(a().at(23,3).eol().k(12,'Static: no ratio, no disk. View some art.'));await this.key();continue;}this.creditsLeft-=rel.cost;}else{const buy=await net('warezBuy',{id:rel.id});if(!buy?.ok){this.send(a().at(23,3).eol().k(12,buy?.why??'Ledger offline. Transfer refused.'));await this.key();continue;}this.creditsLeft=buy.balance;}this.send(a().cls());box(a(),7,12,56,11,11);this.send(a().at(8,14).k(11,'TELEWIRE / ZMODEM RECEIVE').at(11,14).k(15,`${rel.id}.ZIP`).at(13,14).k(11,'████████████████████████████████████').at(16,14).k(8,'ENTER completes / ESC aborts'));await this.io.drain();const key=await this.io.key();if(key.key==='Escape')continue;const bytes=nfoBytes(rel.id);if(rel.runnable)await this.io.client.saveDownload({name:`C:\\WAREZ\\${rel.id}\\${rel.id}.EXE`,bytes:new TextEncoder().encode('KESTREL-RUN:'+rel.id),pack:'fiction',year:1993,file:'PROGRAM',artists:[rel.group],groups:[rel.group]});await this.io.client.saveDownload({name:`C:\\WAREZ\\${rel.id}\\${rel.id}.NFO`,bytes,pack:'fiction',year:1993,file:'NFO',artists:[rel.group],groups:[rel.group]});await this.io.client.saveDownload({name:`C:\\WAREZ\\${rel.id}\\FILE_ID.DIZ`,bytes:dizBytes(rel.id),pack:'fiction',year:1993,file:'DIZ',artists:[rel.group],groups:[rel.group]});this.send(a().at(18,3).k(10,`Unpacked C:\\WAREZ\\${rel.id} / ${rel.runnable?'RUN '+rel.id:'NFO collector release'}`));await this.anyKey(20);}}}
 
   // ── VOID//NODE ─────────────────────────────────────────────────
   async voidGate() {
