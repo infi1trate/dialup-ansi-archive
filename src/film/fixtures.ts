@@ -6,12 +6,12 @@ export const FILM_CAST = ["NullPtr", "Vera_9", "mothman", "sysop's cat", "Halcyo
 const CITY: Record<string, string> = { KESTREL: "Port Ellis", NullPtr: "Ashby", Vera_9: "Lakewood", mothman: "Grayson", "sysop's cat": "under the desk", Halcyon: "Milltown", "dot.matrix": "Somerset" };
 const LEVEL: Record<string, string> = { KESTREL: "ELITE", NullPtr: "ELITE", Vera_9: "VALIDATED", mothman: "VALIDATED", "sysop's cat": "NEW USER", Halcyon: "VALIDATED", "dot.matrix": "NEW USER" };
 const ONELINERS: [string, string][] = [
-  ["Vera_9", "|11latchkey|07 drop tonight? my 14.4 is warmed up"],
+  ["Vera_9", "latchkey drop tonight? my 14.4 is warmed up"],
   ["mothman", "who keeps calling at 3am. oh. me."],
   ["sysop's cat", "zzzzzzzzzzzzzzzzzzzzzzzzzzzz"],
   ["NullPtr", "half blocks forever, quarter blocks never"],
   ["Halcyon", "mom picked up the extension mid-zmodem. RIP"],
-  ["dot.matrix", "first time caller. the logo is |12so red"],
+  ["dot.matrix", "first call. that logo is so red"],
 ];
 const WALL = [
   { id: 3, handle: "NullPtr", body: "the corner: buy low in the rail yards,\nsell at the arcade. you're welcome.", hidden: false },

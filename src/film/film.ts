@@ -12,7 +12,7 @@ import { filmNet, FILM_HANDLE } from "./fixtures";
 import { FILM_DATE_RATE, filmDateBase, spliceSpans } from "./splice";
 
 export const FILM_W = 1920, FILM_H = 1080, FILM_FPS = 30;
-const SR = 48000, Q = 128, HOLD_MS = 500, FAST_MS = 100, QUANTIZER = 10;
+const SR = 48000, Q = 128, HOLD_MS = 500, FAST_MS = 100, QUANTIZER = 4;
 const SEEDED = "dialup.film.seeded";
 
 export interface FilmApi { lean: (v: boolean) => void; setLamp: (on: boolean) => void; takePhoto: () => Promise<void> }
@@ -29,6 +29,7 @@ const comp = typeof document !== "undefined" ? createCompositor(FILM_W, FILM_H) 
 export async function prepare(): Promise<boolean> {
   if (!localStorage.getItem(SEEDED)) { await seed(); localStorage.setItem(SEEDED, "1"); location.reload(); return false; }
   (globalThis as unknown as { __filmNet?: unknown }).__filmNet = (action: string, body: Record<string, unknown>) => filmNet(action, body, Date.now());
+  (globalThis as unknown as { __filmOrigin?: string }).__filmOrigin = "https://dialup-ansi-archive.lovable.app"; // no test-host address on film
   clock = createClock(filmDateBase(new Date()), FILM_DATE_RATE);
   const realFetch = window.fetch.bind(window);
   window.fetch = ((...a: Parameters<typeof fetch>) => { if (inflight++ === 0) inflightSince = clock.real.now(); return realFetch(...a).finally(() => { inflight--; }); }) as typeof fetch;
@@ -45,7 +46,7 @@ export async function prepare(): Promise<boolean> {
 }
 
 async function seed() {
-  const profile = { handle: FILM_HANDLE, password: null, city: "Port Ellis", joke: "", lastCall: { "555-0142": "11-18-93 23:12" }, filesSeen: [], speed: 14400, fastBoot: true, calls: 211, accessLevel: "ELITE", serverFiles: 148 };
+  const profile = { handle: FILM_HANDLE, password: null, city: "Port Ellis", joke: "", lastCall: { "555-0142": "11-18-93 23:12", "555-0167": "11-17-93 22:40", "555-0193": "11-16-93 01:05", "555-0128": "11-14-93 19:30", "555-0177": "11-18-93 00:51" }, filesSeen: [], speed: 14400, fastBoot: true, calls: 211, accessLevel: "ELITE", serverFiles: 148 };
   const set = (k: string, v: unknown) => localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
   set("dialup.profile.v1", profile);
   set("dialup.room.v1", { muted: false, reducedMotion: false, lamp: true, lean: false, brightness: 0.6, contrast: 0.7, modemVolume: 0.6, musicVolume: 0.6, turbo: false });
@@ -207,7 +208,8 @@ async function toMenu(timeoutMs = 120_000) {
     if (clock.now() > end) throw new Error("film: main menu never appeared");
     const s = screen();
     if (m.state.value === "session") {
-      if (["L", "A", "G", "H"].every((k) => h.some((x) => x.key === k)) && /Login/.test(s)) key("L");
+      if (["L", "A", "G", "H"].every((k) => h.some((x) => x.key === k)) && /\[L\]ogin|Login/.test(s)) key("L");
+      else if (s.includes("This week in the scene") && h.some((x) => x.key === "Escape")) key("Escape");
       else if (s.includes("ENTER logs you in") || h.some((x) => x.label === "CONTINUE" || x.label === "MENU")) key("Enter");
     }
     await sleep(350);
@@ -228,9 +230,10 @@ const helpers = {
   record,
   save: (blob: Blob, name: string) => { const u = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); },
   stats: () => lastStats,
-  now: () => (rec ? (clock.now() - rec.start) / 1000 : clock.now() / 1000),
-  /** Wait until this many seconds after the clip began (the 0.5 s lead hold included). */
-  at: (sec: number) => sleep(Math.max(0, (rec?.start ?? clock.now()) + sec * 1000 - clock.now())),
+  /** Seconds of film so far (frames captured; cut time excluded), or virtual seconds outside a recording. */
+  now: () => (rec ? rec.frames / FILM_FPS : clock.now() / 1000),
+  /** Wait until this many seconds of film exist (the 0.5 s lead hold included; cuts excluded). */
+  at: async (sec: number) => { while (rec && rec.frames < Math.round(sec * FILM_FPS)) await sleep(1000 / FILM_FPS); },
   sleep, key, type, waitFor, until, screen, hints, toMenu, dialBoard, hangup,
   state: () => m.state.value,
   lamp: (on: boolean) => api.current.setLamp(on),
@@ -249,4 +252,9 @@ const helpers = {
   skip: () => m.keys.push({ key: " ", ch: 32, ctrl: false, alt: false }),
   /** Run setup steps inside the clip without filming them: an instant state jump. */
   cut: async (fn: () => Promise<void>) => { cutting = true; try { await fn(); } finally { cutting = false; } },
+  /** Virtual milliseconds now, and when a bus event next fires (e.g. "offHook", "ring", "handshakeStart"). */
+  vnow: () => clock.now(),
+  event: (name: string) => new Promise<number>((r) => { const off = audio.on(name as never, (() => { off(); r(clock.now()); }) as never); }),
+  showUntil: (ms: number) => sleep(Math.max(0, ms - clock.now())),
+  cutUntil: (ms: number) => helpers.cut(() => sleep(Math.max(0, ms - clock.now()))),
 };

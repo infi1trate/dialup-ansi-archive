@@ -1112,7 +1112,7 @@ export class Board {
       if (!opts.local && !io.profile.filesSeen.includes(seen)) { if(this.guest)this.creditsLeft++;io.profile.filesSeen.push(seen); io.save(); }
       if (!opts.local) { this.setDoing(`viewing ${f.name}`.slice(0, 40)); artViewed(); }
       if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name,guest:this.guest,board:this.io.entry.id }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
-      const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
+      const url = typeof location !== "undefined" ? `${(import.meta.env.DEV && (globalThis as { __filmOrigin?: string }).__filmOrigin) || location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
       const unlocked = maxSpeed(io.profile) !== before ? maxSpeed(io.profile) : 0;
       let finished = false, info = false;
       const viewHints = (done: boolean) => this.hint([

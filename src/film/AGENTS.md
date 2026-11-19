@@ -1,0 +1,1 @@
+- Film mode (`src/film`) is test-only: reached only through `import.meta.env.DEV && ?film` guards, runs the page on a virtual clock with offline audio, and reuses the tape compositor. Why: portfolio clips at full frame rate on slow test browsers without shipping any of it.
