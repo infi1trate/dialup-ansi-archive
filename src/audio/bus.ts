@@ -7,6 +7,10 @@ export interface AudioEvents {
   printScreen: number;
   /** The instant camera on the cork board: shutter clack, then the print motor. */
   camera: void;
+  /** A click on the cassette stack: play or stop the mixtape. */
+  mixtape: void;
+  /** Mixtape status for the escape hatch: "stopped", or "A: Basement Lamp" style. */
+  mixtapeState: string;
   floppyInsert: void;
   floppyEject: void;
   /** The monitor's degauss coil: a full cycle, the dull click of an uncharged coil, or the reduced-motion thunk. */
@@ -71,10 +75,13 @@ class AudioBus {
     if (!this.loading) {
       this.loading = true;
       const ctx = this.ctx;
-      void import("./engine").then((m) => m.startSynth(ctx, this));
+      this.ready = import("./engine").then((m) => { m.startSynth(ctx, this); });
     }
   }
 
+  private ready: Promise<void> | null = null;
+  /** Resolves once the synth is listening (after the first unlock), so a first click's event is not lost. */
+  whenReady() { this.unlock(); return this.ready ?? Promise.resolve(); }
   get context() { return this.ctx; }
 }
 

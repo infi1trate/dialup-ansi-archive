@@ -3,6 +3,8 @@
 import type { audio as Bus } from "./bus";
 import { BUSY, DIAL_TONE, DTMF, DTMF_OFF_MS, DTMF_ON_MS, RINGBACK, handshakeMs } from "./tables";
 import {introNote,noteFrequency,INTRO_STEP} from './intro-score';
+import { Mixtape, FLIP_HISS_S, type MixAction } from '@/lib/mixtape';
+import { TUNES, scheduleTune, noiseBuffer } from './tunes';
 
 type B = typeof Bus;
 type Src = AudioScheduledSourceNode;
@@ -103,6 +105,12 @@ class Synth {
     bus.on("floppySeek", () => this.floppySeek());
     bus.on("printScreen", (sec) => this.printScreen(sec));
     bus.on("camera", () => this.camera());
+    bus.on("mixtape", () => this.mixAct(this.mix_.press()));
+    bus.on("handshakeStart", () => this.mixDuck(true));
+    bus.on("connect", () => this.mixDuck(false));
+    bus.on("hangup", () => this.mixDuck(false));
+    bus.on("music", (on) => { if (on) this.mixAct(this.mix_.interrupt()); });
+    bus.on("introMusic", (on) => { if (on) this.mixAct(this.mix_.interrupt()); });
     bus.on("floppyInsert", () => this.floppyLatch(false));
     bus.on("floppyEject", () => this.floppyLatch(true));
     bus.on("offHook", () => this.offHook());
@@ -282,6 +290,51 @@ class Synth {
       this.burst(this.buses.pc, t, 0.01, rnd(300, 420), 6, rnd(0.08, 0.15));
       t += rnd(0.015, 0.06);
     }
+  }
+  // ── the mixtape: original chiptunes through a cheap tape deck into the room speaker ──
+  private mix_ = new Mixtape();
+  private deck: { input: GainNode; duck: GainNode; hiss: AudioBufferSourceNode; out: GainNode; lfo: OscillatorNode[] } | null = null;
+  private deckSources: AudioScheduledSourceNode[] = [];
+  private deckTimers: ReturnType<typeof setTimeout>[] = [];
+  private deckNoise: AudioBuffer | null = null;
+  private deckOn() {
+    if (this.deck) return this.deck;
+    const c = this.ctx, t = this.now;
+    const input = this.gain(0.55), hp = this.biquad("highpass", 95, 0.7), lp = this.biquad("lowpass", 5200, 0.6), body = this.biquad("peaking", 850, 0.9); body.gain.value = 2.5;
+    const delay = c.createDelay(0.05); delay.delayTime.value = 0.012;
+    const wow = this.osc("sine", 0.55), wowG = this.gain(0.0016), flutter = this.osc("sine", 7.3), flutG = this.gain(0.00022);
+    wow.connect(wowG).connect(delay.delayTime); flutter.connect(flutG).connect(delay.delayTime); wow.start(t); flutter.start(t);
+    const duck = this.gain(this.mix_.ducked ? 0.2512 : 1), out = this.gain(0);
+    input.connect(hp).connect(body).connect(lp).connect(delay).connect(duck).connect(out).connect(this.musicVol);
+    const hiss = this.buf(this.pink, true), hhp = this.biquad("highpass", 2600, 0.5), hg = this.gain(0.035);
+    hiss.connect(hhp).connect(hg).connect(delay); this.start(hiss, t);
+    out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(1, t + 0.08);
+    this.deck = { input, duck, hiss, out, lfo: [wow, flutter] };
+    return this.deck;
+  }
+  private deckOff() {
+    const d = this.deck; if (!d) return; this.deck = null; const t = this.now;
+    d.out.gain.cancelScheduledValues(t); d.out.gain.setValueAtTime(d.out.gain.value, t); d.out.gain.linearRampToValueAtTime(0, t + 0.06);
+    setTimeout(() => { try { d.hiss.stop(); d.lfo.forEach((o) => o.stop()); } catch { /* stopped */ } d.out.disconnect(); }, 200);
+  }
+  private deckStopTunes() { this.deckTimers.forEach(clearTimeout); this.deckTimers = []; this.deckSources.forEach((s) => { try { s.stop(); } catch { /* not started */ } }); this.deckSources = []; }
+  /** The deck's play/stop key: a mechanical clunk at the speaker. */
+  private deckClunk() { const t = this.now, p = this.panner(PAN.speakerR); p.connect(this.buses.room); this.burst(p, t, 0.035, 240, 2.5, 0.5); this.burst(p, t + 0.008, 0.01, 1700, 4, 0.2); }
+  private mixDuck(on: boolean) { const g = this.mix_.duck(on); if (this.deck) this.deck.duck.gain.setTargetAtTime(g, this.now, 0.08); }
+  private mixAct(a: MixAction) {
+    const label = () => (this.mix_.state === "stopped" ? "stopped" : `${this.mix_.side}: ${TUNES[this.mix_.current]?.title ?? ""}`);
+    if (a.kind === "none") return;
+    if (a.kind === "stop") { this.deckStopTunes(); this.deckClunk(); this.deckOff(); this.bus.emit("mixtapeState", "stopped"); return; }
+    if (a.kind === "flip") { this.deckStopTunes(); this.deckClunk(); this.bus.emit("mixtapeState", "flipping"); this.deckTimers.push(setTimeout(() => this.mixAct(this.mix_.flipped()), FLIP_HISS_S * 1000)); return; }
+    const tune = TUNES[a.tune]; if (!tune) return;
+    const fresh = !this.deck; const d = this.deckOn(); if (fresh) this.deckClunk();
+    this.deckNoise ??= noiseBuffer(this.ctx);
+    const t0 = this.now + (fresh ? 0.35 : 0.15); let done = 0;
+    // schedule a second or so ahead at a time, so a stop is instant and nothing piles up
+    const chunk = () => { const to = Math.min(tune.length, done + 1.5); this.deckSources.push(...scheduleTune(this.ctx, d.input, tune, t0, done, to, this.deckNoise!)); done = to; this.deckSources = this.deckSources.filter((s) => (s as unknown as { _dead?: boolean })._dead !== true); if (done < tune.length) this.deckTimers.push(setTimeout(chunk, 1000)); };
+    chunk();
+    this.deckTimers.push(setTimeout(() => this.mixAct(this.mix_.ended()), (t0 - this.now + tune.length) * 1000));
+    this.bus.emit("mixtapeState", label());
   }
   /** Instant camera on the cork board (far right): shutter clack, then the print-eject motor whirr. */
   camera() {

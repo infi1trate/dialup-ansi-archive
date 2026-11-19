@@ -12,6 +12,8 @@ export const HOTSPOTS = {
   cork_note: [.947,.447,.042,.096], alarm_clock: [0,.713,.1354,.1319],
   // Blank badge at the lower left of the monitor bezel: the degauss button.
   monitor_degauss: [.3191,.6021,.0449,.0271],
+  // The stack of cassettes left of the alarm clock: the mixtape.
+  cassettes: [0,.626,.064,.088],
   // The instant print pinned to the cork board: the camera.
   cork_photo: [.9258,.5167,.0492,.1563],
 } satisfies Record<string, Box>;

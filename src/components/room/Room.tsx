@@ -12,7 +12,7 @@ export interface RoomProps {
  modemVolume: number; musicVolume: number; onMusicVolume:(v:number)=>void; getState:()=>string;
  onPcPower:()=>void; onTurbo:()=>void; onLamp:()=>void; onModemVolume:(v:number)=>void; onLean:(v:boolean)=>void; children?:ReactNode; recording?:boolean; onDegauss?:()=>void;
  /** Visitor toys: hotspots render only once they are live (see useToys). */
- toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void; onPhoto:()=>void };
+ toys?:{ live:boolean; floppyIn:boolean; onFloppySlot:()=>void; onPhoto:()=>void; onTapes:()=>void };
  /** The last instant print (small JPEG) laid over the photographed one on the cork board. */
  corkPrint?:string|null; flash?:boolean;
 }
@@ -49,6 +49,7 @@ export function Room(p: RoomProps) {
  {hotspot('lamp','Desk lamp',p.onLamp)}
  {p.onDegauss&&hotspot('monitor_degauss','Degauss button',p.onDegauss)}
  {p.toys?.live&&hotspot('cork_photo','Instant camera',p.toys.onPhoto)}
+ {p.toys?.live&&hotspot('cassettes','Cassette tapes',p.toys.onTapes)}
  {p.toys?.live&&hotspot('floppy',p.toys.floppyIn?'Eject floppy':'Floppy drive',p.toys.onFloppySlot)}
  {hotspot('sticky_note','Sticky note',()=>setNote(1))}
  {hotspot('cork_note','Pinned paper',()=>setNote(2),'secret-paper')}
