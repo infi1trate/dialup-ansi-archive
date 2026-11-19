@@ -275,7 +275,7 @@
   .hatch { position: fixed; right: 0.75rem; bottom: 0.75rem; z-index: 20; font-family: var(--font-mono); font-size: 0.75rem; display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; }
   .hatch-toggle { width: 2rem; height: 1.5rem; border-radius: 0.3rem; color: oklch(0.5 0.01 80); background: oklch(0.12 0.005 80 / 0.6); border: 1px solid oklch(0.3 0.01 80 / 0.5); cursor: pointer; opacity: 0.45; transition: opacity 150ms; }
   .hatch-toggle:hover, .hatch-toggle:focus-visible, .hatch.is-open .hatch-toggle { opacity: 1; }
-  .hatch-menu { list-style: none; margin: 0; padding: 0.4rem; display: flex; flex-direction: column; gap: 0.15rem; background: oklch(0.12 0.005 80 / 0.92); border: 1px solid oklch(0.3 0.01 80 / 0.6); border-radius: 0.4rem; }
+  .hatch-menu { list-style: none; margin: 0; padding: 0.4rem; display: flex; flex-direction: column; gap: 0.15rem; max-height: calc(100dvh - 3.5rem); overflow-y: auto; overscroll-behavior: contain; background: oklch(0.12 0.005 80 / 0.92); border: 1px solid oklch(0.3 0.01 80 / 0.6); border-radius: 0.4rem; }
   .hatch-menu button, .hatch-menu a { display: block; width: 100%; text-align: left; padding: 0.3rem 0.6rem; border-radius: 0.25rem; color: oklch(0.78 0.02 80); background: none; border: 0; cursor: pointer; font: inherit; text-decoration: none; }
   .hatch-menu button:hover, .hatch-menu a:hover, .hatch-menu button:focus-visible, .hatch-menu a:focus-visible { background: oklch(0.22 0.01 80); outline: none; }
 
@@ -451,3 +451,11 @@
 .calendar-page { position:absolute; left:0; top:0; transform-origin:0 0; pointer-events:none; filter:brightness(calc(.25 + var(--lamp-level) * .75)); }
 .calendar-page.is-turning { animation:calendar-turn .42s ease-out both; }
 @keyframes calendar-turn { from { clip-path:inset(0 0 100% 0); } to { clip-path:inset(0 0 0 0); } }
+/* Short landscape screens (phones): the sheet rises further and sits above the touch keys so it can be read and tapped. */
+@media (orientation:landscape) and (max-height:540px) { .printout { width:min(22vw, 220px); z-index:25; } .printout.is-up { transform:translateY(12%); } }
+/* Phone held sideways: the tube fills the height, so the touch keys stand in a column at the left edge instead of over the bottom rows. */
+@media (orientation:landscape) and (max-height:540px) {
+  .photo-room .ctxbar { top:max(8px, env(safe-area-inset-top)); bottom:8px; left:max(8px, env(safe-area-inset-left)); right:auto; max-width:none; max-height:none; min-height:0; padding:0;
+    display:grid; grid-auto-flow:column; grid-template-rows:repeat(auto-fill, 3rem); gap:.4rem; align-content:start; overflow:visible; }
+  .photo-room .ctxbar .keycap { height:3rem; min-width:3.5rem; }
+}

@@ -20,17 +20,25 @@ export function ContextBar({ hints, powered, onPower, onKey, onText }: Props) {
   const wantsText = hints.some((h) => h.text);
   // a text prompt summons the phone's own keyboard
   useEffect(() => { if (wantsText) input.current?.focus({ preventScroll: true }); else input.current?.blur(); }, [wantsText]);
+  // arrow keys repeat while held, like a real keyboard's typematic repeat (paddle and snake games)
+  const repeat = useRef<{ t?: ReturnType<typeof setTimeout>; i?: ReturnType<typeof setInterval> }>({});
+  const stop = () => { clearTimeout(repeat.current.t); clearInterval(repeat.current.i); repeat.current = {}; };
+  useEffect(() => stop, []);
+  const hintKeys = hints.map((h) => h.key).join(" ");
+  useEffect(() => { stop(); }, [hintKeys]);
   const press = (h: KeyHint) => (e: React.PointerEvent) => {
     e.preventDefault(); tick();
     if (h.text) { input.current?.focus({ preventScroll: true }); return; }
     onKey(h);
+    stop();
+    if (h.key.startsWith("Arrow")) repeat.current.t = setTimeout(() => { repeat.current.i = setInterval(() => onKey(h), 60); }, 300);
   };
   return (
     <div className="ctxbar" role="toolbar" aria-label="Keys for this screen">
       {!powered ? (
         <button type="button" className="keycap keycap-power" onPointerDown={(e) => { e.preventDefault(); tick(); onPower(); }}>POWER</button>
       ) : hints.map((h, i) => (
-        <button type="button" key={`${h.label}-${i}`} className={`keycap ${h.label.length > 6 ? "keycap-wide" : ""}`} onPointerDown={press(h)}>{h.text ? "⌨ type" : h.label}</button>
+        <button type="button" key={`${h.label}-${i}`} className={`keycap ${h.label.length > 6 ? "keycap-wide" : ""}`} onPointerDown={press(h)} onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}>{h.text ? "⌨ type" : h.label}</button>
       ))}
       <input
         ref={input} className="ctx-input" aria-label="Type to the computer" autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="send"

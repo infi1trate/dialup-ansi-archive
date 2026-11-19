@@ -21,7 +21,7 @@ export function EscapeHatch(p: Props) {
       {p.share && <ShareLink url={p.share} />}
       <Button variant="ghost" className="hatch-toggle hatch-lamp-direct" aria-label="Toggle desk lamp" aria-pressed={p.lamp} onClick={act(p.onLamp)}>☼</Button>
       {open && (
-        <ul className="hatch-menu">
+        <ul className="hatch-menu" onClick={(e) => { if ((e.target as HTMLElement).closest("[data-close]")) setOpen(false); }}>
           <li><Button variant="ghost" aria-pressed={p.lamp} onClick={act(p.onLamp)}>Lamp: {p.lamp ? "on" : "off"}</Button></li>
           {p.tape}
           {p.physical}
