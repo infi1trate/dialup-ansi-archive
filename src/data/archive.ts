@@ -36,7 +36,7 @@ export async function getYears(min = MIN_YEAR, max = MAX_YEAR): Promise<{ year: 
 export async function getYearPacks(year: number, page: number, pagesize = 60): Promise<Page<PackSummary>> {
   const d = await api(`/v1/year/${year}?pagesize=${pagesize}&page=${page}`);
   return {
-    items: (d.results ?? []).map((r: any) => ({ name: r.name, year: r.year, groups: r.groups ?? [], released: r.date ?? r.released ?? "" })),
+    items: (d.results ?? []).map((r: any) => ({ name: String(r.name), year: Number(r.year), groups: r.groups ?? [], released: r.date ?? r.released ?? "" })),
     page: d.page?.page ?? page, pages: d.page?.pages ?? 1, total: d.page?.total ?? 0,
   };
 }

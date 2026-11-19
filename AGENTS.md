@@ -30,6 +30,7 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## Dial-Up architecture
+- Public board compositions and selection coordinates share `src/bbs/designs.ts`; the host sends their ANSI bytes through the modem so layout and keyboard movement cannot diverge.
 - Modules are split by role: `src/term` (parser, cells, renderer), `src/modem` (byte scheduler), `src/bbs` (virtual host), `src/crt` (WebGL2 post-process), `src/machine` (state machine, engine, storage), `src/audio` (event bus), `src/data` (archive access). Why: later passes add room, sound and multi-user features on these seams.
 - The board (`src/bbs`) only writes bytes through `HostIO.send` and reads keys; client-side terminal features (mode, scrollback, info overlay) go through `HostIO.client`. Why: everything the board shows must arrive at modem speed.
 - Nothing on the CRT is HTML: every screen is CP437/ANSI bytes fed to the terminal; author screens with `src/bbs/ansi.ts`, whose colors take VGA palette indexes (mapped to ANSI SGR order internally).

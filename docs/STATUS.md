@@ -1,5 +1,6 @@
 # Dial-Up status (Sprint B photographic room)
 ## 1. Verified working (test browser = Playwright Chromium, software GL)
+**Sprint C part 3:** Part 1: five real keyboard GUEST calls completed; five main menu layouts inspected in greyscale contact sheet. Twelve private quality-85 JPEG links verified HTTP 200/image/jpeg. Screen-fit and tile-coordinate tests pass; numeric archive pack-name crash fixed.
 **Sprint B, Part 2:** Additive tinted screen plate, 250ms smoothing, exact min(1,2.2*luminance) gain. Keyboard RGB: monitor-off 24/35/51 versus b04 88/78/87; black matches off, red raises red, blue raises blue. Real archive call, three-second portrait notice then unobscured art, phone/tablet desk controls, nine viewport glass bounds, live clock (3:51 AM) checked. 121 tests pass; ten refreshed/new private JPEG links verified HTTP 200/image/jpeg.
 **Sprint B:** Original locked-camera plates, lamp fade, luminance-masked additive screen tint, real 4:3 WebGL CRT and registered lean transform checked in Chromium. First six links committed before live details. Twelve private JPEG links verified HTTP 200/image/jpeg. 114 tests pass. First-visit lamp/note, wheel/outside/backtick/keyboard lean-back, launcher and actual 45-second starfield/wake checked. All nine requested viewports inspected; CRT remains 4:3. Real archive ACID-SC2.ANS streamed through existing proxy/modem, lamp on/off and close view inspected against reference.
 **Sprint C, Part 2:** Fifteen 1600x900 quality-82 JPEGs recreated on the real terminal; private archive-cache/review-shots/c uploads and seven-day URLs verified HTTP 200/image/jpeg; links committed first. Forty-five native-size Terminal/rasterizer outputs opened individually; 42 retained, three conservatively removed; table in docs/family-shelf-review.md. 98 tests pass. Real browser verified first-visit lamp, wheel/outside/backtick lean-back, launcher and an actual 45-second idle saver/wake. DEAD CARRIER live tag marker, queue interruption and search results reached.
@@ -31,6 +32,7 @@
 - Pass 6: phone 390x844: tube pinned to the top (y=0, full width), handwritten hint note above keycaps, keycaps 56 px tall in at most two rows. 16-phone re-shot.
 - Pass 6: tests cover decay, SAUCE group fallback, DOS download dates (pack year) and word-wrapped sysop lines (58 tests pass).
 ## 2. Built but untested
+**Sprint C part 3:** Part 1: full logo/file/goodbye visual coverage beyond the requested twelve views remains incomplete; DEAD CARRIER 0-DAY status count fills after a scan, not yet at first menu. Parts 2 and 3 not started.
 **Sprint B, Part 2:** Native iOS/Android software keyboard not physically tested; reduced visual viewport clearance unit-tested. Physical GPU/audio remain unverified. Fixed clock replaced with visitor-local digits; native touch pinch and DPR2 sharpness remain uncertified.
 **Sprint C, Part 2:** All-board tag/search combinations, new scans, handle/guest shelf readback, all-seven DOS/launcher programs, trainer day rollover, full ratio and courier multi-call progression, and live 0-DAY month/empty-month remain unverified. Audio by ear remains unverified.
 **Sprint C:** Tag/slideshow and new-scan combinations are not exhaustively checked. Trainer bonus and installed saver selection need full end-to-end verification. Family shelf now has 42 individually reviewed pieces; menu-route verification remains outstanding. Sound not listened to.
@@ -46,6 +48,7 @@
 - Pass 6: breathing standby LED (3 s cycle, steady under reduced motion) and the pointer-cursor audit (knobs/speaker knob now pointer; leaned-in stage no longer zoom-out) were not screenshotted.
 - Pass 6: sysop chat word wrap is unit-tested on the layout, not watched live in the browser.
 ## 3. Known bugs and gaps
+**Sprint C part 3:** Part 1: STROBE holds its short animation after six seconds; LINE NOISE intentional teletype scroll is exempt from fixed-screen bounds.
 **Sprint B, Part 2:** Literal luminance formula takes precedence over approximate targets: measured logo gain .116 and b04 .446, not .45/.8; additive light now visibly colours the room without an extra multiplier. b09 is a clock-detail crop. Untouched links retain original expiry. b08 remains replayed LED events; no new floppy/drive behaviour.
 **Sprint C, Part 2:** Favorite UI assertion failed during live search-result flow; no fix claim. Exhaustive family menu-route checks remain unfinished despite boundary denial tests. Nested warez keys, CD/parent/DIR/TYPE and distinct executable markers implemented but not fully exercised via live transfer. 0-DAY progress/cache implemented and month matching unit-tested, not live-verified.
 **Sprint C:** Sprint is not complete: fifteen JPEGs uploaded and links verified in Part 2. Nested fictional disk paths now implemented; live directory checks remain outstanding. No final first-load size measurement.
@@ -59,6 +62,7 @@
 - Group fallback skips the group endpoint: the API has no pack-to-group lookup that is cheap, so it goes straight to "omit". The SAUCE fallback reads at most two art files, and only when you open a pack.
 - Historical phone band resolved by Sprint B Part 2 photographic desk extension.
 ## 4. Choices made
+**Sprint C part 3:** Part 1: layouts and keyboard positions share byte-only authoring helpers; no computer/room contracts changed.
 **Sprint B, Part 2:** Original pixels unchanged; SVG channel matrix multiplies plate by normalized tint/gain, plus-lighter adds it. Portrait 8px bezel margins, smaller fit only for software-keyboard clearance; bottom 6% mirrored/blurred/faded in matching lamp/light layers. Local TELEWIRE notice awaited before modem bytes. Seven-segment panel uses sampled lamp-state colours; original desk reflection retained.
 **Sprint B:** All original plates preserved unchanged as CDN pointers; reference board is not shipped. Small versions generated at WebP quality 84. One photographed speaker receives both tracker channels; old staircase creak suppressed because its source is gone. Removed old room props/drawing modules/assets, light pools and grain. First-note close-up on yellow paper; secret second paper on cork board. Volume controls moved to photographed modem/speaker; power/turbo to case buttons; all active controls also in escape hatch. Glass mask is grayscale luminance, not alpha, so clipping uses luminance mode.
 **Sprint C, Part 2:** No new test handles created; checks used fresh GUEST profiles. Prior RivetC1964 scored run remains from Sprint C. No destructive cleanup performed. Review the unfinished checklist before calling Sprint C complete.
@@ -74,6 +78,7 @@
 - Screensaver after 45 seconds at local menus/prompt/directory; no call saver, warning at four minutes, hangup at five.
 - noindex is on site-wide; remove it at launch in the root route.
 ## 5. Owner to-do
+**Sprint C part 3:** Part 1: review docs/shots/sprint-c3.txt within seven days; only GUEST calls used, no new handle created.
 **Sprint B, Part 2:** Review replaced b03/b04/b05/b06/b09/b10/b11/b12 and new b13/b14 within seven days of 2026-11-19 in docs/shots/sprint-b.txt. No new callers, secret prompts, approvals or database mutations. Native phone keyboard/audio review remains useful; portrait band resolved.
 **Sprint C, Part 2:** Preserved byte-only board output and caching proxy. Added nested release keys to the existing capped IndexedDB store; allowlist gates at viewer/path/queue/quick-scan boundaries. Trainer duplicate insertion now checks the unique-key result instead of claiming success on failed writes.
 **Sprint C:** Review remaining checklist before calling Sprint C done. Test handles RivetProbeC and RivetC* remain; no destructive cleanup performed. Earlier test rows retained. Review JPEG links not delivered yet.
@@ -82,6 +87,7 @@
 - Test data was NOT deleted (approval declined). Remove by hand: callers Probe9957, Tester8804, Probe30410, Alpha769, Beta566, Burst474, Gamma*, every P4test* caller, and P5Crawler (pass 5), with their call_log, oneliners, presence, reports, views, rate hits, door_scores (2 rows), door_turns and test daily_counters rows.
 - Lift noindex at launch. Publish and check share cards and 60 fps on a real laptop.
 ## 6. Weight (production build, gzip -9)
+**Sprint C part 3:** Part 1: no new dependencies or first-frame assets; preview build OK. Production weights not remeasured.
 **Sprint B, Part 2:** No new bitmap assets/dependencies; desk reuses decoded plates. Small clock/filter markup added; JavaScript gzip not remeasured. Latest preview build OK, all tests pass.
 **Sprint B:** Three 2560 originals total 555 KB; with mask/reflection under 570 KB. Three 1280 plates total 180,018 bytes (under 350 KB including glass). Lamp plates decode before room loading cover disappears; screen-light plate may load afterward. No new dependencies; latest preview build OK. JavaScript gzip not remeasured.
 **Sprint C, Part 2:** No final first-load measurement this pass; no new dependencies. Preview build log reports build OK after edits; all 98 tests passed. Private review links were issued 2026-11-19 for seven days.

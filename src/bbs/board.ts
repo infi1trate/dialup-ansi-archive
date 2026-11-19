@@ -24,6 +24,7 @@ import { directLookup } from "@/data/archive";
 import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
+import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
 
 export function wrapCourier(text:string){const lines:string[]=[];let line="";for(const word of text.split(/\s+/)){if((line+" "+word).trim().length>70){lines.push(line);line=word;}else line=(line+" "+word).trim();}if(line)lines.push(line);return lines;}
 export function releasedInMonth(pack:PackSummary,month:number){if(pack.year<1990||pack.year>1996)return false;const date=/^\d{4}-(\d{2})/.exec(String(pack.released??""));if(date)return +date[1]===month;const suffix=/(\d{2})(\d{2})$/.exec(pack.name);return !!suffix&&+suffix[1]===month&&+suffix[2]===pack.year%100;}
@@ -170,6 +171,7 @@ export class Board {
 
   header(x: Ansi, title: string, sub?: string) {
     this.screenMode();
+    if (!["attic","void"].includes(this.io.entry.id)) return listChrome(this.io.entry.id,this.config.name,title,sub);
     x.cls().at(1, 1);
     shadeBar(x, 79, this.sk.a&7);
     x.at(2, 3).k(this.sk.a, this.sk.name).k(this.sk.line, " ── ").k(this.sk.b, title.slice(0,Math.max(12,70-this.sk.name.length)));
@@ -179,6 +181,7 @@ export class Board {
   }
 
   status(x: Ansi, row = 24) {
+    if(row===24 && ["vault","strobe","crawl"].includes(this.io.entry.id)) return x;
     const left = Math.max(0, Math.min(this.io.entry.id==="maple"?30:60,Math.ceil(this.io.timeLeftMs() / 60000)));
     x.at(row, 1).c(15, 1).t(pad(` ${this.user}`, 26)).c(11, 1).t(pad(`node ${this.node}`, 12))
       .c(14, 1).t(pad(`${this.io.speed} bps`, 14)).c(15, 1).t(rpad(`time left: ${left} min `, 27)).reset();
@@ -201,7 +204,7 @@ export class Board {
     const { row, col, width, height, items } = o;
     if(this.config.style==='prompt') {
       let page=0;
-      for(;;){const x=a();items.slice(page*height,(page+1)*height).forEach((it,n)=>x.at(row+n,col).k(10,pad(`${page*height+n+1} ${it.text}`,width)));x.at(row+height,col).k(2,pad(`Page ${page+1} / R n read / N next / P previous / T n tag / Q quit`,width));this.send(x);this.send(a().at(23,3).eol().k(10,'Command (?=help): '));const command=(await this.input(30,{fg:10})).toUpperCase();this.io.clearOutput();if(command==='Q'||command==='')return null;if(command==='N'){page=Math.min(Math.max(0,Math.ceil(items.length/height)-1),page+1);continue;}if(command==='P'){page=Math.max(0,page-1);continue;}if(command==='V'&&o.hotkeys?.includes('V'))return {index:0,key:'V'};const m=/^(?:R|T)?\s*(\d+)$/.exec(command);if(m){const n=+m[1]-1;if(n>=0&&n<items.length)return {index:n,...(command.startsWith('T')?{key:' '}:{} )};}}
+      for(;;){const x=a();items.slice(page*height,(page+1)*height).forEach((it,n)=>x.nl().k(10,pad(`${page*height+n+1}. ${it.text}`,width).replace(/ {3,}/g,m=>".".repeat(m.length))));x.nl().k(2,pad(`Page ${page+1} / R n read / N next / P previous / T n tag / Q quit`,width));this.send(x);this.send(a().nl().k(10,'Command (?=help): '));const command=(await this.input(30,{fg:10})).toUpperCase();this.io.clearOutput();if(command==='Q'||command==='')return null;if(command==='N'){page=Math.min(Math.max(0,Math.ceil(items.length/height)-1),page+1);continue;}if(command==='P'){page=Math.max(0,page-1);continue;}if(command==='V'&&o.hotkeys?.includes('V'))return {index:0,key:'V'};const m=/^(?:R|T)?\s*(\d+)$/.exec(command);if(m){const n=+m[1]-1;if(n>=0&&n<items.length)return {index:n,...(command.startsWith('T')?{key:' '}:{} )};}}
     }
     let i = Math.max(0, Math.min(items.length - 1, o.index ?? 0));
     let top = Math.floor(i / height) * height;
@@ -209,7 +212,7 @@ export class Board {
       const x = a().at(row + (n - top), col);
       const it = items[n];
       if (!it) return x.reset().rep(" ", width);
-      return sel ? x.c(15, 1).t(pad(" " + it.text, width)) : x.c(it.dim ? 8 : it.color).t(pad(" " + it.text, width));
+      return sel ? x.c(15, 1).t(pad(" " + it.text, width)) : x.c(it.dim ? 8 : this.io.entry.id==="maple"?15:it.color,this.io.entry.id==="maple"?1:0).t(pad(" " + it.text, width));
     };
     const page = () => {
       const x = a();
@@ -276,17 +279,12 @@ export class Board {
       return x;
     }
     this.screenMode();
-    x.at(1,1);shadeBar(x,79,this.sk.a&7);
-    if(this.io.entry.id==='maple') {
-      box(x,3,3,74,11,1,'WELCOME TO THE CLUB');
-      x.at(5,8).k(15,'MAPLE RIDGE PC USERS GROUP BBS').at(7,8).k(9,'Visitors welcome / Please leave the telephone line tidy.');
-    } else {
-      const label=this.io.entry.id==='crawl'?'DEAD CARRIER':this.config.name;
-      chromeText(x,4,Math.max(3,Math.floor((79-label.length*6)/2)),label,[15,this.sk.b,this.sk.a,this.sk.a,this.sk.c,this.sk.c&7],this.sk.a&7);
-      x.at(9,3).k(this.sk.c,'▓▒░'.repeat(24));
+    if(this.io.entry.id!=="attic") {
+      x=boardLogo(this.io.entry.id,this.config.name);
+      if(this.io.entry.id!=="c93")x.at(14,1).k(this.sk.b,center(this.config.tagline,79),this.io.entry.id==='maple'?1:0).at(16,1).k(this.sk.c,center(`sysop: ${this.config.sysop} / ${this.io.entry.number}`,79),this.io.entry.id==='maple'?1:0);
+      return x;
     }
-    x.at(14,1).k(this.sk.b,center(this.config.tagline,79));
-    x.at(16,1).k(this.sk.c,center(`sysop: ${this.config.sysop} / ${this.io.entry.number}`,79));
+    chromeText(x,4,20,'THE ATTIC',[15,14,6,6,7,7],8);
     return x;
   }
 
@@ -501,18 +499,38 @@ export class Board {
     if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye']];
     return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','Bulletins / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye']];
   }
-  menuScreen() {
-    this.screenMode();const x=a().cls(),items=this.menuItems();
-    if(this.config.style==='numbered'){x.at(2,4).c(15,1).t(pad(this.config.name,72));x.at(4,4).k(9,'Mr. Hutchins welcomes you. Please enjoy our reviewed picture shelf.');items.forEach(([k,l],i)=>x.at(6+i,8).k(15,`${k}. ${l}`));}
-    else if(this.config.style==='prompt'){x.at(2,4).k(10,'LINE NOISE / private exchange / Dial Tone').at(4,4).k(2,'NO RECORD OF THIS CONNECTION');items.forEach(([k,l],i)=>x.at(6+i,4).k(10,`${k}  ${l}`));x.at(21,4).k(10,'Command (?=help): ');}
-    else{shadeBar(x,79,this.sk.a&7);chromeText(x,3,4,this.io.entry.id==='attic'?'ATTIC':this.io.entry.id==='void'?'VOID NODE':this.config.name,[15,this.sk.b,this.sk.a,this.sk.a,this.sk.c,this.sk.c&7],this.sk.a&7);x.at(7,4).k(this.sk.b,pad(this.config.tagline,72));box(x,8,3,75,11,this.sk.a&7);items.forEach(([k,l],i)=>x.at(9+Math.floor(i/2),6+(i%2)*36).hot(k,pad(l,29),15,this.sk.b,this.sk.a));x.at(21,4).k(this.sk.c,`SYSOP ${this.config.sysop} / ${this.io.entry.number}`);}
-    this.status(x,24);return x;
+  private menuCallers = CALLERS.slice(0,3).map(c=>c[0]);
+  private menuOneliner = ONELINERS[0][1];
+  private menuFeatured = HOUSE_PACK;
+  menuScreen(selected=0) {
+    this.screenMode();
+    if(!["attic","void"].includes(this.io.entry.id))return drawMenu(this.io.entry.id,this.config.name,this.menuItems(),{user:this.user,node:this.node,credits:this.creditsLeft,minutes:Math.ceil(this.io.timeLeftMs()/60000),callers:this.menuCallers,oneliner:this.menuOneliner,zeroDay:this.zeroDayCache?String(this.zeroDayCache.length):'checking',featured:this.menuFeatured},selected);
+    const x=a().cls();shadeBar(x,79,this.sk.a&7);chromeText(x,3,4,this.io.entry.id==='attic'?'ATTIC':'VOID NODE',[15,this.sk.b,this.sk.a,this.sk.a,this.sk.c,this.sk.c&7],this.sk.a&7);box(x,8,3,75,11,this.sk.a&7);this.menuItems().forEach((_,i)=>x.bytes(menuSelection(this.io.entry.id,this.menuItems(),i,i===selected).build()));this.status(x,24);return x;
   }
   async mainMenu(): Promise<'bye'> {
     let selected=0;
-    for(;;){this.setDoing('at the main menu');this.send(this.menuScreen());const items=this.menuItems();this.hint([...items.map(([c])=>hk(c)),...NAV]);
-      if(this.config.style==='lightbar')this.send(a().at(9+Math.floor(selected/2),4+(selected%2)*36).k(15,'>'));
-      let c='';for(;;){const k=await this.key();c=String.fromCharCode(k.ch??0).toUpperCase();if(this.config.style==='lightbar'&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k.key)){this.send(a().at(9+Math.floor(selected/2),4+(selected%2)*36).k(0,' '));selected=(selected+(k.key==='ArrowUp'?-2:k.key==='ArrowDown'?2:k.key==='ArrowLeft'?-1:1)+items.length)%items.length;this.send(a().at(9+Math.floor(selected/2),4+(selected%2)*36).k(15,'>'));continue;}if(k.key==='Enter'&&this.config.style==='lightbar')c=items[selected][0];if(c==='?'&&this.config.style==='prompt'){this.io.clearOutput();this.send(this.menuScreen());continue;}if(items.some(([v])=>v===c)||c==='!')break;}
+    for(;;){
+      this.setDoing('at the main menu');
+      if(this.io.entry.id==='crawl'){
+        const [callers,lines,balance]=await Promise.all([net('callers'),net('oneliners'),this.guest?Promise.resolve(null):net('balance')]);
+        if(callers?.callers?.length)this.menuCallers=callers.callers.slice(0,3).map((c:any)=>c.handle);
+        if(lines?.oneliners?.length)this.menuOneliner=lines.oneliners[lines.oneliners.length-1].body;
+        if(balance?.balance!=null)this.creditsLeft=balance.balance;
+      }
+      if(this.io.entry.id==='vault'){const packs=[...discovered.values()];if(packs.length)this.menuFeatured=packs[Math.floor(Date.now()/86400000)%packs.length].name;}
+      this.send(this.menuScreen(selected));const items=this.menuItems();this.hint([...items.map(([c])=>hk(c)),...NAV,hk('?')]);
+      let c='',frame=0;const started=Date.now(),reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+      for(;;){
+        const k=this.io.entry.id==='strobe'&&!reduced&&Date.now()-started<6000?await this.io.keyTimeout(250):await this.key();
+        if(!k){frame++;this.send(strobeMotion(frame));if(frame%2===0)this.send(menuSelection('strobe',items,selected,true,frame/2));const ticker=' GREETS / FULL BLOCK / LATCHKEY / TIN SAINTS / MIDNIGHT RELAY / ALL CALLERS / ';this.send(a().at(24,1).k(14,pad((ticker+ticker).slice(frame%ticker.length),79)));continue;}
+        c=String.fromCharCode(k.ch??0).toUpperCase();
+        if(this.config.style==='lightbar'&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k.key)){
+          this.send(menuSelection(this.io.entry.id,items,selected,false));const columns=this.io.entry.id==='vault'?6:this.io.entry.id==='crawl'?1:2;selected=(selected+(k.key==='ArrowUp'?-columns:k.key==='ArrowDown'?columns:k.key==='ArrowLeft'?-1:1)+items.length)%items.length;this.send(menuSelection(this.io.entry.id,items,selected,true));continue;
+        }
+        if(k.key==='Enter'&&this.config.style==='lightbar')c=items[selected][0];
+        if(c==='?'&&this.config.style==='prompt'){const help=a().nl(2);items.forEach(([v,l],i)=>{if(i%2===0)help.nl();help.k(10,pad(`${v}  ${l}`,37));});help.nl(2).t('Command (?=help): ');this.send(help);continue;}
+        if(items.some(([v])=>v===c)||c==='!')break;
+      }
       this.io.clearOutput();
       if(this.io.entry.id==='maple'){if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
       if(this.io.entry.id==='c93'){if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
@@ -730,6 +748,7 @@ export class Board {
   }
 
   async goodbye() {
+    if(!['attic','void'].includes(this.io.entry.id)){this.screenMode();this.send(goodbyeDesign(this.io.entry.id,this.config.name,this.user,this.config.quotes[Math.floor(Math.random()*this.config.quotes.length)]));await this.io.drain();await sleep(900);return;}
     const x = a().cls();
     const v = this.sk === VOID_SKIN;
     x.at(1, 1); shadeBar(x, 79, v ? 4 : 5);
@@ -907,7 +926,7 @@ export class Board {
       } else x.at(5, 4).k(8, "(no FILE_ID.DIZ in this pack)");
       x.at(14, 3).k(13, pad("File", 16) + pad("SAUCE title / Artist", 36) + rpad("Size", 10)).at(15, 3).k(5, "─".repeat(64));
       x.at(23,4).eol().k(8,`${hidden} files this terminal can't show (H to ${showAll?"hide":"list"} them)`);
-      x.at(13,3).k(8,"SPC tag / V queue / L show / Q scan / H others / D save / P music / ESC");
+      x.at(13,3).k(8,"SPC tag / V queue / L show / Q scan / H others / D save / P play / ESC");
       this.status(x);
       this.send(x);
       const label = (f:PackFile) => `${pad(f.name,16)}${pad(f.title || fileTitle(pack.name,f.name) || f.artists.join(", ") || "—",36)}${rpad(String(f.size ?? "?"),10)}`;
@@ -1088,7 +1107,7 @@ export class Board {
   async search(){const query=await this.ask(22,'Artist / group / title',60);if(!query)return;this.send(this.header(a(),'Searching',query));let rows:any[]=[];if(this.io.entry.id==='maple')rows=FAMILY_SHELF.filter(f=>`${f.file} ${f.artist} ${f.pack}`.toLowerCase().includes(query.toLowerCase()));else{const r=await net('search',{query});rows=r?.rows??[];for(const p of discovered.values())for(const f of p.files)if(f.viewable&&`${f.name} ${f.title} ${f.artists.join(' ')} ${p.groups.join(' ')}`.toLowerCase().includes(query.toLowerCase())&&!rows.some(r=>r.pack===p.name&&r.file===f.name))rows.push({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')});if(!rows.length){try{const gs=await getGroupPacks(query,1990,1996);if(gs.length){await this.pagedPacks(`Group: ${query}`,'archive credits',async()=>({items:gs,page:1,pages:1,total:gs.length}));return;}const d=await directLookup('artist',query);const packs=d.results?.packs??{};for(const [year,names]of Object.entries(packs))for(const name of names as string[]){const p=await getPack(name);for(const f of p.files.filter(f=>f.artists.some(a=>a.toLowerCase().includes(query.toLowerCase()))))rows.push({pack:name,file:f.name,year:+year,artist:f.artists.join(', ')});if(rows.length>=80)break;}}catch{}}}await this.fileResults(`Search: ${query}`,rows);}
   async artistIndex(){const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';this.send(this.header(a(),'Artist index A-Z').at(5,4).k(11,letters.split('').join(' ')).at(8,4).k(8,'Pick an initial / ESC return'));const k=await this.key();if(k.key==='Escape')return;const letter=String.fromCharCode(k.ch??0).toUpperCase();if(!letters.includes(letter))return;const artists=[...new Set([...discovered.values()].flatMap(p=>p.files.flatMap(f=>f.artists)))].filter(a=>a.toUpperCase().startsWith(letter)).sort();this.send(this.header(a(),`Artists: ${letter}`).at(23,3).k(8,'ENTER search / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:artists.map(a=>({text:a,color:11}))});if(r){const result=await net('search',{query:artists[r.index]});await this.fileResults(artists[r.index],result?.rows??[]);}}
   async newScan(){const result=await net('newScan');const unviewed=[...discovered.values()].filter(p=>!this.io.profile.filesSeen.some(f=>f.startsWith(p.name+'/')));const x=this.header(a(),'New since your last call');x.at(6,5).k(this.sk.a,`${result?.lines??0} new oneliners / ${result?.scores??0} new THE CORNER scores`);x.at(8,5).k(15,`${unviewed.length} discovered packs new to you.`);unviewed.slice(0,8).forEach((p,i)=>x.at(10+i,5).k(this.sk.c,p.name));if(!this.guest){const b=await net('balance');this.creditsLeft=b?.balance??this.creditsLeft;if(this.creditsLeft===0)x.at(20,5).k(12,'Mail from Static: your ratio is empty. Art earns your way back.');}x.at(22,5).k(8,'Any key returns');this.send(x);await this.key();this.io.clearOutput();}
-  async textList(){const packs=[...discovered.values()];if(!packs.length){try{packs.push(await getPack('ensiart'));}catch{}}const rows=packs.flatMap(p=>p.files.filter(f=>/\.(nfo|diz|asc|txt)$/i.test(f.name)).map(f=>({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')})));await this.fileResults('LINE NOISE / text first',rows);}
+  async textList(){const packs=[...discovered.values()];if(!packs.length){try{packs.push(await getPack('ensiart'));}catch{}}const rows=packs.flatMap(p=>p.files.filter(f=>/\.(nfo|diz|asc|txt)$/i.test(f.name)).map(f=>({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')})));await this.fileResults('text first',rows);}
   private zeroDayCache: PackSummary[] | null=null;
   async zeroDay(){const month=new Date().getUTCMonth()+1;this.send(this.header(a(),'0-DAY ART',`month ${month} / 199x`));if(!this.zeroDayCache){const packs:PackSummary[]=[];for(let year=1996;year>=1990;year--){this.send(a().at(6,4).eol().k(8,`Checking ${year} disks for month ${month}...`));let page=1;for(;;){const p=await getYearPacks(year,page,100);packs.push(...p.items.filter(p=>releasedInMonth(p,month)));if(page>=p.pages)break;page++;}}this.zeroDayCache=packs.sort((a,b)=>b.year-a.year||b.name.localeCompare(a.name));}if(!this.zeroDayCache.length){this.send(a().at(8,4).k(8,'No packs released in this calendar month.'));await this.anyKey(22);return;}await this.pagedPacks('0-DAY ART','this month in the scene, 199x',async()=>({items:this.zeroDayCache??[],page:1,pages:1,total:this.zeroDayCache?.length??0}));}
 

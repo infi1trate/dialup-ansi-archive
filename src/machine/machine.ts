@@ -572,11 +572,12 @@ export class Machine {
     x.at(6, 6).c(3, 1).t("─".repeat(68));
     this.book().forEach((d, i) => {
       const last = this.profile.lastCall[d.number] ?? "never";
-      const text = pad(String(i + 1), 4) + pad(d.name, 26) + pad(d.number, 12) + pad(String(this.profile.speed), 8) + pad(last, 18);
+      const text = pad(String(i + 1), 4) + pad(d.id === "maple" ? "MAPLE RIDGE PC USERS GRP" : d.name, 26) + pad(d.number, 12) + pad(String(this.profile.speed), 8) + pad(last, 10);
       x.at(7 + i, 5);
       if (i === sel) x.c(1, 7).t(" " + text + " "); else x.c(15, 1).t(" " + text + " ");
 
     });
+    x.at(15,6).c(14,1).t(pad(this.book()[sel]?.blurb ?? "",68));
     box(x, 17, 3, 75, 5, 3, "KEYS", true, 1);
     x.at(18, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to menu");
     x.at(20, 6).c(7, 1).t("Inside a call: ").c(15, 1).t("ENTER").c(7, 1).t(" finish transfer  ").c(15, 1).t("SPACE").c(7, 1).t(" pause  ").c(15, 1).t("I").c(7, 1).t(" info  ").c(15, 1).t("ESC").c(7, 1).t(" back");
