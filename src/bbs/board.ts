@@ -969,7 +969,7 @@ export class Board {
     const viewable = pack.files.filter((f) => f.viewable);
     if (startFile) {
       if (isHousePack(pack.name)) startFile = houseName(startFile);
-      const i = viewable.findIndex((f) => f.name.toLowerCase() === startFile.toLowerCase());
+      const i = viewable.findIndex((f) => f.name.toLowerCase() === (startFile ?? "").toLowerCase());
       if (i >= 0) await this.viewer(pack, viewable, i);
     }
     let idx = 0, showAll = false;
