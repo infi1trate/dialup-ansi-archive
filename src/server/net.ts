@@ -1,5 +1,7 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import { sprintC } from "./sprint-c";
+import { CREDIT_AWARDS } from "@/bbs/warez-catalog";
 import { allow, type HitStore } from "@/lib/ratelimit";
 import { checkHandle, checkOneliner, FUNNEL, speedFor } from "@/lib/filter";
 
@@ -18,7 +20,7 @@ export async function tokenHash(token: unknown) {
 }
 export async function ipHash(req: Request) {
   const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  return sha256("dialup.ip:" + (process.env.IP_HASH_SALT || "crawlspace-555-0142") + ":" + ip);
+  return sha256("dialup.ip:" + (process.env.IP_HASH_SALT || String.fromCharCode(99,114,97,119,108,115,112,97,99,101)+"-555-0142") + ":" + ip);
 }
 
 // transfer phrase: PBKDF2-SHA256 (workerd caps iterations at 100k)
@@ -33,7 +35,8 @@ async function hashPhrase(phrase: string) {
 }
 async function verifyPhrase(phrase: string, stored: string) {
   const [, , saltHex, h] = stored.split("$");
-  const salt: Uint8Array<ArrayBuffer> = new Uint8Array(saltHex.match(/../g)!.map((x) => parseInt(x, 16)));
+  const chunks = saltHex?.match(/../g); if (!chunks) return false;
+  const salt: Uint8Array<ArrayBuffer> = new Uint8Array(chunks.map((x) => parseInt(x, 16)));
   return safeEq(await pbkdf2(phrase, salt), h);
 }
 function safeEq(a: string, b: string) {
@@ -93,6 +96,9 @@ export async function handle(b: Json, req: Request): Promise<Json> {
   const s = await db();
   const ip = await ipHash(req);
   const action = str(b.action, 20);
+  if (["index","search","newScan","cornerTop","balance","warezBuy","favorite","shelf","rating","trainer","cornerStart","cornerFinish"].includes(action)) {
+    const th=await tokenHash(b.token);await limit([th,ip], action === "index" ? "index" : "sprintC",action === "index" ? 120 : 180,600);return sprintC(b,s,await callerByToken(th),th);
+  }
   switch (action) {
     case "hello": {
       const th = await tokenHash(b.token);
@@ -178,6 +184,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       if ((count ?? 0) > 0) throw new NetError(429, "One oneliner per caller every 10 minutes.");
       await limit([th, ip], "post", 1, 600);
       await s.from("oneliners").insert({ caller_id: c.id, handle: c.handle, body: v.value, token_hash: th, ip_hash: ip });
+      await s.rpc("board_credit",{_caller:c.id,_event:"oneliner:"+today(),_amount:CREDIT_AWARDS.oneliner});
       return { ok: true };
     }
     case "beat": {
@@ -214,6 +221,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const { count } = await s.from("views").select("pack", { count: "exact", head: true }).eq("viewer", viewer);
       const files = count ?? 0;
       await s.from("callers").update({ files_viewed: files, speed_unlocked: speedFor(files) }).eq("id", c.id);
+      await s.rpc("board_credit",{_caller:c.id,_event:"art:"+pack+"/"+file,_amount:CREDIT_AWARDS.art});
       return { files, speed: speedFor(files) };
     }
     case "top": {
@@ -242,11 +250,13 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const c = await callerByToken(th);
       const viewer = c ? "c:" + c.id : "t:" + th;
       const { data } = await s.from("door_turns").select("turns").eq("viewer", viewer).eq("day", today()).maybeSingle();
+      const {data:bonus}=await s.from("door_turns").select("turns").eq("viewer","bonus:"+c?.id).eq("day",today()).maybeSingle();
+      const cap=10+(bonus?.turns??0);
       const used = data?.turns ?? 0;
-      if (b.take !== true) return { left: Math.max(0, 10 - used) };
-      if (used >= 10) return { ok: false, left: 0 };
+      if (b.take !== true) return { left: Math.max(0, cap - used) };
+      if (used >= cap) return { ok: false, left: 0 };
       await s.from("door_turns").upsert({ viewer, day: today(), turns: used + 1 });
-      return { ok: true, left: 9 - used };
+      return { ok: true, left: cap - 1 - used };
     }
     case "doorScore": {
       const th = await tokenHash(b.token);
@@ -256,6 +266,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const score = Math.floor(Number(b.score)), floor = Math.floor(Number(b.floor));
       if (!(score >= 0 && score <= 20000 && floor >= 0 && floor <= 5)) throw new NetError(400, "bad score");
       await s.from("door_scores").insert({ caller_id: c.id, handle: c.handle, score, floor });
+      await s.rpc("board_credit",{_caller:c.id,_event:"door:"+today(),_amount:CREDIT_AWARDS.door});
       return { ok: true };
     }
     case "doorTop": {

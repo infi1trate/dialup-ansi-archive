@@ -1,6 +1,7 @@
 // Audio event bus. Producers (machine, room) emit; the lazily loaded synth engine
 // (src/audio/engine.ts) subscribes. The bus itself stays tiny so it can ship in the first frame.
 export interface AudioEvents {
+  programTone: {frequency:number;duration:number;speaker:"modem"|"music"};
   powerOn: void; powerOff: void; keyDown: string; keyUp: string; beep: void;
   diskSeek: void; floppySeek: void; offHook: void; dialDigit: string; ring: void; busy: void;
   handshakeStart: number; connect: number; hangup: void; byteFlow: number;

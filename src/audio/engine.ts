@@ -83,6 +83,7 @@ class Synth {
     bus.on("diskSeek", () => this.diskSeek());
     bus.on("floppySeek", () => this.floppySeek());
     bus.on("offHook", () => this.offHook());
+    bus.on("programTone", (p) => this.tones([p.frequency], this.now, p.duration, 0.12, p.speaker === "music" ? this.musicVol : this.modemIn));
     bus.on("dialDigit", (d) => this.digit(d));
     bus.on("ring", () => this.ringback());
     bus.on("busy", () => this.busy());

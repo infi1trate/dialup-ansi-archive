@@ -9,7 +9,7 @@ export const Route = createFileRoute("/dial/$number/$year/$pack/$file")({
   },
   head: ({ params, loaderData }) => {
     const line = loaderData?.line ?? `${params.file} (${params.pack}, ${params.year})`;
-    const desc = `Dial ${params.number} and watch it stream in at modem speed on The Crawlspace BBS.`;
+    const desc = `Dial ${params.number} and watch it stream in at modem speed on DEAD CARRIER.`;
     const meta = [
       { title: `${line} — Dial-Up` },
       { name: "description", content: desc },

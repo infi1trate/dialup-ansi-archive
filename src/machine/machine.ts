@@ -6,6 +6,7 @@ import { doorMenu } from "@/bbs/door";
 import { localView, runBoard } from "@/bbs/board";
 import * as drive from "./drive";
 import { kplay, MUSIC, screenSaver, SAVERS, type Saver, type LocalEnv } from "./programs";
+import { installed, runRelease } from "./releases";
 import { count } from "@/data/net";
 import { audio } from "@/audio/bus";
 import { Engine } from "./engine";
@@ -335,7 +336,7 @@ export class Machine {
 
   private async launcher(g: number) {
     let sel = 0;
-    const labels = ["Dial a BBS", "Downloads", "Games", "Screen savers", "DOS prompt"];
+    const labels = ["Dial a BBS", "Downloads", "Games / Programs", "Screen savers", "DOS prompt"];
     for (;;) {
       this.alive(g); this.state.set("dos");
       this.engine.term.setMode({cols: 80, ice: false, ninePixel: true});
@@ -355,10 +356,13 @@ export class Machine {
       else if(k.key !== "Enter") continue;
       if(sel===0) await this.comm(g);
       if(sel===1) await this.downloadMenu(g);
-      if(sel===2) await doorMenu({io:this.localIO(),send:x=>this.out(x),user:"GUEST",guest:true,hint:k=>this.hints.set(k)});
+      if(sel===2) await this.programMenu(g);
       if(sel===3) await this.saverMenu(g);
       if(sel===4) await this.prompt(g);
     }
+  }
+  private async programMenu(g: number) {
+    for (;;) { const fs=await installed(); const x=a().cls();box(x,2,4,72,21,11,"GAMES / PROGRAMS");x.at(5,8).k(15,"0 BASEMENT CRAWL");fs.slice(0,9).forEach((f,i)=>x.at(7+i,8).k(11,`${i+1} ${f.name}`));x.at(21,8).k(8,"Number starts / ESC menu");this.out(x);const k=await this.key();if(k.key==="Escape")return;const n=(k.ch??0)-48;if(n===0)await doorMenu({io:this.localIO(),send:y=>this.out(y),user:"GUEST",guest:true,hint:h=>this.hints.set(h)});else if(fs[n-1])await runRelease(this.localEnv(),fs[n-1].name.replace(".EXE",""));this.alive(g);}
   }
   private async downloadMenu(g: number) {
     let sel = 0;
@@ -377,13 +381,15 @@ export class Machine {
       else if((k.key==="Enter"||k.ch===86||k.ch===118)&&fs[sel]) await this.dosCommand(`VIEW ${fs[sel].name}`,g);
     }
   }
+  private drifterInstalled=false;
   private async saverMenu(g: number) {
+    this.drifterInstalled=(await installed()).some(f=>f.name==="DRIFTER.EXE");
     for (;;) {
       const x=a().reset().cls();box(x,5,15,50,14,11,"SCREEN SAVERS");
-      SAVERS.forEach((v,i)=>x.at(8+i*3,19).k(15,`${i+1}  ${v === "number" ? "Bouncing board number" : v === "rain" ? "Falling characters" : "Starfield"}${this.saver===v?" *":""}`));
-      x.at(20,15).k(8,"1-3 select and preview · any key ends · ESC menu");this.out(x);this.hints.set([hk("1"),hk("2"),hk("3"),{label:"ESC",key:"Escape"}]);
+      (SAVERS.filter(v=>v!=="drifter"||!!this.drifterInstalled)).forEach((v,i)=>x.at(8+i*2,19).k(15,`${i+1}  ${v === "drifter" ? "Drifter plasma" : v === "number" ? "Bouncing board number" : v === "rain" ? "Falling characters" : "Starfield"}${this.saver===v?" *":""}`));
+      x.at(20,15).k(8,"1-4 select and preview · any key ends · ESC menu");this.out(x);this.hints.set([hk("1"),hk("2"),hk("3"),hk("4"),{label:"ESC",key:"Escape"}]);
       const k=await this.key();this.alive(g);if(k.key==="Escape")return;
-      const n=(k.ch??0)-49;if(n<0||n>2)continue;
+      const n=(k.ch??0)-49;if(n<0||n>3||(n===3&&!this.drifterInstalled))continue;
       this.saver=SAVERS[n];try{localStorage.setItem("dialup.saver",this.saver);}catch{}
       await screenSaver(this.localEnv(),this.saver);
     }
@@ -422,6 +428,8 @@ export class Machine {
     const arg = rest.join(" ").toUpperCase();
     const p = (t: string, c = 7) => this.out(a().k(c, t).nl());
     const now = new Date();
+    const program=(cmd === "RUN" ? arg : cmd).replace(/\.EXE$/, "").replace(/^.*\\/, "");
+    if((await installed()).some(f=>f.name===program+".EXE")){await runRelease(this.localEnv(),program);return;}
     switch (cmd) {
       case "": return;
       case "CLS": this.out(a().cls()); return;
@@ -431,7 +439,7 @@ export class Machine {
       case "HELP": case "/?":
         p("Kestrel DOS 5.0 commands:", 15);
         ["MENU       open KESTREL MENU", "DIAL       start TELEWIRE (TELEWIRE, EXIT)",
-         "DIR [dir]  list files", "VIEW file  read a download", "KPLAY file play tracker music",
+         "RUN name   run an installed warez program", "DIR [dir]  list files", "VIEW file  read a download", "KPLAY file play tracker music",
          "DEL file   erase a download (ERASE)", "CD dir     change directory (CHDIR)",
          "CLS        clear the screen", "VER        DOS version", "DATE       date", "TIME       time",
          "TYPE file  read AUTOEXEC.BAT, CONFIG.SYS or README.TXT", "MEM        memory report",
@@ -445,10 +453,11 @@ export class Machine {
         if (!arg) { p(this.cwd); return; }
         const t = arg === ".." || arg === "\\" ? "C:\\" : arg.replace(/^C:\\?/, "").replace(/\\$/, "");
         if (t === "C:\\") { this.cwd = "C:\\"; return; }
-        if (["TELEWIRE", "GAMES", "DOS", "DOWNLOAD"].includes(t) && this.cwd === "C:\\") { this.cwd = `C:\\${t}`; return; }
+        if (["TELEWIRE", "GAMES", "DOS", "DOWNLOAD", "WAREZ"].includes(t) && this.cwd === "C:\\") { this.cwd = `C:\\${t}`; return; }
         p("Invalid directory"); return;
       }
       case "DIR": {
+        if(arg.includes("WAREZ")||this.cwd.includes("WAREZ")){p(" Directory of C:\\WAREZ");for(const f of await installed())p(`  <DIR> ${f.name.replace(".EXE","")} / ${f.name}`);return;}
         if (/^(C:)?\\?DOWNLOAD\\?$/.test(arg) || (!arg && this.cwd === "C:\\DOWNLOAD")) { await this.dirDownload(); return; }
         const files = this.cwd === "C:\\" ? [["COMMAND", "COM", "47845"], ["AUTOEXEC", "BAT", "112"], ["CONFIG", "SYS", "97"], ["README", "TXT", "640"], ["WARDIAL", "EXE", "21504"], ["VIEW", "COM", "8812"], ["KPLAY", "EXE", "61440"], ["DOS", "<DIR>", ""], ["DOWNLOAD", "<DIR>", ""], ["TELEWIRE", "<DIR>", ""], ["GAMES", "<DIR>", ""]]
           : this.cwd.endsWith("TELEWIRE") ? [["TELEWIRE", "EXE", "184320"], ["TELEWIRE", "DIR", "1024"], ["CAPTURE", "LOG", "0"]]
@@ -462,7 +471,7 @@ export class Machine {
         const docs: Record<string, string[]> = {
           "AUTOEXEC.BAT": ["@ECHO OFF", "PROMPT $P$G", "PATH C:\\DOS;C:\\TELEWIRE", "MODE COM2:9600,N,8,1", "TELEWIRE"],
           "CONFIG.SYS": ["DEVICE=C:\\DOS\\HIMEM.SYS", "DOS=HIGH", "FILES=30", "BUFFERS=20"],
-          "README.TXT": ["Welcome to your Kestrel 486!", "Type DIAL to call a BBS. The Crawlspace is 555-0142.", "Don't pick up the phone while the modem is on line."],
+          "README.TXT": ["Welcome to your Kestrel 486!", "Type DIAL to call a BBS. DEAD CARRIER is 555-0142.", "Don't pick up the phone while the modem is on line."],
         };
         const d = docs[arg.replace(/^C:\\/, "")];
         if (!d || this.cwd !== "C:\\") { p("File not found"); return; }
@@ -549,19 +558,19 @@ export class Machine {
   private dirScreen(sel: number) {
     const x = a().c(15, 1).raw("\x1b[2J");
     x.at(1, 1).c(1, 7).t(pad(" TELEWIRE v2.1  ·  Dialing Directory", 59) + pad(`COM2  ${this.profile.speed} N81`, 20));
-    box(x, 3, 3, 75, 12, 11, "DIRECTORY", true, 1);
+    box(x, 3, 3, 75, 13, 11, "DIRECTORY", true, 1);
     x.at(5, 6).c(14, 1).t(pad("#", 4) + pad("Name", 26) + pad("Number", 12) + pad("Speed", 8) + "Last call");
     x.at(6, 6).c(3, 1).t("─".repeat(68));
     this.book().forEach((d, i) => {
       const last = this.profile.lastCall[d.number] ?? "never";
       const text = pad(String(i + 1), 4) + pad(d.name, 26) + pad(d.number, 12) + pad(String(this.profile.speed), 8) + pad(last, 18);
-      x.at(7 + i * 2, 5);
+      x.at(7 + i, 5);
       if (i === sel) x.c(1, 7).t(" " + text + " "); else x.c(15, 1).t(" " + text + " ");
-      x.at(8 + i * 2, 10).c(3, 1).t(pad(d.blurb, 40));
+
     });
-    box(x, 16, 3, 75, 6, 3, "KEYS", true, 1);
-    x.at(17, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to menu");
-    x.at(19, 6).c(7, 1).t("Inside a call: ").c(15, 1).t("ENTER").c(7, 1).t(" finish transfer  ").c(15, 1).t("SPACE").c(7, 1).t(" pause  ").c(15, 1).t("I").c(7, 1).t(" info  ").c(15, 1).t("ESC").c(7, 1).t(" back");
+    box(x, 17, 3, 75, 5, 3, "KEYS", true, 1);
+    x.at(18, 6).c(15, 1).t("↑↓").c(7, 1).t(" select    ").c(15, 1).t("ENTER").c(7, 1).t(" dial    ").c(15, 1).t("S").c(7, 1).t(" modem setup    ").c(15, 1).t("ESC").c(7, 1).t(" exit to menu");
+    x.at(20, 6).c(7, 1).t("Inside a call: ").c(15, 1).t("ENTER").c(7, 1).t(" finish transfer  ").c(15, 1).t("SPACE").c(7, 1).t(" pause  ").c(15, 1).t("I").c(7, 1).t(" info  ").c(15, 1).t("ESC").c(7, 1).t(" back");
     const fs = this.profile.filesSeen.length;
     const nxt = fs < 5 ? `${5 - fs} more files to unlock 14400` : fs < 15 ? `${15 - fs} more files to unlock 28800` : "all speeds unlocked";
     x.at(23, 1).c(0, 3).t(pad(` ${fs} files seen · ${nxt}`, 79));
@@ -590,7 +599,7 @@ export class Machine {
       else if (k.key === "ArrowDown") sel = (sel + 1) % book.length;
       else if (c >= "1" && c <= String(book.length)) sel = +c - 1;
       else if (k.key === "Tap" && k.tapRow) {
-        const i = Math.floor((k.tapRow - 7) / 2);
+        const i = k.tapRow - 7;
         if (i >= 0 && i < book.length) { if (i === sel) { this.engine.term.cursorVisible = true; await this.call(book[sel], g, false); } else sel = i; }
       }
       else if (k.key === "Enter" || c === "D") { this.engine.term.cursorVisible = true; await this.call(book[sel], g, false); }

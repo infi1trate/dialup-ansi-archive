@@ -1,0 +1,21 @@
+import {a,box,pad,rpad} from './ansi';
+import type {HostIO} from './io';
+import {net} from '@/data/net';
+import {newCorner,actCorner,cornerScore,GOODS,NEIGHBORHOODS,type CornerAction} from './corner-economy';
+const keyChar=(k:{ch:number|null})=>k.ch===null?'':String.fromCharCode(k.ch).toUpperCase();
+async function amount(io:HostIO,label:string){let text='';io.send(a().at(23,3).eol().k(14,`${label}: `).build());for(;;){const k=await io.key();if(k.key==='Escape')return 0;if(k.key==='Enter')return Number(text)||0;if(k.key==='Backspace'){text=text.slice(0,-1);io.send(a().raw('\b \b').build());}else if(k.ch!==null&&k.ch>=48&&k.ch<=57&&text.length<8){text+=String.fromCharCode(k.ch);io.send(a().k(15,String.fromCharCode(k.ch)).build());}}}
+export async function cornerDoor(io:HostIO,guest:boolean,user:string){
+ for(;;){io.client.setMode({cols:80,rows:25,ice:false,ninePixel:true});const x=a().cls();box(x,3,7,66,19,14,'THE CORNER · city of Rivet');x.at(6,11).k(15,'Thirty days trading the night markets of Rivet.').at(8,11).k(7,'1 Scored run   2 Practice   3 High scores   ESC Return');x.at(11,11).k(8,'Cash 1800 / debt 4000 / coat 60 pockets / daily interest 8%');x.at(13,11).k(7,'A scored finish earns 8 DEAD CARRIER credits.');io.send(x.build());io.hint(['1','2','3'].map(c=>({key:c,ch:c,label:c})).concat([{key:'Escape',ch:'',label:'ESC'}]));const k=await io.key(),c=keyChar(k);io.clearOutput();if(k.key==='Escape')return;if(c==='3'){const r=await net('cornerTop');const y=a().cls().at(3,5).k(14,'THE CORNER / NET WORTH');(r?.top??[]).forEach((t:any,i:number)=>y.at(6+i,5).k(15,pad(t.handle,22)).k(11,String(t.score)));y.at(22,5).k(8,'Any key returns');io.send(y.build());await io.key();continue;}if(!['1','2'].includes(c))continue;
+ const scored=c==='1'&&!guest;let seed=crypto.getRandomValues(new Uint32Array(1))[0];if(scored){const r=await net('cornerStart');if(!r?.ok){io.send(a().at(18,11).k(12,r?.why??'Scorekeeper offline. Practice is open.').build());await io.key();continue;}seed=r.seed;}
+ let s=newCorner(seed);const actions:CornerAction[]=[];let abandon=false;
+ const apply=(action:CornerAction)=>{actions.push(action);s=actCorner(s,action);};
+ while(!s.ended){const y=a().cls();box(y,1,2,77,24,6,'THE CORNER');y.at(3,5).k(14,`RIVET / ${NEIGHBORHOODS[s.place]} / DAY ${s.day} OF 30`).at(5,5).k(15,`Cash ${s.cash}   Bank ${s.bank}   Debt ${s.debt}`).at(6,5).k(7,`Coat ${s.stock.reduce((x,y)=>x+y,0)}/${s.pockets}   ${s.weapon?'Deterrent carried':'Unarmed'}   ${scored?'SCORED':'PRACTICE'} / ${user}`);y.at(8,5).k(11,pad('Good',24)+rpad('Price',12)+rpad('Carried',12));GOODS.forEach((g,i)=>y.at(10+i,5).k(15,`${i+1} ${pad(g,22)}${rpad(String(s.prices[i]),12)}${rpad(String(s.stock[i]),12)}`));y.at(17,5).k(14,pad(s.message,69));y.at(19,5).k(7,s.police?'1 Run   2 Stand':'1 Buy   2 Sell   3 Travel   4 Bank   5 Withdraw   6 Repay');y.at(20,5).k(7,s.police?'':'7 Bigger coat   8 Deterrent   9 End day / settle on day 30');y.at(22,5).k(8,'ESC abandon run');io.send(y.build());io.hint([...Array.from({length:9},(_,i)=>({label:String(i+1),key:String(i+1),ch:String(i+1)})),{label:'ESC',key:'Escape'}]);const k=await io.key(),c=keyChar(k);io.clearOutput();if(k.key==='Escape'){abandon=true;break;}if(s.police){if(c==='1'||c==='2')apply({type:c==='1'?'run':'stand'});continue;}
+ if(c==='1'||c==='2'){const g=await amount(io,'Good number (1-6)');const qty=await amount(io,'Quantity');apply({type:c==='1'?'buy':'sell',good:g-1,qty});}
+ else if(c==='3'){const z=a().at(18,5).eol();NEIGHBORHOODS.forEach((p,i)=>z.at(18+Math.floor(i/3),5+(i%3)*24).k(11,`${i+1} ${p}`));io.send(z.build());const n=await amount(io,'District (1-6)');if(n>=1&&n<=6)apply({type:'travel',place:n-1});}
+ else if(['4','5','6'].includes(c))apply({type:c==='4'?'bank':c==='5'?'withdraw':'repay',qty:await amount(io,'Amount')});
+ else if(c==='7'||c==='8')apply({type:c==='7'?'coat':'weapon'});
+ else if(c==='9')apply({type:'travel',place:(s.place+1)%6});
+ }
+ if(abandon)continue;const r=scored?await net('cornerFinish',{actions}):null;io.send(a().cls().at(7,6).k(14,'DAY 30 / ACCOUNTS CLOSED').at(10,6).k(15,`Net worth: ${cornerScore(s)}`).at(12,6).k(11,scored?(r?.ok?'Score posted. Eight credits added.':'Score could not post. No credits claimed.'):'Practice finished. No score posted.').at(18,6).k(8,'Any key returns').build());await io.key();
+ }
+}

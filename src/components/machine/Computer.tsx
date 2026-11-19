@@ -154,7 +154,7 @@ export function Computer({ deepLink, lost }: Props) {
 
   if (layout === "tube") return (
     <main className={`tube-only ${reduced ? "reduce" : ""}`}>
-      <h1 className="sr-only">Dial-Up: a 1992 PC calling The Crawlspace BBS</h1>
+      <h1 className="sr-only">Dial-Up: a 1992 PC calling DEAD CARRIER</h1>
       <div className="tube-frame">
         <canvas ref={canvas} className="monitor-screen" aria-label="CRT screen" onPointerDown={onTubePointerDown} onPointerUp={onTubePointerUp} />
       </div>

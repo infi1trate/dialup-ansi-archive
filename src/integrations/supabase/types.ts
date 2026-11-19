@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      archive_index: {
+        Row: {
+          artist: string
+          file: string
+          groups: string
+          pack: string
+          title: string
+          year: number
+        }
+        Insert: {
+          artist?: string
+          file: string
+          groups?: string
+          pack: string
+          title?: string
+          year?: number
+        }
+        Update: {
+          artist?: string
+          file?: string
+          groups?: string
+          pack?: string
+          title?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      art_ratings: {
+        Row: {
+          caller_id: string
+          file: string
+          pack: string
+          rating: number
+        }
+        Insert: {
+          caller_id: string
+          file: string
+          pack: string
+          rating: number
+        }
+        Update: {
+          caller_id?: string
+          file?: string
+          pack?: string
+          rating?: number
+        }
+        Relationships: []
+      }
       call_log: {
         Row: {
           caller_id: string | null
@@ -41,6 +89,24 @@ export type Database = {
           id?: string
           speed?: number
           token_hash?: string
+        }
+        Relationships: []
+      }
+      caller_shelf: {
+        Row: {
+          caller_id: string
+          file: string
+          pack: string
+        }
+        Insert: {
+          caller_id: string
+          file: string
+          pack: string
+        }
+        Update: {
+          caller_id?: string
+          file?: string
+          pack?: string
         }
         Relationships: []
       }
@@ -86,6 +152,54 @@ export type Database = {
           phrase_hash?: string | null
           speed_unlocked?: number
           token_hashes?: string[]
+        }
+        Relationships: []
+      }
+      corner_runs: {
+        Row: {
+          actions: Json
+          caller_id: string
+          day: string
+          handle: string
+          score: number | null
+          seed: number
+        }
+        Insert: {
+          actions?: Json
+          caller_id: string
+          day?: string
+          handle: string
+          score?: number | null
+          seed: number
+        }
+        Update: {
+          actions?: Json
+          caller_id?: string
+          day?: string
+          handle?: string
+          score?: number | null
+          seed?: number
+        }
+        Relationships: []
+      }
+      credit_ledger: {
+        Row: {
+          amount: number
+          caller_id: string
+          created_at: string
+          event: string
+        }
+        Insert: {
+          amount: number
+          caller_id: string
+          created_at?: string
+          event: string
+        }
+        Update: {
+          amount?: number
+          caller_id?: string
+          created_at?: string
+          event?: string
         }
         Relationships: []
       }
@@ -319,6 +433,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      board_credit: {
+        Args: { _amount: number; _caller: string; _event: string }
+        Returns: number
+      }
       bump_counter: { Args: { _step: string }; Returns: undefined }
       top_files: {
         Args: { _limit: number }

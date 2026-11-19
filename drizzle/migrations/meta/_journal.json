@@ -15,6 +15,13 @@
       "when": 1794931471574,
       "tag": "0001_door_game",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795053083943,
+      "tag": "0002_sprint_c_board_economy",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,7 @@ export async function shareMeta(pack: string, file: string, year: number): Promi
     const hp = housePack(), f = hp.files.find((x) => x.name.toLowerCase() === file.toLowerCase());
     const bytes = houseFile(file);
     const s = bytes ? parseSauce(bytes).sauce : null;
-    return { ...base, year: hp.year, title: s?.title || file, artist: s?.author || f?.artists[0] || base.artist, group: s?.group || "Crawlspace" };
+    return { ...base, year: hp.year, title: s?.title || file, artist: s?.author || f?.artists[0] || base.artist, group: s?.group || "DEAD CARRIER" };
   }
   const { getApiJson } = await import("@/server/archive-proxy");
   const j = JSON.parse(new TextDecoder().decode(await getApiJson(`/v1/pack/${pack}?sauce=true&filesize=true`)));

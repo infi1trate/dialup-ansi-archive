@@ -7,7 +7,7 @@ const UA = "DialUp-BBS/1.0 (browser BBS simulator; caching proxy, fetches on dem
 const inflight = new Map<string, Promise<Uint8Array>>();
 
 // Allowed API paths: years, a year's packs, a pack, the group list, one group.
-const JSON_PATH = /^\/v1\/(year\/(\d{4})?|pack\/[A-Za-z0-9._\-]+|group\/([A-Za-z0-9._\-%+ ]+)?)(\?[A-Za-z0-9=&._\-]*)?$/;
+const JSON_PATH = /^\/v1\/(year\/(\d{4})?|pack\/[A-Za-z0-9._\-]+|artist\/[A-Za-z0-9._\-%+ ]+|group\/([A-Za-z0-9._\-%+ ]+)?)(\?[A-Za-z0-9=&._\-]*)?$/;
 
 export function isAllowedJsonPath(p: string) {
   return JSON_PATH.test(p) && p.length < 200;

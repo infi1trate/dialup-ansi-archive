@@ -52,3 +52,6 @@ use the editor.
 
 - Legacy display-code translation and licensed SAUCE font selection stay inside `src/term/prepare.ts`; all viewing surfaces share them so no format gets an alternate renderer.
 - Archive audit tools store downloaded corpus/reference output under `/tmp/dialup-audit` and use the existing proxy serially at one request per second; repository reports contain metrics, not art copies.
+
+- Board identities and chrome are configured in src/bbs/config.ts; legacy dialing IDs stay stable so saved deep links continue working.
+- Fictional programs dispatch through src/machine/releases.ts; scored trading runs replay seeded actions server-side to validate results before posting.

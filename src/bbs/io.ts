@@ -5,16 +5,18 @@ import type { Key } from "@/machine/keyboard";
 import type { Profile } from "@/machine/storage";
 import type { TermMode } from "@/term/terminal";
 
-export type BoardMode = "archive" | "groups" | "year1993" | "later" | "void";
+export type BoardMode = "archive" | "groups" | "year1993" | "family" | "music" | "later" | "void";
 export interface DirEntry { id: string; name: string; number: string; mode: BoardMode; blurb: string; years: [number, number]; hidden?: boolean }
 
 /** Files a caller must view before The Attic appears in the phone book. */
 export const ATTIC_UNLOCK = 10;
 
 export const DIRECTORY: DirEntry[] = [
-  { id: "crawl", name: "The Crawlspace BBS", number: "555-0142", mode: "archive", blurb: "whole archive, 1990-1996", years: [1990, 1996] },
-  { id: "vault", name: "Group Vault", number: "555-0167", mode: "groups", blurb: "browse by group first", years: [1990, 1996] },
-  { id: "c93", name: "Class of '93", number: "555-0193", mode: "year1993", blurb: "1993 only", years: [1993, 1993] },
+  { id: "crawl", name: "DEAD CARRIER", number: "555-0142", mode: "archive", blurb: "whole archive, 1990-1996", years: [1990, 1996] },
+  { id: "vault", name: "FULL BLOCK", number: "555-0167", mode: "groups", blurb: "browse by group first", years: [1990, 1996] },
+  { id: "c93", name: "LINE NOISE", number: "555-0193", mode: "year1993", blurb: "text files and quiet lines", years: [1990, 1996] },
+  { id: "maple", name: "MAPLE RIDGE PC USERS GROUP BBS", number: "555-0128", mode: "family", blurb: "club-approved picture shelf", years: [1990, 1996] },
+  { id: "strobe", name: "STROBE", number: "555-0177", mode: "music", blurb: "modules, motion and roulette", years: [1990, 1996] },
   { id: "attic", name: "The Attic", number: "555-0199", mode: "later", blurb: "1997 to the present", years: [1997, 2100] },
   { id: "void", name: "VOID//NODE", number: "555-0113", mode: "void", blurb: "", years: [1990, 2100], hidden: true },
 ];

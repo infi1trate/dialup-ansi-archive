@@ -6,7 +6,7 @@ export const Route = createFileRoute("/gallery")({
   head: () => ({
     meta: [
       { title: "Plain gallery — Dial-Up" },
-      { name: "description", content: "A plain, fast, screen-reader-friendly list of the Crawlspace house pack and any ANSI art pack, with title, artist, group and year as text." },
+      { name: "description", content: "A plain, fast, screen-reader-friendly list of DEAD CARRIER house pack and any ANSI art pack, with title, artist, group and year as text." },
       { property: "og:title", content: "Plain gallery — Dial-Up" },
       { property: "og:description", content: "ANSI art without the basement: every piece drawn instantly with full credits as text." },
       { property: "og:type", content: "website" },

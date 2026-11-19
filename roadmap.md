@@ -1,3 +1,14 @@
+# Sprint C
+- [x] Five distinct public boards and two unlockable boards
+- [ ] Shared tags, quick scan, search, new scans and favorites
+- [ ] Visually reviewed family allowlist (40 real pieces)
+- [ ] Fictional warez catalog, ratio, DOS installs and seven runnable programs
+- [x] THE CORNER economy, daily scored run and shared scores
+- [ ] Regression tests, full calls, runnable releases and scored game verification
+- [x] Sprint C status blocks
+- [ ] Fifteen private review pictures: captured locally; upload/signing remains
+- [ ] True nested warez directories and exhaustive trainer/saver/tag flows
+
 # Sprint A
 - [x] First-visit lamp, hints and hover treatment
 - [x] Stable CRT grain, smooth spill and seamless lamp falloff

@@ -1,4 +1,4 @@
-// THE CRAWLSPACE BBS — the virtual host. Writes bytes, reads keys. Nothing else.
+// DEAD CARRIER — the virtual host. Writes bytes, reads keys. Nothing else.
 import { Ansi, a, bigText, box, center, chromeText, pad, rpad, shadeBar, stairwell } from "./ansi";
 import { ATTIC_UNLOCK, type HostIO, type DeepLink, type KeyHint } from "./io";
 import type { Key } from "@/machine/keyboard";
@@ -15,63 +15,36 @@ import { artViewed, net, newSessionId, setLiveSession, timeAgo, type CallerInfo 
 import { checkHandle, checkOneliner } from "@/lib/filter";
 import { doorMenu } from "./door";
 import { sysopChat } from "./chat";
+import { configFor, type BoardConfig } from "./config";
+import { cornerDoor } from "./corner";
+import { RELEASES, RELEASE_GROUPS, nfoBytes, dizBytes, GUEST_CREDITS, COURIER_LOGS, tagOrder } from "./warez-catalog";
+import { FAMILY_SHELF, familyAllowed, pictureOfDay } from "@/data/family-shelf";
+import { discovered, jukebox, guestShelf, toggleGuestFavorite } from "@/data/browsing";
+import { directLookup } from "@/data/archive";
+import { strobeFont } from "@/term/board-font";
+import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 
 const SYSOP = "Static";
-/** VOID//NODE's new-user password. It is printed at the end of the Crawlspace credits screen. */
+/** VOID//NODE's new-user password. It is printed at the end of DEAD CARRIER credits screen. */
 export const VOID_NUP = "STAIRWELL";
 interface Skin { name: string; a: number; b: number; c: number; line: number; hot: [number, number, number] }
-const CRAWL_SKIN: Skin = { name: "THE CRAWLSPACE BBS", a: 11, b: 13, c: 3, line: 8, hot: [15, 13, 11] };
+const CRAWL_SKIN: Skin = { name: "DEAD CARRIER", a: 11, b: 13, c: 3, line: 8, hot: [15, 13, 11] };
 const VOID_SKIN: Skin = { name: "VOID//NODE", a: 12, b: 7, c: 4, line: 8, hot: [15, 4, 7] };
 const NAV: KeyHint[] = [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "ENTER", key: "Enter" }, { label: "ESC", key: "Escape" }];
 const hk = (c: string, label = c): KeyHint => ({ label, key: c, ch: c });
 const ANY: KeyHint[] = [{ label: "CONTINUE", key: "Enter" }];
-const QUOTES = [
-  "\"The modem is the message.\" — overheard at a 2600 meeting",
-  "\"Real artists ship. Real sysops reboot.\" — Static",
-  "\"I'll just download one more pack.\" — every caller, 4:12am",
-  "\"Your mother called. The line was busy.\" — the Crawlspace",
-  "\"Sixteen colors ought to be enough for anybody.\"",
-  "\"Upload/download ratio: a state of mind.\"",
-];
 const CALLERS = [
   ["Phosphor", "Lakewood", "11:52p"], ["Lord Cyan", "Port Ellis", "11:20p"], ["Ms. Halftone", "Grayson", "10:47p"],
   ["Dr. Baud", "Milltown", "10:02p"], ["Nyx", "Somerset", "9:31p"], ["Kilobyte Kid", "Lakewood", "8:58p"], ["Parity Error", "Ashby", "8:15p"],
 ];
 const ONELINERS = [
-  ["Phosphor", "anyone got the new acid pack? 9600 is too slow for this"],
+  ["Phosphor", "anyone got the new latchkey disk? 9600 is too slow for this"],
   ["Nyx", "static pls install a door game already"],
   ["Lord Cyan", "greetz to everyone on node 2 at 3am"],
   ["Dr. Baud", "my mom picked up the phone mid-download AGAIN"],
   ["Ms. Halftone", "shade blocks are a lifestyle"],
   ["Kilobyte Kid", "first time caller, long time lurker"],
-];
-const BULLETINS = [
-  { title: "Welcome to the Crawlspace", body: [
-    "The Crawlspace has been running on a 486 under the stairs since 1991.",
-    "We carry the art scene's archive: ANSI, ASCII and iCE packs from",
-    "1990 to 1996, sent to you byte by byte at whatever your modem can take.",
-    "", "Be cool. Leave a oneliner. Don't tie up the line during dinner." ] },
-  { title: "Modem speeds & you", body: [
-    "New callers connect at 9600. View 5 files and your modem negotiates",
-    "14400. View 15 and you unlock 28800. Masochists may choose 2400.",
-    "", "Set your speed in TELEWIRE's modem setup (press S at the directory)." ] },
-  { title: "Takedown policy", body: [
-    "All art on this board belongs to its artists. If you made something",
-    "here and want it gone, write the sysop: sysop@ (placeholder address).",
-    "", "Or press R while viewing it and pick 3. Static hides it from the list." ] },
-  { title: "What this board stores", body: [
-    "If you apply for a handle, the message base keeps: your handle, city,",
-    "number of calls, how many files you've viewed and your modem speed.",
-    "It keeps your oneliners, your logons (handle, city, speed, time),",
-    "which files you viewed (one count per caller) and any reports you file.",
-    "",
-    "It does NOT keep: email, real names, passwords, cookies, or your raw",
-    "network address. Your machine makes a random token; the board stores",
-    "only a scrambled fingerprint (SHA-256) of it, and a scrambled fingerprint",
-    "of your network address to slow down spammers. A transfer phrase, if you",
-    "set one, is stored as a salted slow hash. Daily totals are just numbers.",
-    "Guests leave nothing but a logon and their view counts." ] },
 ];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -101,7 +74,17 @@ export class Board {
   private lastBeat = 0;
   private beatTimer: ReturnType<typeof setInterval> | null = null;
   sk: Skin;
-  constructor(private io: HostIO) { this.node = io.node; this.sk = io.entry.mode === "void" ? VOID_SKIN : CRAWL_SKIN; }
+  config: BoardConfig;
+  colorBack = false;
+  creditsLeft = GUEST_CREDITS;
+  tagged = new Set<string>();
+  private musicQueue: {pack:string;file:string;artist:string}[]=[];
+  constructor(private io: HostIO) { this.node = io.node; this.config=configFor(io.entry); const [aa,bb,cc]=this.config.colors; this.sk = io.entry.mode === "void" ? VOID_SKIN : {name:this.config.name,a:aa,b:bb,c:cc,line:8,hot:[15,bb,aa]}; }
+  screenMode(m:Partial<TermMode>={cols:80,rows:25,ice:false,ninePixel:true}) {
+    if(this.io.entry.id === "c93" && !this.colorBack) { const levels=[0,55,85,100,75,95,120,150,65,175,200,220,180,210,230,255]; m={...m,palette:Uint32Array.from(levels,v=>(0xff000000 | (v<<8) | Math.floor(v*.12))>>>0)}; }
+    if(this.io.entry.id === "strobe" && !m.font)m={...m,font:strobeFont(),ninePixel:false};
+    this.io.client?.setMode(m);
+  }
   hint(k: KeyHint[]) { this.io.hint(k); }
   get filesSeen() { return Math.max(this.io.profile.filesSeen.length, this.io.profile.serverFiles ?? 0); }
 
@@ -184,16 +167,17 @@ export class Board {
   }
 
   header(x: Ansi, title: string, sub?: string) {
+    this.screenMode();
     x.cls().at(1, 1);
-    shadeBar(x, 79, 1);
-    x.at(2, 3).k(this.sk.a, this.sk.name).k(this.sk.line, " ── ").k(this.sk.b, title);
-    if (sub) x.at(2, 79 - sub.length).k(this.sk.c, sub);
+    shadeBar(x, 79, this.sk.a&7);
+    x.at(2, 3).k(this.sk.a, this.sk.name).k(this.sk.line, " ── ").k(this.sk.b, title.slice(0,Math.max(12,70-this.sk.name.length)));
+    if (sub) x.at(2, 79 - Math.min(24,sub.length)).k(this.sk.c, sub.slice(0,24));
     x.at(3, 1).k(this.sk.line, "─".repeat(79));
     return x;
   }
 
   status(x: Ansi, row = 24) {
-    const left = Math.max(0, Math.ceil(this.io.timeLeftMs() / 60000));
+    const left = Math.max(0, Math.min(this.io.entry.id==="maple"?30:60,Math.ceil(this.io.timeLeftMs() / 60000)));
     x.at(row, 1).c(15, 1).t(pad(` ${this.user}`, 26)).c(11, 1).t(pad(`node ${this.node}`, 12))
       .c(14, 1).t(pad(`${this.io.speed} bps`, 14)).c(15, 1).t(rpad(`time left: ${left} min `, 27)).reset();
     return x;
@@ -213,6 +197,10 @@ export class Board {
   // ── lightbar ───────────────────────────────────────────────────
   async lightbar(o: { row: number; col: number; width: number; height: number; items: { text: string; color: number; dim?: boolean }[]; index?: number; hotkeys?: string; highlight?: (index:number) => void; refresh?: () => boolean }): Promise<{ index: number; key?: string } | null> {
     const { row, col, width, height, items } = o;
+    if(this.config.style==='prompt') {
+      let page=0;
+      for(;;){const x=a();items.slice(page*height,(page+1)*height).forEach((it,n)=>x.at(row+n,col).k(10,pad(`${page*height+n+1} ${it.text}`,width)));x.at(row+height,col).k(2,pad(`Page ${page+1} / R n read / N next / P previous / T n tag / Q quit`,width));this.send(x);this.send(a().at(23,3).eol().k(10,'Command (?=help): '));const command=(await this.input(30,{fg:10})).toUpperCase();this.io.clearOutput();if(command==='Q'||command==='')return null;if(command==='N'){page=Math.min(Math.max(0,Math.ceil(items.length/height)-1),page+1);continue;}if(command==='P'){page=Math.max(0,page-1);continue;}if(command==='V'&&o.hotkeys?.includes('V'))return {index:0,key:'V'};const m=/^(?:R|T)?\s*(\d+)$/.exec(command);if(m){const n=+m[1]-1;if(n>=0&&n<items.length)return {index:n,...(command.startsWith('T')?{key:' '}:{} )};}}
+    }
     let i = Math.max(0, Math.min(items.length - 1, o.index ?? 0));
     let top = Math.floor(i / height) * height;
     const line = (n: number, sel: boolean) => {
@@ -225,7 +213,7 @@ export class Board {
       const x = a();
       for (let r = 0; r < height; r++) x.bytes(line(top + r, top + r === i).build());
       const pages = Math.max(1, Math.ceil(items.length / height));
-      x.at(row + height, col).k(8, pad(`page ${Math.floor(top / height) + 1}/${pages}  ·  ${items.length} entries`, width));
+      x.at(Math.min(22,row + height), col).k(8, pad(`page ${Math.floor(top / height) + 1}/${pages}  ·  ${items.length} entries`, width));
       this.send(x);
     };
     if (!items.length) { this.send(a().at(row, col).k(8, "  (nothing here)")); }
@@ -284,21 +272,28 @@ export class Board {
       x.at(14, 1).k(4, center(`node 0 · ${this.io.entry.number} · you were never here`, 79));
       return x;
     }
-    x.at(1, 1); shadeBar(x, 79, 1);
-    x.at(3, 1).k(8, center("· t h e ·", 79));
-    chromeText(x, 4, 10, "CRAWLSPACE", [15, 7, 11, 11, 3, 1], 1);
-    chromeText(x, 8, 12, "BBS", [15, 13, 13, 5, 5, 1], 5);
-    x.at(11, 12).k(5, "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀").at(12, 12).k(8, "est. 1991 · node 1");
-    stairwell(x, 7, 50);
-    x.at(13, 50).k(8, "  (the 486 is under there)");
-    x.at(14, 1); shadeBar(x, 79, 5);
-    x.at(15, 1).k(7, center("Running on a 486 under the stairs since 1991", 79));
-    x.at(16, 1).k(3, center(`sysop: ${SYSOP}  ·  ${this.io.entry.name}  ·  ${this.io.entry.number}`, 79));
+    this.screenMode();
+    x.at(1,1);shadeBar(x,79,this.sk.a&7);
+    if(this.io.entry.id==='maple') {
+      box(x,3,3,74,11,1,'WELCOME TO THE CLUB');
+      x.at(5,8).k(15,'MAPLE RIDGE PC USERS GROUP BBS').at(7,8).k(9,'Visitors welcome / Please leave the telephone line tidy.');
+    } else {
+      const label=this.io.entry.id==='crawl'?'DEAD CARRIER':this.config.name;
+      chromeText(x,4,Math.max(3,Math.floor((79-label.length*6)/2)),label,[15,this.sk.b,this.sk.a,this.sk.a,this.sk.c,this.sk.c&7],this.sk.a&7);
+      x.at(9,3).k(this.sk.c,'▓▒░'.repeat(24));
+    }
+    x.at(14,1).k(this.sk.b,center(this.config.tagline,79));
+    x.at(16,1).k(this.sk.c,center(`sysop: ${this.config.sysop} / ${this.io.entry.number}`,79));
     return x;
   }
 
   async login(): Promise<void> {
     this.send(this.logo(a()).at(17, 1));
+    if(this.io.entry.id === "crawl") {
+      this.send(a().at(19,8).hot("L","ogin",15,7,12).t("  ").hot("A","pply",15,7,12).t("  ").hot("G","uest",15,7,11).t("  ").hot("H","ang up",15,7,7));
+      this.hint("LAGH".split("").map(c=>hk(c)));
+      for(;;){const k=await this.key();const c=String.fromCharCode(k.ch??0).toUpperCase();if(c==="G"){this.io.clearOutput();this.guest=true;return;}if(c==="H")throw new Aborted("hangup");if(c==="A"){this.online=!!(await net("hello"));await this.newUser();return;}if(c==="L")break;}
+    }
     const p = this.io.profile;
     const hello = await net("hello");
     this.online = !!hello && !hello.error;
@@ -365,6 +360,7 @@ export class Board {
 
   async newUser() {
     const x = this.header(a(), "New caller application");
+    x.at(22,4).k(this.sk.a,pad(`${this.config.sysop}: ${this.config.bulletins[0].body[0]}`,70));
     box(x, 5, 6, 68, 6, 12, "READ THIS");
     x.at(6, 9).k(15, "Do NOT reuse a real password anywhere on this board.")
       .at(7, 9).k(7, "Your handle lives on the board; this machine remembers you.")
@@ -408,7 +404,7 @@ export class Board {
         this.io.save();
         this.user = handle; this.guest = false;
       }
-      this.send(a().at(18, 6).eol().k(10, `Welcome aboard, ${handle}. Validation pending (Static is asleep).`));
+      this.send(a().at(18, 6).eol().k(10, `Welcome aboard, ${handle}. Validation noted. The sysop has your application.`));
       if (joke) this.send(a().at(19, 6).k(8, `Noted: "${joke.slice(0, 50)}". Bold choice.`));
       if (!this.online) this.send(a().at(20, 6).k(12, "Saved on this machine only until the message base is back."));
       await this.anyKey(21);
@@ -450,8 +446,8 @@ export class Board {
     const lines = [
       [15, "Archive drive is back on line!"], [7, "Static swapped the 120MB for a whole archive's worth of"],
       [7, "art packs, 1990-1996. Browse by year in the [F]ile areas."], [7, ""],
-      [11, "Call our sister lines:"], [7, "  Group Vault  555-0167   ·   Class of '93  555-0193"], [7, ""],
-      [13, "Door games: coming soon. Very soon. Any day now."],
+      [11, "Call our sister lines:"], [7, "  FULL BLOCK 555-0167 / LINE NOISE 555-0193 / STROBE 555-0177"], [7, ""],
+      [13, "Doors: BASEMENT CRAWL and THE CORNER / fictional warez downstairs."],
     ] as [number, string][];
     if (this.filesSeen >= ATTIC_UNLOCK) lines.push([7, ""], [14, "A new board came online: The Attic, 555-0199."], [7, "1997 to the present. It's in your TELEWIRE phone book now."]);
     lines.forEach(([c, t], n) => x.at(6 + n, 7).k(c, t));
@@ -495,66 +491,34 @@ export class Board {
   }
 
   // ── main menu ──────────────────────────────────────────────────
-  menuScreen() {
-    const x = a().cls();
-    const v = this.sk === VOID_SKIN;
-    if (v) {
-      x.at(1, 1).k(8, "▀".repeat(79));
-      chromeText(x, 2, 6, "VOID", [15, 7, 12, 12, 4, 4], 4);
-      x.at(3, 32).k(8, "//").k(7, "NODE");
-      x.at(4, 32).k(4, "most viewed first. that's all.");
-    } else {
-      x.at(1, 1); shadeBar(x, 79, 1);
-      chromeText(x, 2, 4, "CRAWLSPACE", [15, 7, 11, 11, 3, 1], 1);
-      x.at(2, 75).k(6, "▄▄▄").at(3, 71).k(6, "▄▄▄█").k(8, "▓▓▓").at(4, 67).k(6, "▄▄▄█").k(8, "▓▓▓▓▓▓▓");
-    }
-    x.at(6, 1).k(this.sk.line, "─".repeat(60)).k(this.sk.b, " main menu ").k(this.sk.line, "─".repeat(8));
-    box(x, 7, 4, 72, 11, v ? 8 : 5);
-    const items: [string, string, string][] = [
-      ["F", v ? "iles" : "iles", v ? "most viewed" : "the archive"], ["U", "ser list", "who calls here"],
-      ["A", "nimations", "art that moves"], ["P", "age sysop", "he might answer"],
-      ["B", "ulletins", "news, top 10"], ["D", "oors", "BASEMENT CRAWL"],
-      ["O", "neliners", "the wall"], ["C", "redits", "who made what"],
-      ["W", "ho's online", "nodes 1-8"], ["G", "oodbye", "hang up"],
-    ];
-    const [h1, h2, h3] = this.sk.hot;
-    items.forEach(([k, l, d], n) => {
-      const col = n % 2 ? 42 : 8, row = 8 + Math.floor(n / 2) * 2;
-      x.at(row, col).hot(k, pad(l, 12), h1, h2, h3).k(8, pad(d, 16));
-    });
-    x.at(18, 6).k(v ? 8 : 5, "░▒▓").k(7, ` ${pad(this.io.entry.blurb, 30)}`);
-    this.status(x, 20);
-    x.at(22, 4).k(this.sk.b, "Main").k(8, " ► ").k(this.sk.a, "Command").k(v ? 4 : 5, ": ").c(15);
-    return x;
+  menuItems():[string,string][] {
+    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye']];
+    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit']];
+    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye']];
+    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye']];
+    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','Bulletins / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye']];
   }
-
-  async mainMenu(): Promise<"bye"> {
-    for (;;) {
-      this.setDoing("at the main menu");
-      this.send(this.menuScreen());
-      this.hint("FABOWUPDCG".split("").map((c) => hk(c)));
-      let c = "";
-      while (!"FABOWUPDCG!".includes(c) || !c) { const k = await this.key(); c = (k.ch !== null ? String.fromCharCode(k.ch) : "").toUpperCase(); }
-      // a hotkey interrupts the menu still drawing, like any good BBS
-      if ("FABOWUPDCG".includes(c) && c) this.io.clearOutput();
-      if (c) this.send(a().k(15, c));
-      switch (c) {
-        case "F": await this.files(); break;
-        case "A": await this.animations(); break;
-        case "B": await this.bulletins(); break;
-        case "O": await this.oneliners(); break;
-        case "W": await this.whosOnline(); break;
-        case "U": await this.userList(); break;
-        case "P": await this.pageSysop(); break;
-        case "D": await this.doors(); break;
-        case "C": await this.credits(); break;
-        case "G": if (await this.confirmBye()) return "bye"; break;
-        case "!": this.io.clearOutput(); await this.sysopConsole(); break;
-      }
+  menuScreen() {
+    this.screenMode();const x=a().cls(),items=this.menuItems();
+    if(this.config.style==='numbered'){x.at(2,4).c(15,1).t(pad(this.config.name,72));x.at(4,4).k(9,'Mr. Hutchins welcomes you. Please enjoy our reviewed picture shelf.');items.forEach(([k,l],i)=>x.at(6+i,8).k(15,`${k}. ${l}`));}
+    else if(this.config.style==='prompt'){x.at(2,4).k(10,'LINE NOISE / private exchange / Dial Tone').at(4,4).k(2,'NO RECORD OF THIS CONNECTION');items.forEach(([k,l],i)=>x.at(6+i,4).k(10,`${k}  ${l}`));x.at(21,4).k(10,'Command (?=help): ');}
+    else{shadeBar(x,79,this.sk.a&7);chromeText(x,3,4,this.io.entry.id==='attic'?'ATTIC':this.io.entry.id==='void'?'VOID NODE':this.config.name,[15,this.sk.b,this.sk.a,this.sk.a,this.sk.c,this.sk.c&7],this.sk.a&7);x.at(7,4).k(this.sk.b,pad(this.config.tagline,72));box(x,8,3,75,11,this.sk.a&7);items.forEach(([k,l],i)=>x.at(9+Math.floor(i/2),6+(i%2)*36).hot(k,pad(l,29),15,this.sk.b,this.sk.a));x.at(21,4).k(this.sk.c,`SYSOP ${this.config.sysop} / ${this.io.entry.number}`);}
+    this.status(x,24);return x;
+  }
+  async mainMenu(): Promise<'bye'> {
+    let selected=0;
+    for(;;){this.setDoing('at the main menu');this.send(this.menuScreen());const items=this.menuItems();this.hint([...items.map(([c])=>hk(c)),...NAV]);
+      if(this.config.style==='lightbar')this.send(a().at(9+Math.floor(selected/2),4+(selected%2)*36).k(15,'>'));
+      let c='';for(;;){const k=await this.key();c=String.fromCharCode(k.ch??0).toUpperCase();if(this.config.style==='lightbar'&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k.key)){this.send(a().at(9+Math.floor(selected/2),4+(selected%2)*36).k(0,' '));selected=(selected+(k.key==='ArrowUp'?-2:k.key==='ArrowDown'?2:k.key==='ArrowLeft'?-1:1)+items.length)%items.length;this.send(a().at(9+Math.floor(selected/2),4+(selected%2)*36).k(15,'>'));continue;}if(k.key==='Enter'&&this.config.style==='lightbar')c=items[selected][0];if(c==='?'&&this.config.style==='prompt'){this.io.clearOutput();this.send(this.menuScreen());continue;}if(items.some(([v])=>v===c)||c==='!')break;}
+      this.io.clearOutput();
+      if(this.io.entry.id==='maple'){if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
+      if(this.io.entry.id==='c93'){if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
+      switch(c){case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
     }
   }
 
   async bulletins() {
+    const BULLETINS=this.config.bulletins;
     for (;;) {
       const x = this.header(a(), "Bulletins");
       BULLETINS.forEach((b, n) => x.at(6 + n * 2, 6).hot(String(n + 1), "  " + b.title, 15, 5, 11));
@@ -698,6 +662,7 @@ export class Board {
   private pages = 0;
   /** Static answers every fourth page, and always on the first page after 20 files. */
   async pageSysop() {
+    const SYSOP=this.config.sysop;
     this.pages++;
     const p = this.io.profile;
     const after20 = this.filesSeen >= 20 && !p.chatAfter20;
@@ -711,6 +676,7 @@ export class Board {
       this.setDoing("chatting with the sysop");
       this.send(a().at(8, 6).k(14, "*** SYSOP BREAKING IN ***").raw("\x07"));
       await this.io.drain(); await sleep(900);
+      if(this.io.entry.id!=="crawl"){this.send(a().at(10,6).k(this.sk.a,pad(`${SYSOP}: ${this.config.bulletins[1].body[0]}`,68)));await this.anyKey(20);return;}
       await sysopChat(this.io, (y) => this.send(y), (k) => this.hint(k), this.user, this.sk !== VOID_SKIN && !p.voidUnlocked);
       return;
     }
@@ -725,7 +691,7 @@ export class Board {
 
   async doors() {
     this.setDoing("in a door: BASEMENT CRAWL");
-    await doorMenu({ io: this.io, send: (y) => this.send(y), user: this.user, guest: this.guest, hint: (k) => this.hint(k) });
+    for(;;){this.send(this.header(a(),"Doors").at(6,6).k(15,"1 BASEMENT CRAWL").at(8,6).k(14,"2 THE CORNER").at(12,6).k(8,"ESC main menu"));const k=await this.key();this.io.clearOutput();if(k.key==="Escape")return;if(k.ch===49)await doorMenu({io:this.io,send:y=>this.send(y),user:this.user,guest:this.guest,hint:h=>this.hint(h)});if(k.ch===50)await cornerDoor(this.io,this.guest,this.user);}
   }
 
   async credits() {
@@ -770,9 +736,9 @@ export class Board {
     else x.at(5, 50).k(4, "the void says nothing back.");
     x.at(11, 1); shadeBar(x, 79, v ? 8 : 1);
     x.at(13, 1).k(15, center(`Thanks for calling, ${this.user}.`, 79));
-    const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    const q = this.config.quotes[Math.floor(Math.random() * this.config.quotes.length)];
     x.at(15, 1).k(3, center(q.length > 77 ? q.slice(0, 77) : q, 79));
-    x.at(18, 1).k(8, center(v ? "VOID//NODE · 555-01?3 · forget this number" : "The Crawlspace BBS · 555-0142 · call again after midnight", 79)).at(20, 1).reset();
+    x.at(18, 1).k(this.sk.c, center(v ? "VOID//NODE · 555-01?3 · forget this number" : `${this.config.name} · ${this.io.entry.number} · ${this.config.sysop} signs off`, 79)).at(20, 1).reset();
     this.send(x);
     await this.io.drain();
     await new Promise((r) => setTimeout(r, 900));
@@ -796,7 +762,8 @@ export class Board {
   async files() {
     this.setDoing("browsing the file areas");
     const mode = this.io.entry.mode;
-    if (mode === "year1993") return this.yearPacks(1993);
+    if (mode === "year1993") return this.textList();
+    if(mode === "family")return this.familyList();
     if (mode === "groups") return this.groupList();
     if (mode === "void") return this.mostViewed();
     return this.yearList();
@@ -828,7 +795,7 @@ export class Board {
       const r = await this.lightbar({ row: 7, col: 3, width: 74, height: 11, items, index: idx });
       if (!r) return;
       idx = r.index;
-      if (r.index === 0) await this.packScreen({ name: HOUSE_PACK, year: 1994, groups: ["crawlspace"] });
+      if (r.index === 0) await this.packScreen({ name: HOUSE_PACK, year: 1994, groups: ["Dead Carrier house crew"] });
       else await this.yearPacks(years[r.index - 1].year);
     }
   }
@@ -868,12 +835,12 @@ export class Board {
   async groupList() {
     let page = 1, idx = 0;
     for (;;) {
-      this.send(this.header(a(), "Group Vault", "by group"));
+      this.send(this.header(a(), "FULL BLOCK", "by group"));
       await this.loading("Opening the vault...");
       let p;
       try { p = await getGroups(page); } catch (e) { await this.errorScreen(String((e as Error).message)); return; }
       const items: { text: string; color: number; act?: string; name?: string }[] = [];
-      if (page === 1) items.push({ text: `${pad("CRAWLSPACE", 40)}house pack`, color: 14, name: "__house" });
+      if (page === 1) items.push({ text: `${pad("DEAD CARRIER", 40)}house pack`, color: 14, name: "__house" });
       if (p.page > 1) items.push({ text: "◄ previous page", color: 13, act: "prev" });
       for (const g of p.items) items.push({ text: `${pad(g.name.toUpperCase(), 40)}${g.releases} releases`, color: 11, name: g.name });
       if (p.page < p.pages) items.push({ text: "► next page", color: 13, act: "next" });
@@ -887,8 +854,8 @@ export class Board {
       if (it.act === "next") { page++; idx = 0; continue; }
       if (it.act === "prev") { page--; idx = 0; continue; }
       idx = r.index;
-      if (it.name === "__house") { await this.packScreen({ name: HOUSE_PACK, year: 1994, groups: ["crawlspace"] }); continue; }
-      const name = it.name!;
+      if (it.name === "__house") { await this.packScreen({ name: HOUSE_PACK, year: 1994, groups: ["Dead Carrier house crew"] }); continue; }
+      const name = it.name; if(!name)continue;
       const [y0, y1] = this.io.entry.years;
       await this.pagedPacks(`Group: ${name}`, `${y0}-${Math.min(y1, MAX_YEAR)}`, async () => {
         const all = await getGroupPacks(name, y0, y1);
@@ -904,6 +871,7 @@ export class Board {
   }
 
   async packScreen(s: PackSummary, startFile?: string) {
+    if(this.io.entry.id === "maple" && !FAMILY_SHELF.some(f=>f.pack===s.name)){await this.errorScreen("That disk is not on the club-approved shelf.");return;}
     this.send(this.header(a(), `Pack ${s.name.toUpperCase()}`, String(s.year)));
     if (!packCached(s.name)) await this.loading("Retrieving pack listing...");
     let pack: PackInfo;
@@ -915,7 +883,9 @@ export class Board {
       }
     }
     let diz: Uint8Array | null = null;
-    if (pack.fileId) { try { diz = parseSauce(await getFile(pack.name, pack.fileId)).body; } catch { diz = null; } }
+    if (pack.fileId && !startFile) { try { diz = parseSauce(await getFile(pack.name, pack.fileId)).body; } catch { diz = null; } }
+    if(this.io.entry.id === "maple")pack={...pack,files:pack.files.filter(f=>familyAllowed(pack.name,f.name))};
+    if(this.io.entry.id === "c93")pack.files.sort((a,b)=>Number(/\.(nfo|diz|asc|txt)$/i.test(b.name))-Number(/\.(nfo|diz|asc|txt)$/i.test(a.name)));
     const viewable = pack.files.filter((f) => f.viewable);
     if (startFile) {
       const i = viewable.findIndex((f) => f.name.toLowerCase() === startFile.toLowerCase());
@@ -932,21 +902,25 @@ export class Board {
         lines.forEach((l, n) => { x.at(4 + n, 3).reset(); x.bytes(l); x.reset(); });
       } else x.at(5, 4).k(8, "(no FILE_ID.DIZ in this pack)");
       x.at(14, 3).k(13, pad("File", 16) + pad("SAUCE title / Artist", 36) + rpad("Size", 10)).at(15, 3).k(5, "─".repeat(64));
-      x.at(23,4).eol().k(8,`${hidden} files this terminal can't show (V to ${showAll?"hide":"list"} them)`);
-      x.at(25,1).k(8,"ENTER view · D download · P play music · ESC back");
+      x.at(23,4).eol().k(8,`${hidden} files this terminal can't show (H to ${showAll?"hide":"list"} them)`);
+      x.at(13,3).k(8,"SPC tag / V queue / L slideshow / Q scan / H others / D download / ESC");
       this.status(x);
       this.send(x);
       const label = (f:PackFile) => `${pad(f.name,16)}${pad(f.title || fileTitle(pack.name,f.name) || f.artists.join(", ") || "—",36)}${rpad(String(f.size ?? "?"),10)}`;
       const items = listed.map((f) => ({
-        text: label(f),
+        text: `${this.tagged.has(`${pack.name}/${f.name}`)?"*":" "}${label(f)}`,
         color: MUSIC.test(f.name) ? 10 : /\.(ans|ice|bin|xb)$/i.test(f.name) ? 11 : 3, dim: !f.viewable && !MUSIC.test(f.name),
       }));
-      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx, hotkeys: "DPV", refresh: () => {
-        let changed = false; listed.forEach((f,i)=>{const t=label(f); if(items[i].text!==t){items[i].text=t;changed=true;}});return changed;
+      const r = await this.lightbar({ row: 16, col: 2, width: 68, height: 6, items, index: idx, hotkeys: "DPVQLH ", refresh: () => {
+        let changed = false; listed.forEach((f,i)=>{const t=`${this.tagged.has(`${pack.name}/${f.name}`)?"*":" "}${label(f)}`; if(items[i].text!==t){items[i].text=t;changed=true;}});return changed;
       } });
       if (!r) return;
       idx = r.index;
-      if(r.key === "V") { showAll=!showAll; idx=0; continue; }
+      if(r.key === "H") { showAll=!showAll; idx=0; continue; }
+      if(r.key === " "){const path=`${pack.name}/${listed[idx].name}`;if(this.tagged.has(path))this.tagged.delete(path);else this.tagged.add(path);continue;}
+      if(r.key === "V"){const fs=tagOrder(viewable.map(f=>f.name),new Set([...this.tagged].filter(t=>t.startsWith(pack.name+"/")).map(t=>t.slice(pack.name.length+1))));await this.autoQueue(pack,fs.map(n=>viewable.find(f=>f.name===n)).filter((f):f is PackFile=>!!f));continue;}
+      if(r.key === "L"){await this.autoQueue(pack,viewable);continue;}
+      if(r.key === "Q"){await this.quickScan(pack,viewable);continue;}
       const f = listed[r.index];
       const music = MUSIC.test(f.name);
       if (r.key === "D" || r.key === "P" || (music && !r.key)) {
@@ -1017,7 +991,7 @@ export class Board {
 
   async viewer(pack: PackInfo, files: PackFile[], idx: number, opts: { animation?: boolean; local?: Uint8Array } = {}) {
     const io = this.io;
-    const restore = () => { io.client.overlay(null); io.client.setMode({ cols: 80, ice: false, ninePixel: true }); };
+    const restore = () => { io.client.overlay(null); this.screenMode(); };
     for (;;) {
       const f = files[idx];
       if(!opts.local && !fileCached(pack.name,f.name)) this.send(a().cls().at(12, 1).k(8, center(`░▒▓ retrieving ${f.name} from the stacks ▓▒░`, 79)));
@@ -1027,14 +1001,16 @@ export class Board {
       let prep: Prepared;
       try { prep = prepareArt(f.name, bytes); } catch (e) { restore(); await this.errorScreen(`${f.name}: ${(e as Error).message}`); return; }
       const art = { sauce: prep.sauce };
+      if(!opts.local)void net("index",{rows:[{pack:pack.name,file:f.name,year:pack.year,title:prep.sauce?.title||f.title||"",artist:prep.sauce?.author||f.artists.join(", "),groups:prep.sauce?.group||pack.groups.join(", ")}]});
       const mode = prep.mode, stream = prep.stream;
-      io.client.setMode(mode);
+      this.screenMode(mode);
       io.client.markTop();
       io.send(stream);
       if(!opts.local) for(const n of [idx-1,idx+1]) { const neighbor=files[n]; if(neighbor) prefetchFile(pack.name,neighbor.name); }
       const seen = `${pack.name}/${f.name}`;
       const before = maxSpeed(io.profile);
       if (!opts.local && !io.profile.filesSeen.includes(seen)) { io.profile.filesSeen.push(seen); io.save(); }
+      if(!opts.local && this.guest)this.creditsLeft++;
       if (!opts.local) { this.setDoing(`viewing ${f.name}`.slice(0, 40)); artViewed(); }
       if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
       const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
@@ -1043,7 +1019,7 @@ export class Board {
       const viewHints = (done: boolean) => this.hint([
         ...(done ? [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "PGUP", key: "PageUp" }, { label: "PGDN", key: "PageDown" }]
           : [{ label: "SPACE pause", key: " " }, ...(opts.animation ? [] : [{ label: "ENTER finish", key: "Enter" }])]),
-        hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), ...(opts.local ? [] : [hk("R", "R report")]), { label: "ESC back", key: "Escape" },
+        hk("F","F favorite"),hk("E","E rate 1-5"),...(this.io.entry.id==="c93"?[hk("C","C color")]:[]),hk("I", "I info"), ...(idx > 0 ? [hk("P", "P prev")] : []), ...(idx < files.length - 1 ? [hk("N", "N next")] : []), ...(opts.local ? [] : [hk("R", "R report")]), { label: "ESC back", key: "Escape" },
       ]);
       viewHints(false);
       io.client.artOpen(true);
@@ -1059,6 +1035,9 @@ export class Board {
           if (info) { info = false; showInfo(); continue; }
           io.clearOutput(); io.resume(); restore(); io.client.artOpen(false); return;
         }
+        if(c === "F" && !opts.local){const favored=this.guest?toggleGuestFavorite(pack.name,f.name):(await net("favorite",{pack:pack.name,file:f.name}))?.favorite;io.client.overlay(a().at(24,2).k(14,favored?"Added to your shelf":"Removed from your shelf").build());continue;}
+        if(c === "C" && this.io.entry.id === "c93"){this.colorBack=!this.colorBack;io.clearOutput();this.screenMode(mode);io.send(stream);finished=false;continue;}
+        if(c === "E" && !opts.local){const k=await io.key();const rating=(k.ch??0)-48;if(rating>=1&&rating<=5)await net("rating",{pack:pack.name,file:f.name,rating});continue;}
         if (c === "I") { info = !info; showInfo(); continue; }
         if (c === "R" && !opts.local) { await this.report(pack, f); showInfo(); viewHints(finished); continue; }
         if (c === "N" && idx < files.length - 1) { next = 1; break; }
@@ -1096,6 +1075,23 @@ export class Board {
     }
     io.client.overlay(null);
   }
+
+  async openPath(path:string){const [pack,file]=path.split('/');if(!pack||!file)return;try{const p=await getPack(pack);if(this.io.entry.id==='maple'&&!familyAllowed(pack,file)){await this.errorScreen('Not on the club-approved shelf.');return;}await this.packScreen({name:pack,year:p.year,groups:p.groups},file);}catch(e){await this.errorScreen(String(e));}}
+  async openFamily(piece:typeof FAMILY_SHELF[number]|undefined){if(!piece)return;await this.openPath(`${piece.pack}/${piece.file}`);}
+  async familyList(){for(;;){this.send(this.header(a(),'Club-approved shelf').at(23,3).k(8,'ENTER picture / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:FAMILY_SHELF.map(f=>({text:`${pad(f.file,18)}${pad(f.pack,18)}${f.artist}`,color:9}))});if(!r)return;await this.openFamily(FAMILY_SHELF[r.index]);}}
+  async fileResults(title:string,rows:{pack:string;file:string;year?:number;title?:string;artist?:string}[]){if(this.io.entry.id==='maple')rows=rows.filter(r=>familyAllowed(r.pack,r.file));for(;;){this.send(this.header(a(),title).at(23,3).k(8,'ENTER view / SPACE tag / V queue / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:rows.map(f=>({text:`${this.tagged.has(`${f.pack}/${f.file}`)?'*':' '} ${pad(f.file,16)}${pad(f.pack,16)}${pad(f.title||f.artist||'',36)}`,color:this.sk.a})),hotkeys:' V'});if(!r)return;if(r.key==='V'){await this.playTags();continue;}const f=rows[r.index];if(!f)continue;if(r.key===' '){const id=`${f.pack}/${f.file}`;if(this.tagged.has(id))this.tagged.delete(id);else this.tagged.add(id);continue;}await this.openPath(`${f.pack}/${f.file}`);}}
+  async shelf(){const rows=this.guest?guestShelf():(await net('shelf'))?.rows??[];await this.fileResults('Your shelf',rows);}
+  async search(){const query=await this.ask(22,'Artist / group / title',60);if(!query)return;this.send(this.header(a(),'Searching',query));let rows:any[]=[];if(this.io.entry.id==='maple')rows=FAMILY_SHELF.filter(f=>`${f.file} ${f.artist} ${f.pack}`.toLowerCase().includes(query.toLowerCase()));else{const r=await net('search',{query});rows=r?.rows??[];for(const p of discovered.values())for(const f of p.files)if(f.viewable&&`${f.name} ${f.title} ${f.artists.join(' ')} ${p.groups.join(' ')}`.toLowerCase().includes(query.toLowerCase())&&!rows.some(r=>r.pack===p.name&&r.file===f.name))rows.push({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')});if(!rows.length){try{const gs=await getGroupPacks(query,1990,1996);if(gs.length){await this.pagedPacks(`Group: ${query}`,'archive credits',async()=>({items:gs,page:1,pages:1,total:gs.length}));return;}const d=await directLookup('artist',query);const packs=d.results?.packs??{};for(const [year,names]of Object.entries(packs))for(const name of names as string[]){const p=await getPack(name);for(const f of p.files.filter(f=>f.artists.some(a=>a.toLowerCase().includes(query.toLowerCase()))))rows.push({pack:name,file:f.name,year:+year,artist:f.artists.join(', ')});if(rows.length>=80)break;}}catch{}}}await this.fileResults(`Search: ${query}`,rows);}
+  async artistIndex(){const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';this.send(this.header(a(),'Artist index A-Z').at(5,4).k(11,letters.split('').join(' ')).at(8,4).k(8,'Pick an initial / ESC return'));const k=await this.key();if(k.key==='Escape')return;const letter=String.fromCharCode(k.ch??0).toUpperCase();if(!letters.includes(letter))return;const artists=[...new Set([...discovered.values()].flatMap(p=>p.files.flatMap(f=>f.artists)))].filter(a=>a.toUpperCase().startsWith(letter)).sort();this.send(this.header(a(),`Artists: ${letter}`).at(23,3).k(8,'ENTER search / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:artists.map(a=>({text:a,color:11}))});if(r){const result=await net('search',{query:artists[r.index]});await this.fileResults(artists[r.index],result?.rows??[]);}}
+  async newScan(){const result=await net('newScan');const unviewed=[...discovered.values()].filter(p=>!this.io.profile.filesSeen.some(f=>f.startsWith(p.name+'/')));const x=this.header(a(),'New since your last call');x.at(6,5).k(this.sk.a,`${result?.lines??0} new oneliners / ${result?.scores??0} new THE CORNER scores`);x.at(8,5).k(15,`${unviewed.length} discovered packs new to you.`);unviewed.slice(0,8).forEach((p,i)=>x.at(10+i,5).k(this.sk.c,p.name));if(!this.guest){const b=await net('balance');this.creditsLeft=b?.balance??this.creditsLeft;if(this.creditsLeft===0)x.at(20,5).k(12,'Mail from Static: your ratio is empty. Art earns your way back.');}x.at(22,5).k(8,'Any key returns');this.send(x);await this.key();this.io.clearOutput();}
+  async textList(){const packs=[...discovered.values()];if(!packs.length){try{packs.push(await getPack('ensiart'));}catch{}}const rows=packs.flatMap(p=>p.files.filter(f=>/\.(nfo|diz|asc|txt)$/i.test(f.name)).map(f=>({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')})));await this.fileResults('LINE NOISE / text first',rows);}
+  async zeroDay(){const month=new Date().getUTCMonth()+1;this.send(this.header(a(),'0-DAY ART',`month ${month} / 199x`));const packs:PackSummary[]=[];for(let year=1996;year>=1990;year--){let page=1;for(;;){const p=await getYearPacks(year,page,100);packs.push(...p.items.filter(p=>{const d=String(p.released??'');const m=/^\d{4}-(\d{2})/.exec(d);if(m)return +m[1]===month;const tail=/(\d{2})(\d{2})$/.exec(p.name);return !!tail&&+tail[1]===month;}));if(page>=p.pages)break;page++;}}packs.sort((a,b)=>b.year-a.year||b.name.localeCompare(a.name));await this.pagedPacks('0-DAY ART','this month in the scene, 199x',async()=>({items:packs,page:1,pages:1,total:packs.length}));}
+  async roulette(){try{const years=await getYears();const y=years[Math.floor(Math.random()*years.length)];const list=await getYearPacks(y.year,1);const chosen=list.items[Math.floor(Math.random()*list.items.length)];const pack=await getPack(chosen.name);const fs=pack.files.filter(f=>f.viewable);if(fs.length)await this.viewer(pack,fs,Math.floor(Math.random()*fs.length));}catch(e){await this.errorScreen(String(e));}}
+  async autoQueue(pack:PackInfo,files:PackFile[]){for(let i=0;i<files.length;i++){const f=files[i];if(this.io.entry.id==='maple'&&!familyAllowed(pack.name,f.name))continue;try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));this.screenMode(prep.mode);this.io.client.markTop();this.send(prep.stream);if(files[i+1])prefetchFile(pack.name,files[i+1].name);const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();break;}await this.io.drain();if(await this.io.keyTimeout(3000))break;}catch{}}this.io.clearOutput();this.screenMode();}
+  async playTags(){for(const path of this.tagged){const [name,file]=path.split('/');try{const p=await getPack(name),f=p.files.find(f=>f.name===file&&f.viewable);if(!f)continue;const prep=prepareArt(f.name,await getFile(name,file));this.screenMode(prep.mode);this.send(prep.stream);for(;;){const k=await this.io.keyOrDrain();if(k){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}if(await this.io.keyTimeout(3000))break;}catch{}}this.io.clearOutput();this.screenMode();}
+  async quickScan(pack:PackInfo,files:PackFile[]){for(const f of files){try{const prep=prepareArt(f.name,await getFile(pack.name,f.name));const t=new Terminal(prep.mode);t.feed(prep.stream);this.screenMode({cols:t.cols,rows:25,ice:t.ice,ninePixel:t.ninePixel,font:t.font,palette:t.palette});const x=a().cls();for(let row=0;row<Math.min(8,t.lines.length);row++){x.at(row+2,1);for(const cell of t.lines[row])x.c((cell>>8)&15,((cell>>12)&7)).bytes([cell&255]);}x.at(12,1).k(15,pad(`${f.name} / ${prep.sauce?.title||f.title||''} / ${prep.sauce?.author||f.artists.join(', ')}`,t.cols));x.at(14,1).k(8,'QUICK SCAN / ESC stops');this.send(x);for(;;){const k=await this.io.keyOrDrain();if(k?.key==='Escape'){this.io.clearOutput();this.screenMode();return;}if(k===null)break;}const k=await this.io.keyTimeout(750);if(k?.key==='Escape')break;}catch{}}this.io.clearOutput();this.screenMode();}
+  async juke(){for(;;){this.send(this.header(a(),'STROBE / Jukebox').at(23,3).k(8,'ENTER play / SPACE queue / V play queue / ESC back'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:jukebox.map(t=>({text:`${pad(t.file,20)}${pad(t.pack,20)}${t.artist}`,color:13})),hotkeys:' V'});if(!r)return;if(r.key===' '){this.musicQueue.push(jukebox[r.index]);continue;}const tunes=r.key==='V'?this.musicQueue.splice(0):[jukebox[r.index]];for(const t of tunes){if(!t)continue;try{const bytes=await getFile(t.pack,t.file);await this.io.drain();await this.io.client.kplay(t.file,bytes);}catch(e){await this.errorScreen(String(e));}}}}
+  async warez(){for(;;){this.send(this.header(a(),'WAREZ / FICTION',`${this.creditsLeft} credits`).at(5,5).k(12,'1 0-DAY   2 UTILS   3 GAMEZ   4 CRACKTROS   5 COURIER.LOG').at(8,5).k(8,'Art +1 / rating +1 / oneliner +2 / doors +5 / THE CORNER +8').at(10,5).k(7,'All releases original fiction. No commercial software.').at(22,5).k(8,'ESC return'));const k=await this.key();this.io.clearOutput();if(k.key==='Escape')return;const n=(k.ch??0)-49;if(n===4){const calls=this.guest?1:this.caller?.calls??1;for(let i=0;i<Math.min(calls,8);i++){const x=this.header(a(),`COURIER.LOG / ${i+1} of 8`);x.at(6,5).k(7,COURIER_LOGS[i].slice(0,70)).at(7,5).k(7,COURIER_LOGS[i].slice(70));this.send(x);await this.anyKey(20);}continue;}const area=['0-DAY','UTILS','GAMEZ','CRACKTROS'][n];if(!area)continue;for(;;){const releases=RELEASES.filter(r=>r.area===area);this.send(this.header(a(),`WAREZ / ${area}`).at(23,3).k(8,'ENTER NFO / D download / ESC directories'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:releases.map(r=>({text:`${pad(r.id,10)}${pad(r.title,28)}${pad(r.group,18)}${r.cost} credits`,color:12})),hotkeys:'D'});if(!r)break;const rel=releases[r.index];if(r.key!=='D'){this.send(nfoBytes(rel.id));await this.anyKey(24);continue;}if(this.guest){if(this.creditsLeft<rel.cost){this.send(a().at(23,3).eol().k(12,'Static: no ratio, no disk. View some art.'));await this.key();continue;}this.creditsLeft-=rel.cost;}else{const buy=await net('warezBuy',{id:rel.id});if(!buy?.ok){this.send(a().at(23,3).eol().k(12,buy?.why??'Ledger offline. Transfer refused.'));await this.key();continue;}this.creditsLeft=buy.balance;}this.send(a().cls());box(a(),7,12,56,11,11);this.send(a().at(8,14).k(11,'TELEWIRE / ZMODEM RECEIVE').at(11,14).k(15,`${rel.id}.ZIP`).at(13,14).k(11,'████████████████████████████████████').at(16,14).k(8,'ENTER completes / ESC aborts'));await this.io.drain();const key=await this.io.key();if(key.key==='Escape')continue;const bytes=nfoBytes(rel.id);if(rel.runnable)await this.io.client.saveDownload({name:rel.id+'.EXE',bytes,pack:'fiction',year:1993,file:'PROGRAM',artists:[rel.group],groups:[rel.group]});await this.io.client.saveDownload({name:rel.id+'.NFO',bytes,pack:'fiction',year:1993,file:'NFO',artists:[rel.group],groups:[rel.group]});await this.io.client.saveDownload({name:rel.id+'.DIZ',bytes:dizBytes(rel.id),pack:'fiction',year:1993,file:'DIZ',artists:[rel.group],groups:[rel.group]});this.send(a().at(18,3).k(10,`Unpacked C:\\WAREZ\\${rel.id} / ${rel.runnable?'RUN '+rel.id:'NFO collector release'}`));await this.anyKey(20);}}}
 
   // ── VOID//NODE ─────────────────────────────────────────────────
   async voidGate() {
@@ -1180,9 +1176,8 @@ export class Board {
       if (this.io.entry.mode === "void") await this.voidGate();
       await this.login();
       await this.logon();
-      await this.lastCallers();
-      await this.news();
-      await this.oneliners();
+      await this.newScan();
+      if(this.io.entry.id === "crawl"){await this.lastCallers();await this.news();await this.oneliners();}
       await this.mainMenu();
       await this.goodbye();
     } catch (e) {

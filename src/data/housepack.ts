@@ -31,7 +31,7 @@ function diz() {
   const x = a();
   x.k(9, "  ▄▄▄ ▄▄▄  ▄▄▄ ▄   ▄ ▄").nl().k(11, " █    █▄▄▀ █▄▄█ █ ▄ █ █").nl().k(3, " ▀▀▀▀ ▀  ▀ ▀  ▀ ▀▀ ▀▀ ▀▀▀").k(8, " -01").nl();
   x.k(8, "─────────────────────────────────────────────").nl();
-  x.k(7, " The Crawlspace BBS house pack, volume one.").nl();
+  x.k(7, " DEAD CARRIER house pack, volume one.").nl();
   x.k(13, " Eight pieces by the sysop at 3am: logo, stairs,").nl().k(15, " scroller, 2 ansimations, ascii, iCE and XBin.").nl();
   x.k(11, " Call ").k(15, "555-0142").k(11, " · 9600 baud · 24hrs").nl();
   x.k(8, " p.s. call 555-01?3 ... the middle digit is").nl().k(8, "      how many stairs creak").nl().reset();
@@ -42,13 +42,13 @@ function logo() {
   const x = a().cls();
   x.at(2, 4); shadeBar(x, 72, 1);
   x.at(4, 30).k(8, "t h e");
-  bigText(x, 6, 10, "CRAWLSPACE", [11, 3, 1], 8);
+  bigText(x, 6, 10, "DEAD CARRIER", [11, 3, 1], 8);
   bigText(x, 10, 30, "BBS", [13, 5, 5], 8);
   x.at(15, 4); shadeBar(x, 72, 5);
   x.at(17, 1).k(7, center("Running on a 486 under the stairs since 1991", 80));
   x.at(19, 1).k(3, center("sysop: Static  ·  node 1-2  ·  9600-28800", 80));
   x.at(22, 60).k(8, "logo by static/crwl").at(25, 1).reset();
-  return join(x.build(), sauce("Crawlspace logo", "Static", "Crawlspace"));
+  return join(x.build(), sauce("DEAD CARRIER logo", "Static", "DEAD CARRIER"));
 }
 
 function stairs() {
@@ -71,12 +71,12 @@ function stairs() {
   x.at(19, 6).k(7, "┌──────┐").at(20, 6).k(7, "│").k(10, "▒▒▒▒▒▒").k(7, "│").at(21, 6).k(7, "└──┬┬──┘").at(22, 5).k(8, "▄▄▄▀▀▄▄▄▄");
   x.at(20, 8).k(10, "C:\\>").at(23, 4).k(12, "•").k(8, " hdd");
   x.at(3, 50).k(15, "UNDER THE STAIRS").at(4, 50).k(8, "a still life, 1994").at(25, 1).reset();
-  return join(x.build(), sauce("Under the Stairs", "Static", "Crawlspace"));
+  return join(x.build(), sauce("Under the Stairs", "Static", "DEAD CARRIER"));
 }
 
 function scroller() {
   const x = a().cls();
-  const words = ["THE", "CRAWLSPACE", "KEEPS", "THE", "SCENE", "ALIVE", "CALL", "AFTER", "MIDNIGHT", "LEAVE", "A", "ONELINER"];
+  const words = ["THE", "DEAD CARRIER", "KEEPS", "THE", "SCENE", "ALIVE", "CALL", "AFTER", "MIDNIGHT", "LEAVE", "A", "ONELINER"];
   const r = rng(42);
   const grad = [1, 9, 11, 15, 11, 9, 1, 5, 13, 15, 13, 5];
   for (let line = 0; line < 140; line++) {
@@ -94,7 +94,7 @@ function scroller() {
     x.nl();
   }
   x.k(13, center("· end of scroller · crwl 1994 ·", 79)).nl().reset();
-  return join(x.build(), sauce("Tunnel Scroller", "Static", "Crawlspace", { lines: 141 }));
+  return join(x.build(), sauce("Tunnel Scroller", "Static", "DEAD CARRIER", { lines: 141 }));
 }
 
 function spinner() {
@@ -111,7 +111,7 @@ function spinner() {
     x.at(20, 34).k(7, `frame ${String(f).padStart(3, "0")}/160`);
   }
   x.at(12, 40).k(10, "√").at(22, 30).k(15, "CONNECTED · WELCOME HOME").at(25, 1).reset();
-  return join(x.build(), sauce("Spinner (ansimation)", "Static", "Crawlspace"));
+  return join(x.build(), sauce("Spinner (ansimation)", "Static", "DEAD CARRIER"));
 }
 
 function rain() {
@@ -132,7 +132,7 @@ function rain() {
     if (f % 40 === 30) x.at(10, 21).k(14, "░▒▓ headlights ▓▒░".padEnd(38)); else if (f % 40 === 34) x.at(10, 21).t(" ".repeat(38));
   }
   x.at(25, 1).reset();
-  return join(x.build(), sauce("Window rain (ansimation)", "Static", "Crawlspace"));
+  return join(x.build(), sauce("Window rain (ansimation)", "Static", "DEAD CARRIER"));
 }
 
 /** XBin piece with its own palette (amber phosphor ramp) and font tweak, RLE-compressed. */
@@ -167,7 +167,7 @@ function xbinPiece() {
   }
   const head = [..."XBIN"].map((c) => c.charCodeAt(0)).concat([0x1a, W, 0, H, 0, 16, 1 | 2 | 4 | 8]);
   const body = new Uint8Array([...head, ...pal, ...font, ...out]);
-  return join(body, sauce("Amber (XBin)", "Static", "Crawlspace", { dt: 6, ft: 0, cols: W, lines: H }));
+  return join(body, sauce("Amber (XBin)", "Static", "DEAD CARRIER", { dt: 6, ft: 0, cols: W, lines: H }));
 }
 
 function ascii() {
@@ -178,7 +178,7 @@ function ascii() {
     "       | |   ATDT 555-0142                   | |",
     "       | |   CONNECT 9600                    | |",
     "       | |                                   | |",
-    "       | |   welcome to the crawlspace.      | |",
+    "       | |   welcome to dead carrier.      | |",
     "       | |___________________________________| |",
     "       |_______________________________________|",
     "            \\_______________________________/",
@@ -190,7 +190,7 @@ function ascii() {
   ].join("\r\n");
   const out = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
-  return join(out, sauce("Terminal (ascii)", "Static", "Crawlspace", { ft: 0 }));
+  return join(out, sauce("Terminal (ascii)", "Static", "DEAD CARRIER", { ft: 0 }));
 }
 
 function ice() {
@@ -204,7 +204,7 @@ function ice() {
     }
   }
   x.at(11, 30).c(15, 1).t("  ICE COLD  CRWL  ").at(12, 30).c(1, 15).t(" bright backgrounds ").at(25, 1).reset();
-  return join(x.build(), sauce("Ice Cold", "Static", "Crawlspace", { ice: true }));
+  return join(x.build(), sauce("Ice Cold", "Static", "DEAD CARRIER", { ice: true }));
 }
 
 const FILES: Record<string, { make: () => Uint8Array; artists: string[] }> = {
@@ -230,7 +230,7 @@ export function houseFile(name: string): Uint8Array | null {
 
 export function housePack(): PackInfo {
   return {
-    name: HOUSE_PACK, year: 1994, groups: ["crawlspace"], fileId: "FILE_ID.DIZ", house: true,
+    name: HOUSE_PACK, year: 1994, groups: ["Dead Carrier house crew"], fileId: "FILE_ID.DIZ", house: true,
     files: Object.keys(FILES).map((n) => ({
       name: n, artists: FILES[n].artists, size: n.endsWith(".EXE") ? 23114 : houseFile(n)!.length, viewable: !n.endsWith(".EXE"),
     })),

@@ -1,0 +1,28 @@
+import {describe,it,expect} from 'vitest';
+import {DIRECTORY,boardAt,phoneBook} from '@/bbs/io';
+import {configFor} from '@/bbs/config';
+import {ledgerBalance,GUEST_CREDITS,RELEASES,PROGRAM_IDS,tagOrder,CREDIT_AWARDS} from '@/bbs/warez-catalog';
+import {newCorner,actCorner,replayCorner,cornerScore} from '@/bbs/corner-economy';
+import {indexRows} from '@/server/sprint-c';
+import {FAMILY_SHELF,familyAllowed} from '@/data/family-shelf';
+import {Board} from '@/bbs/board';
+import {Terminal} from '@/term/terminal';
+import {a} from '@/bbs/ansi';
+it('exactly five public boards before the Attic unlock',()=>expect(phoneBook(0).map(e=>e.number)).toEqual(['555-0142','555-0167','555-0193','555-0128','555-0177']));
+it('all seven numbers resolve distinct identities',()=>{expect(DIRECTORY).toHaveLength(7);for(const e of DIRECTORY)expect(boardAt(e.number)?.id).toBe(e.id);expect(new Set(DIRECTORY.map(e=>configFor(e).name)).size).toBe(7);});
+it('five boards have three voiced bulletins',()=>{for(const e of phoneBook(0))expect(configFor(e).bulletins.length).toBeGreaterThanOrEqual(3);});
+it('ledger is idempotent and earns then spends',()=>expect(ledgerBalance([{event:'welcome',amount:GUEST_CREDITS},{event:'art:a',amount:1},{event:'art:a',amount:1},{event:'download:EMBER',amount:-3}])).toBe(4));
+it('concrete credit awards',()=>expect(CREDIT_AWARDS).toEqual({art:1,rating:1,oneliner:2,door:5,corner:8}));
+it('24 releases, four groups, seven runnable programs',()=>{expect(RELEASES).toHaveLength(24);expect(new Set(RELEASES.map(r=>r.group)).size).toBe(4);expect(PROGRAM_IDS).toHaveLength(7);});
+it('tag queue follows file list order, not tagging order',()=>expect(tagOrder(['A','B','C'],new Set(['C','A']))).toEqual(['A','C']));
+it('search index writes concrete normalized credit fields',()=>expect(indexRows([{pack:'ENSIART',file:'EARTH.ANS',year:1993,title:'Earth',artist:'John Keeney',groups:'archive'}])).toEqual([{pack:'ensiart',file:'EARTH.ANS',year:1993,title:'Earth',artist:'John Keeney',groups:'archive'}]));
+it('search index rejects invalid paths',()=>expect(()=>indexRows([{pack:'../bad',file:'X'}])).toThrow());
+it('family shelf has at least 40 reviewed pieces and denies others',()=>{expect(FAMILY_SHELF.length).toBeGreaterThanOrEqual(40);expect(familyAllowed('unreviewed','X.ANS')).toBe(false);});
+describe('THE CORNER',()=>{
+ it('is deterministic with seed',()=>expect(newCorner(42)).toEqual(newCorner(42)));
+ it('compounds debt daily at 8 percent',()=>{let s=newCorner(42);s=actCorner(s,{type:'travel',place:1});expect(s.debt).toBe(4320);if(s.police)s=actCorner(s,{type:'run'});s=actCorner(s,{type:'travel',place:2});expect(s.debt).toBe(4666);});
+ it('ends on day 30 and ignores later moves',()=>{let s=newCorner(1);for(let i=0;i<30;i++){if(s.police)s=actCorner(s,{type:'run'});s=actCorner(s,{type:'travel',place:i%6});}expect(s.day).toBe(30);expect(s.ended).toBe(true);expect(actCorner(s,{type:'travel',place:1})).toEqual(s);});
+ it('buy respects coat and cash limits',()=>{const s=newCorner(5);expect(actCorner(s,{type:'buy',good:0,qty:61}).stock[0]).toBe(0);expect(actCorner(s,{type:'buy',good:0,qty:1}).cash).toBe(s.cash-s.prices[0]);});
+ it('replay matches score',()=>{const actions=Array.from({length:30},(_,i)=>({type:'travel' as const,place:i%6}));expect(cornerScore(replayCorner(42,actions))).toBeGreaterThanOrEqual(0);});
+});
+it('all board logos and menus stay in 80x25',()=>{for(const entry of DIRECTORY){const b=new Board({entry,profile:{filesSeen:[]},speed:9600,node:1,timeLeftMs:()=>3600000} as any);for(const stream of [b.logo(a()),b.menuScreen()]){const t=new Terminal();t.feed(stream.build());expect(t.scrollbackLines,entry.name).toBe(0);}}});

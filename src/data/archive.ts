@@ -1,5 +1,6 @@
 // Archive access: everything goes through this project's caching proxy, never to 16colo.rs directly.
 import { parseSauce } from "@/term/sauce";
+import { indexPack } from "./browsing";
 import { audio } from "@/audio/bus";
 import { houseFile, housePack, HOUSE_PACK } from "./housepack";
 import { isViewable, type GroupSummary, type PackInfo, type PackSummary, type Page } from "./types";
@@ -35,7 +36,7 @@ export async function getYears(min = MIN_YEAR, max = MAX_YEAR): Promise<{ year: 
 export async function getYearPacks(year: number, page: number, pagesize = 60): Promise<Page<PackSummary>> {
   const d = await api(`/v1/year/${year}?pagesize=${pagesize}&page=${page}`);
   return {
-    items: (d.results ?? []).map((r: any) => ({ name: r.name, year: r.year, groups: r.groups ?? [] })),
+    items: (d.results ?? []).map((r: any) => ({ name: r.name, year: r.year, groups: r.groups ?? [], released: r.date ?? r.released ?? "" })),
     page: d.page?.page ?? page, pages: d.page?.pages ?? 1, total: d.page?.total ?? 0,
   };
 }
@@ -71,7 +72,7 @@ export async function getPack(name: string, groups: string[] = []): Promise<Pack
   const fileId = r.fileid ?? (fl.find((f) => /^file_id\.diz$/i.test(f.name))?.name ?? null);
   let gs: string[] = (r.groups ?? []).length ? r.groups : groups;
   if (!gs.length) gs = sauceGroup(r.files);
-  return { name, year: r.year, groups: gs, files: fl, fileId };
+  const pack = { name, year: r.year, groups: gs, files: fl, fileId }; indexPack(pack); return pack;
 }
 
 export async function getFile(pack: string, file: string): Promise<Uint8Array> {
@@ -110,3 +111,5 @@ export const fileCached = (pack:string,file:string) => pack.toLowerCase()===HOUS
 export const packCached = (pack:string) => pack.toLowerCase()===HOUSE_PACK || json.has(`/v1/pack/${pack}?sauce=true&filesize=true`);
 export const fileTitle = (pack:string,file:string) => knownTitles.get(`${pack}/${file}`) ?? "";
 export function prefetchFile(pack:string,file:string) { void getFile(pack,file).catch(()=>{}); }
+
+export async function directLookup(kind:"artist"|"group",query:string){return api(`/v1/${kind}/${encodeURIComponent(query).replace(/%20/g,"+")}`);}

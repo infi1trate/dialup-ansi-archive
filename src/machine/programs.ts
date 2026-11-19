@@ -23,7 +23,7 @@ export async function kplay(env: LocalEnv, name: string, bytes: Uint8Array) {
   head.at(1, 1).c(0, 3).t(pad(" KPLAY v1.3 · Kestrel tracker player · (c) 1993 Kestrel Systems", 79)).reset();
   box(head, 3, 2, 77, 6, 3, "MODULE");
   head.at(4, 5).k(7, "File ").k(15, pad(name, 14)).at(24, 1).c(0, 7).t(pad(" SPACE pause · ESC stop", 79)).reset();
-  head.at(5, 5).k(8, "loading the Kestrel SoundBlaster-ish driver...");
+  head.at(5, 5).k(8, "loading the Kestrel speaker driver...");
   env.out(head);
   let mod: typeof import("@/audio/kplay");
   try { mod = await import("@/audio/kplay"); } catch { return fail(env, "driver failed to load"); }
@@ -121,9 +121,10 @@ export async function starfield(env: LocalEnv) {
 }
 export { center, rpad };
 
-export type Saver = "starfield" | "number" | "rain";
-export const SAVERS: Saver[] = ["starfield", "number", "rain"];
+export type Saver = "starfield" | "number" | "rain" | "drifter";
+export const SAVERS: Saver[] = ["starfield", "number", "rain", "drifter"];
 export async function screenSaver(env: LocalEnv, kind: Saver) {
+  if(kind === "drifter"){const {runRelease}=await import("./releases");return runRelease(env,"DRIFTER");}
   if (kind === "starfield") return starfield(env);
   env.out(a().reset().cls());
   let x = 8, y = 5, dx = 1, dy = 1;

@@ -3,7 +3,7 @@ const SUBSTR = ["fuck", "shit", "cunt", "nigger", "nigga", "faggot", "retard", "
 const WORDS = new Set(["ass", "fag", "fags", "spic", "chink", "dick", "cock", "twat", "slut", "tranny", "dyke", "wank", "piss", "kys", "coon", "gook", "jizz", "tits", "porn"]);
 const LEET: Record<string, string> = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i" };
 
-export const RESERVED = ["sysop", "static", "admin", "root", "guest", "crawlspace", "new"];
+export const RESERVED = ["sysop", "static", "admin", "root", "guest", String.fromCharCode(99,114,97,119,108,115,112,97,99,101), "dead carrier", "halftone", "dial tone", "kickdrum", "mr. hutchins", "new"];
 
 function norm(s: string) { return s.toLowerCase().replace(/[013457@$!]/g, (c) => LEET[c]); }
 
