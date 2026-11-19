@@ -20,8 +20,10 @@ export const Route = createFileRoute("/dial/$number/$year/$pack/$file")({
       { name: "twitter:title", content: line },
       { name: "twitter:description", content: desc },
     ];
-    if (loaderData?.card) meta.push({ property: "og:image", content: loaderData.card }, { name: "twitter:image", content: loaderData.card });
-    return { meta };
+    const url = `https://dialup-ansi-archive.lovable.app/dial/${params.number}/${params.year}/${encodeURIComponent(params.pack)}/${encodeURIComponent(params.file)}`;
+    meta.push({ property: "og:url", content: url });
+    if (loaderData?.card) meta.push({ property: "og:image", content: loaderData.card }, { property: "og:image:width", content: "1200" }, { property: "og:image:height", content: "630" }, { name: "twitter:image", content: loaderData.card });
+    return { meta, links: [{ rel: "canonical", href: url }] };
   },
   component: DeepLinkPage,
 });

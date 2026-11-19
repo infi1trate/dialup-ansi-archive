@@ -1,5 +1,6 @@
 # Dial-Up status (Sprint B photographic room)
 ## Sprint E
+- Part 3 item 4 complete: both share links fetched without JavaScript as seven link unfurlers; all return og:title/description, absolute 1200x630 og:image (200, image type, under 300 KB), summary_large_image and a self canonical. Table below.
 - Part 2 item 3: private monthly TRI-COUNTY BELLWIRE statements, retained month list, paged modem text and 1080x1350 tractor-feed PNG export with PC-sourced, key-skippable printer tones. Scripted E2Bill1119 calls on DEAD CARRIER, FULL BLOCK and MAPLE RIDGE across October yielded 6 minutes and 40 fictional cents; November logon returned bill waiting; actual PNG download verified. e17/e19 landscape leaned-in 1600x900 and e18 full-size paper JPEG privately uploaded; 164 tests pass. Rates chosen for fiction: local 0, DEAD CARRIER 8, FULL BLOCK 12, LINE NOISE 16, STROBE 20, Attic 24 cents per rounded-up minute; VOID unitemized. No real payments. Native phone share sheet and printer sound by ear remain unverified. Owner to-do: E2Bill1119 and E2Clock1119 retained; no data deleted.
 - Part 2 item 2: server-locked UTC time account, 120-minute reserve, 15-minute withdrawals, first-device-call exemption and fresh GUEST 30-minute sessions. Real E2Clock1119 crossed UTC midnight, excluded monitor-off minute, withdrew 900 seconds and exhausted today’s allowance. e14-e16 1600x900 leaned-in evidence; 160 tests. Owner to-do: E2Clock1119 retained.
 - Part 2 item 1: daily shared scene metadata cache, cold gathering response, deterministic eight-template dated news and common 0-DAY month list; exact proxy group/pack names. 84 November packs on warm read; Enter opened bmb-1196. 155 tests; e12/e13 1600x900 leaned-in private pictures. Missing upstream day dates are inferred only to month from pack suffix, never fabricated as precise release days.
@@ -9,6 +10,29 @@
 - Item 1 complete: server-earned access, level caps, records, promotion, wall with report/hide path and gated rated/weekly INNER CIRCLE. 142 tests pass; e01-e05 private seven-day links verified. Browser: E1Relay1119 made three calls across injected UTC dates, opened 15 real pieces through the proxy, became VALIDATED with 14400 cap; then earned ELITE through six UTC dates, 60 views, three ratings and a finished server-replayed CORNER run. Promotion notice and records rendered through modem. No production clock override.
 - Evidence is captured and committed after each item, not at the end.
 - Owner to-do: test handles E1Mail1119, E1Relay1119 (ELITE), E1Wall1119 (unused NEW USER), E1WallTwo1119 (VALIDATED); retained, no data deleted.
+
+### Share cards against link unfurlers (Sprint E part 3, item 4)
+
+Fetched without JavaScript from the dev server; image URLs are absolute to the request origin (the published host in production). Site-wide noindex left unchanged.
+
+| Link | User agent | og:title | og:description | og:image | Image response | Size | twitter:card | canonical |
+|---|---|---|---|---|---|---|---|---|
+| art deep link | facebookexternalhit | yes | yes | absolute, 1200x630 | 200 image/png | 26 KB | summary_large_image | yes |
+| art deep link | Twitterbot | yes | yes | absolute, 1200x630 | 200 image/png | 26 KB | summary_large_image | yes |
+| art deep link | Slackbot-LinkExpanding | yes | yes | absolute, 1200x630 | 200 image/png | 26 KB | summary_large_image | yes |
+| art deep link | Discordbot | yes | yes | absolute, 1200x630 | 200 image/png | 26 KB | summary_large_image | yes |
+| art deep link | LinkedInBot | yes | yes | absolute, 1200x630 | 200 image/png | 26 KB | summary_large_image | yes |
+| art deep link | WhatsApp | yes | yes | absolute, 1200x630 | 200 image/png | 26 KB | summary_large_image | yes |
+| art deep link | iMessage (Facebot Twitterbot) | yes | yes | absolute, 1200x630 | 200 image/png | 26 KB | summary_large_image | yes |
+| postcard /p/<id> | facebookexternalhit | yes | yes | absolute, 1200x630 | 200 image/jpeg | 65 KB | summary_large_image | yes |
+| postcard /p/<id> | Twitterbot | yes | yes | absolute, 1200x630 | 200 image/jpeg | 65 KB | summary_large_image | yes |
+| postcard /p/<id> | Slackbot-LinkExpanding | yes | yes | absolute, 1200x630 | 200 image/jpeg | 65 KB | summary_large_image | yes |
+| postcard /p/<id> | Discordbot | yes | yes | absolute, 1200x630 | 200 image/jpeg | 65 KB | summary_large_image | yes |
+| postcard /p/<id> | LinkedInBot | yes | yes | absolute, 1200x630 | 200 image/jpeg | 65 KB | summary_large_image | yes |
+| postcard /p/<id> | WhatsApp | yes | yes | absolute, 1200x630 | 200 image/jpeg | 65 KB | summary_large_image | yes |
+| postcard /p/<id> | iMessage (Facebot Twitterbot) | yes | yes | absolute, 1200x630 | 200 image/jpeg | 65 KB | summary_large_image | yes |
+
+Fix made: the art deep link had no canonical or og:url; both now point at the page itself, and og:image width/height are declared.
 
 ## 1. Verified working (test browser = Playwright Chromium, software GL)
 **Sprint C part 4, item 1:** STROBE six-row white 59-column block logo checked in live GUEST call and thumbnail; d06b private JPEG verified, 126 tests pass. Item 2: GUEST and C4ShelfRelay real EARTH.ANS add/list/Enter-open/remove checked; two-second row-25 overlay clears without changing art; shelf metadata hydrated; 128 tests pass; d13 verified. Item 3: original leading ANSI character/SGR bytes retained, placement cropped to eight rows/left 80; one scan mode, scrolling captions, Space pause/resume and Esc pack return checked; d14 verified, 130 tests pass. Item 4: all 24 NFOs have four distinct group styles, release-specific notes, 1992-94 dates, four run lines, six fictional boards, greets and dry fiction line; 78-column full documents paged at 23 rows. d15-d18 inspected/uploaded; 133 tests pass. Item 5: EMBER fire and CHROMA plasma show six-row group logo, twelve-row effect and 300+ character scroller. Original sixteen-bar bass/lead synth runs through speaker music bus; actual oscillator notes checked in browser; key returns to DOS and stops source scheduling. Reduced motion uses 4 fps/word steps. d19-d21 inspected/uploaded; all 136 tests pass; blue directory visibly lights keyboard/bezel.

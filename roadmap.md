@@ -2,7 +2,7 @@
 - [x] 1. Dot-matrix bill print with ruled calls and tear-off stub; e18b
 - [x] 2. Postcards: composer, server, /p/<id> playback, share card; e20-e27
 - [x] 3. Ten-second tape recorder and armed dial; e28 + tape
-- [ ] 4. Share cards checked against real crawler user agents
+- [x] 4. Share cards checked against real crawler user agents
 - [ ] 5. Counters: second-call rate, postcards, tapes, bills, promotions
 
 # Sprint E part 2
