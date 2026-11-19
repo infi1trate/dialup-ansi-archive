@@ -1,5 +1,6 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import {dailyScores} from "./daily";
 import {inspectMail,queueMail,mailAction,dailyTopMail} from "./mail";
 import {newScan} from "./new-scan";
 import { requestClock } from "./clock";
@@ -291,11 +292,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       await s.rpc("board_credit",{_caller:c.id,_event:"door:"+today(),_amount:CREDIT_AWARDS.door});
       return { ok: true };
     }
-    case "doorTop": {
-      await limit([ip], "read", 120, 600);
-      const { data } = await s.from("door_scores").select("handle, score, floor, created_at").order("score", { ascending: false }).limit(10);
-      return { top: data ?? [] };
-    }
+    case "doorTop": { return dailyScores(s,"crawl"); }
     case "sysop": return sysop(b, ip);
   }
   throw new NetError(400, "unknown action");

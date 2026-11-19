@@ -1,5 +1,6 @@
 import {newCorner,replayCorner,cornerScore,type CornerAction} from '@/bbs/corner-economy';
 import {releaseById,CREDIT_AWARDS} from '@/bbs/warez-catalog';
+import {dailyScores} from "./daily";
 import {queueMail,dailyTopMail,inspectMail} from './mail';
 import {NetError} from './net';
 export function indexRows(rows:unknown){if(!Array.isArray(rows)||rows.length>300)throw new NetError(400,'bad index');return rows.map(r=>{if(!r||typeof r!=='object')throw new NetError(400,'bad row');const v=r as Record<string,unknown>;const pack=String(v.pack??'').toLowerCase(),file=String(v.file??'');if(!/^[a-z0-9._-]{1,80}$/.test(pack)||!file||file.length>120||/[\x00-\x1f]/.test(file))throw new NetError(400,'bad file');const clean=(x:unknown)=>String(x??'').replace(/[\x00-\x1f]/g,'').slice(0,160);return {pack,file,year:Math.max(1990,Math.min(2100,Number(v.year)||1993)),title:clean(v.title),artist:clean(v.artist),groups:clean(v.groups)};});}
@@ -9,7 +10,7 @@ export async function sprintC(b:Record<string,any>,s:any,c:any,th:string):Promis
  if(action==='index'){const rows=indexRows(b.rows);if(rows.length){const {error}=await s.from('archive_index').upsert(rows);if(error)throw new NetError(503,'index offline');}return {ok:true};}
  if(action==='search'){const q=String(b.query??'').replace(/[^a-z0-9 ._-]/gi,'').trim().slice(0,60);if(!q)return {rows:[]};const {data,error}=await s.from('archive_index').select('pack,file,year,title,artist,groups').or(`title.ilike.%${q}%,artist.ilike.%${q}%,groups.ilike.%${q}%,file.ilike.%${q}%`).order('year',{ascending:false}).limit(80);if(error)throw new NetError(503,'index offline');return {rows:data??[]};}
  if(action==='newScan'){const since=c?.last_call_at??new Date(0).toISOString();const {count:lines}=await s.from('oneliners').select('id',{count:'exact',head:true}).eq('hidden',false).gt('created_at',since);const {count:scores}=await s.from('corner_runs').select('score',{count:'exact',head:true}).not('score','is',null).gt('day',since.slice(0,10));return {lines:lines??0,scores:scores??0,since};}
- if(action==='cornerTop'){const {data}=await s.from('corner_runs').select('handle,score,day').not('score','is',null).order('score',{ascending:false}).limit(10);return {top:data??[]};}
+ if(action==='cornerTop')return dailyScores(s,'corner');
  if(!c||c.banned)return {ok:false,why:'Apply for a handle first.'};
  if(action==='balance'){await credit('welcome',6);return {ok:true,balance:await credit('balance:'+day,0)};}
  if(action==='warezBuy'){const r=releaseById(String(b.id??''));if(!r)throw new NetError(400,'no release');await credit('welcome',6);const balance=await credit('download:'+r.id+':'+crypto.randomUUID(),-r.cost);if(balance===0)await queueMail(s,c,'ratio',String(b.board??'crawl'));return {ok:balance>=0,balance,why:balance<0?'Leech warning. Earn credits before requesting another disk.':''};}

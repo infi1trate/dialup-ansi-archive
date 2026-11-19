@@ -2,7 +2,7 @@ import {it,expect} from 'vitest';
 import {packInArea,newScan} from '@/server/new-scan';
 import {FAMILY_SHELF} from '@/data/family-shelf';
 it('scan uses the previous call snapshot, not the current logon time',async()=>{
- const times:string[]=[];const query=(table:string):any=>{const q:any={select:()=>q,eq:()=>q,gt:(_c:string,v:string)=>{times.push(v);return q;},gte:()=>q,not:()=>q,is:()=>q,maybeSingle:async()=>({data:{previous_call_at:'2026-11-17T12:00:00Z'}}),then:(resolve:any)=>resolve({data:[],count:2})};return q;};
+ const times:string[]=[];const query=(table:string):any=>{const q:any={select:()=>q,eq:()=>q,gt:(_c:string,v:string)=>{times.push(v);return q;},gte:()=>q,not:()=>q,is:()=>q,order:()=>q,limit:()=>q,maybeSingle:async()=>({data:{previous_call_at:'2026-11-17T12:00:00Z'}}),then:(resolve:any)=>resolve({data:[],count:2})};return q;};
  const r=await newScan({from:query},{id:'caller'},'crawl');expect(r.lines).toBe(2);expect(r.wall).toBe(2);expect(r.scores).toBe(4);expect(times).toEqual(Array(4).fill('2026-11-17T12:00:00Z'));
 });
 it('first-time GUEST scan never touches durable data',async()=>expect((await newScan({from(){throw Error('Guest persisted');}},null,'crawl')).first).toBe(true));

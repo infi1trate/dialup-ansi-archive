@@ -1,4 +1,5 @@
 // BASEMENT CRAWL: an original door game. Pure bytes out, keys in, like everything on the board.
+import {scoreScreen} from "./score-screen";
 import { a, box, center, pad, rpad, type Ansi } from "./ansi";
 import type { HostIO, KeyHint } from "./io";
 import { net } from "@/data/net";
@@ -60,7 +61,7 @@ export async function doorMenu(c: DoorCtx) {
     x.at(8, 16).hot("1", "  BASEMENT CRAWL", 15, 6, 11).k(8, "  a dungeon under the stairs");
     x.at(10, 16).hot("H", "  high scores", 15, 6, 11);
     x.at(12, 16).hot("Q", "  back to the main menu", 15, 6, 11);
-    x.at(16, 14).k(7, "10 floor attempts per caller per day, door rules.");
+    x.at(16, 14).k(7, "10 floor attempts/day; resets at 00:00 UTC.");
     x.at(17, 14).k(8, "Guests can play; only handles go on the score board.");
     x.at(22, 4).k(3, "Door: ").k(11, "1").k(3, ", ").k(11, "H").k(3, " or ").k(11, "Q").k(3, ": ");
     c.send(x);
@@ -76,16 +77,7 @@ export async function doorMenu(c: DoorCtx) {
 
 async function highScores(c: DoorCtx) {
   const res = await net("doorTop");
-  const x = a().cls();
-  box(x, 2, 12, 56, 18, 6, "BASEMENT CRAWL · HALL OF DAMP");
-  x.at(4, 16).k(14, pad("#", 4) + pad("Handle", 20) + rpad("Floor", 6) + rpad("Score", 10));
-  x.at(5, 16).k(6, "─".repeat(40));
-  const top: any[] = res?.top ?? [];
-  if (!res) x.at(7, 16).k(12, "the message base is offline. scores are in a drawer.");
-  else if (!top.length) x.at(7, 16).k(7, "Nobody has made it down yet. Be the first.");
-  top.forEach((t, i) => x.at(6 + i, 16).k(i === 0 ? 15 : 11, pad(String(i + 1), 4) + pad(t.handle, 20)).k(3, rpad(String(t.floor), 6)).k(14, rpad(String(t.score), 10)));
-  x.at(22, 4).k(8, "press any key");
-  c.send(x);
+  c.send(scoreScreen("BASEMENT CRAWL / HALL OF DAMP",res));
   c.hint([{ label: "CONTINUE", key: "Enter" }]);
   await c.io.key();
 }
@@ -104,7 +96,7 @@ async function play(c: DoorCtx) {
   x.at(12, 10).k(7, "*").k(7, " dust bunny   ").k(15, "¶").k(7, " rogue dot-matrix printer   ").k(9, "Ö").k(7, " the sump pump");
   x.at(14, 10).k(7, "Arrows move. Walk into a monster to hit it. SPACE waits. Q gives up.");
   const turns = await net("doorTurn", { take: false });
-  x.at(17, 10).k(11, turns ? `You have ${turns.left} floor attempt${turns.left === 1 ? "" : "s"} left today.` : "the message base is offline: today's turns aren't counted.");
+  x.at(17, 10).k(11, turns ? `You have ${turns.left} floor attempt${turns.left === 1 ? "" : "s"} left; resets at 00:00 UTC.` : "the message base is offline: today's turns aren't counted.");
   if (c.guest) x.at(18, 10).k(8, "Playing as GUEST: your score won't be posted.");
   x.at(21, 10).k(15, "ENTER").k(7, " descend   ").k(15, "ESC").k(7, " back");
   c.send(x);

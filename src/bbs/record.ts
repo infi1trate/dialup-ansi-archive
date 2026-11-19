@@ -6,7 +6,7 @@ export async function yourRecord(b:Board){
   const r=(await net('record',{guest:b.guest}))?.record??{level:'NEW USER',days:0,pieces:0,oneliners:0,wallPosts:0,ratings:0,finishedRuns:0,calls:0,credits:b.creditsLeft,crawlBest:0,cornerBest:0};
   const level=accessLevel(r.level),cap=ACCESS[level];
   const x=b.header(a(),'Your record',level);
-  const lines=[`${b.user} / ${level} / earned, never bought`,`${cap.minutes} min per UTC day / ${cap.speed} bps cap`,`${r.calls} calls / ${r.days} UTC days / ${r.pieces} pieces viewed`,`${r.oneliners} oneliners / ${r.wallPosts} wall posts / ${r.ratings} pieces rated`,`Ratio credits ${r.credits} / BASEMENT best ${r.crawlBest}`,`THE CORNER best ${r.cornerBest} / scored finishes ${r.finishedRuns}`,`Next level: ${level==='NEW USER'?'VALIDATED':level==='VALIDATED'?'ELITE':'complete'}`,...nextChecklist(level,r),...(b.guest?['GUEST activity is not saved. Apply for a handle.']:[])];
+  const lines=[`${b.user} / ${level} / earned, never bought`,`${cap.minutes} min per UTC day / ${cap.speed} bps cap`,`${r.calls} calls / ${r.days} UTC days / ${r.pieces} pieces viewed`,`${r.oneliners} oneliners / ${r.wallPosts} wall posts / ${r.ratings} pieces rated`,`Ratio credits ${r.credits} / BASEMENT best ${r.crawlBest}`,`THE CORNER best ${r.cornerBest} / finishes ${r.finishedRuns} / streak ${r.streak??0} UTC days`,`Next level: ${level==='NEW USER'?'VALIDATED':level==='VALIDATED'?'ELITE':'complete'}`,...nextChecklist(level,r),...(b.guest?['GUEST activity is not saved. Apply for a handle.']:[])];
   lines.forEach((l,i)=>x.at(5+i,5).k(i===0?(b.ioEntryId()==='maple'?14:b.sk.a):15,pad(l,70),b.ioEntryId()==='maple'?1:0));
   b.send(x);await b.anyKey(22);
 }

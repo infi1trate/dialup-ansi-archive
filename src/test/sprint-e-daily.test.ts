@@ -1,0 +1,4 @@
+import {it,expect} from 'vitest';
+import {streak,scoreTables} from '@/server/daily';
+it('streak counts consecutive UTC scored days across either door without double counting',()=>{expect(streak(['2026-11-17','2026-11-18','2026-11-18','2026-11-19'],'2026-11-19')).toBe(3);expect(streak(['2026-11-17','2026-11-18'],'2026-11-19')).toBe(2);expect(streak(['2026-11-17'],'2026-11-19')).toBe(0);});
+it('daily and all-time tables take each handles best and separate UTC days',()=>{const r=scoreTables([{handle:'A',score:12,day:'2026-11-19'},{handle:'A',score:99,day:'2026-11-18'},{handle:'B',score:13,day:'2026-11-19'}],'2026-11-19');expect(r.daily.map(v=>v.score)).toEqual([13,12]);expect(r.allTime.map(v=>v.score)).toEqual([99,13]);});

@@ -1,3 +1,4 @@
+import {streak} from './daily';
 import { ACCESS, accessLevel, wallBody } from '@/lib/access';
 import { NetError, limit } from './net';
 
@@ -5,7 +6,8 @@ export async function record(s:any,c:any) {
   if(!c)return {level:'NEW USER',days:0,pieces:0,oneliners:0,wallPosts:0,ratings:0,finishedRuns:0,calls:0,credits:0,crawlBest:0,cornerBest:0};
   const {data,error}=await s.rpc('caller_record',{_caller:c.id});
   if(error)throw new NetError(503,'Caller record offline.');
-  return data;
+  const [{data:runs},{data:doors}]=await Promise.all([s.from("corner_runs").select("day").eq("caller_id",c.id).not("score","is",null),s.from("door_scores").select("created_at").eq("caller_id",c.id)]);
+  return {...data,streak:streak([...(runs??[]).map((r:any)=>r.day),...(doors??[]).map((r:any)=>r.created_at.slice(0,10))],new Date().toISOString().slice(0,10))};
 }
 export async function publicLevels(s:any,rows:any[]) {
   const ids=[...new Set(rows.map(r=>r.caller_id).filter(Boolean))];

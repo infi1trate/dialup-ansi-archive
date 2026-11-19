@@ -11,6 +11,7 @@ export async function callScan(b:Board){
   const total=r.lines+r.wall+r.scores+r.mail+r.packs.length;
   const voices:Record<string,string>={crawl:'Static counted what you missed. No excuses.',vault:'Halftone / new cells in the showroom',c93:'exchange delta / previous connection',maple:'Mr. Hutchins: here is the news since your visit.',strobe:'Kickdrum / fresh signals since your last set'};
   x.at(5,5).k(accent,pad(voices[b.ioEntryId()]??'New traffic on the line.',70),bg);
+  if(b.ioEntryId()==='crawl')(r.winners??[]).forEach((v:any,i:number)=>x.at(18+i,5).k(7,pad(`Yesterday ${i?'THE CORNER':'BASEMENT'}: ${v?`${v.handle} / ${v.score}`:'no scored finish'}`,70)));
   if(!total){x.at(8,5).k(15,r.first?'First call. Welcome in; the menu is ready.':'Nothing new since your last call.',bg);b.send(x);b.hint([{key:'Enter',label:'CONTINUE'}]);await b.ioTimeout(1500);b.clearPending();return;}
   const lines=[`O  Oneliners             ${r.lines}`,`W  THE WALL messages     ${r.wall}`,`D  Door scores           ${r.scores}`,`M  New mail              ${r.mail}`,`P  Packs new to you      ${r.packs.length}`];
   lines.forEach((l,i)=>x.at(7+i*2,5).k(i%2?accent:15,pad(l,70),bg));
