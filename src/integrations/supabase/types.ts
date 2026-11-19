@@ -214,6 +214,7 @@ export type Database = {
           actions: Json
           caller_id: string
           day: string
+          finished_at: string | null
           handle: string
           score: number | null
           seed: number
@@ -222,6 +223,7 @@ export type Database = {
           actions?: Json
           caller_id: string
           day?: string
+          finished_at?: string | null
           handle: string
           score?: number | null
           seed: number
@@ -230,6 +232,7 @@ export type Database = {
           actions?: Json
           caller_id?: string
           day?: string
+          finished_at?: string | null
           handle?: string
           score?: number | null
           seed?: number
@@ -485,6 +488,48 @@ export type Database = {
         }
         Relationships: []
       }
+      sysop_mail: {
+        Row: {
+          board: string
+          body: string
+          caller_id: string
+          created_at: string
+          delivered_at: string | null
+          delivered_call: number | null
+          id: number
+          occurred_call: number
+          read_at: string | null
+          rule_key: string
+          subject: string
+        }
+        Insert: {
+          board: string
+          body: string
+          caller_id: string
+          created_at?: string
+          delivered_at?: string | null
+          delivered_call?: number | null
+          id?: never
+          occurred_call: number
+          read_at?: string | null
+          rule_key: string
+          subject: string
+        }
+        Update: {
+          board?: string
+          body?: string
+          caller_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          delivered_call?: number | null
+          id?: never
+          occurred_call?: number
+          read_at?: string | null
+          rule_key?: string
+          subject?: string
+        }
+        Relationships: []
+      }
       views: {
         Row: {
           created_at: string
@@ -546,6 +591,10 @@ export type Database = {
       caller_record: { Args: { _caller: string }; Returns: Json }
       charge_call: {
         Args: { _caller: string; _close?: boolean; _session: string }
+        Returns: number
+      }
+      deliver_sysop_mail: {
+        Args: { _call: number; _caller: string }
         Returns: number
       }
       top_files: {

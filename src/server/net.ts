@@ -1,5 +1,6 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import {inspectMail,queueMail,mailAction,dailyTopMail} from "./mail";
 import {newScan} from "./new-scan";
 import { requestClock } from "./clock";
 import { accessAction, logonAccess, record, publicLevels } from "./access";
@@ -101,6 +102,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
   const ip = await ipHash(req);
   const now=requestClock(req);
   const action = str(b.action, 20);
+  if(action==="mail"||action==="mailRead"){const th=await tokenHash(b.token);await limit([th,ip],"mail",120,600);return mailAction(s,b.guest?null:await callerByToken(th),b);}
   if(action==="newScan"){const th=await tokenHash(b.token);await limit([th,ip],"newScan",120,600);return newScan(s,b.guest?null:await callerByToken(th),str(b.board,20));}
   if (["record","wall","wallPost","innerCircle","messageReport"].includes(action)) {
     const th=await tokenHash(b.token);await limit([th,ip],"accessRead",180,600);
@@ -159,6 +161,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const c = b.guest ? null : await callerByToken(th);
       if (c?.banned) return { banned: true };
       const requested = [2400, 9600, 14400, 28800].includes(b.speed) ? b.speed : 9600;
+      if(c){await inspectMail(s,c,str(b.board,20)||'crawl');if(c.last_call_at&&+now-+new Date(c.last_call_at)>=7*86400000)await queueMail(s,c,'return',str(b.board,20)||'crawl');if(b.board==='void')await queueMail(s,c,'void','void');}
       const access=await logonAccess(s,c,str(b.board,20),requested,now);const speed=access.speed;
       let prevDay: string | null = null;
       if (c) prevDay = c.last_call_at ? String(c.last_call_at).slice(0, 10) : null;
@@ -169,6 +172,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const calledBack = !!prevDay && prevDay < today();
       if(c)await s.from("call_log").insert({ caller_id: c?.id ?? null, token_hash: th, handle: c?.handle ?? null, city: c?.city ?? "", speed,created_at:now.toISOString() });
       if (c) await s.from("callers").update({ calls: c.calls + 1, last_call_at: now.toISOString() }).eq("id", c.id);
+      if(c){await s.rpc("deliver_sysop_mail",{_caller:c.id,_call:c.calls+1});await queueMail(s,{...c,calls:c.calls+1},"first",str(b.board,20)||"crawl");}
       await bump("logged_in");
       if (calledBack) await bump("called_back");
       return { caller: c ? {...pub({ ...c, calls: c.calls + 1 }),level:access.level,speed:access.speed} : null, calledBack,...access };
@@ -196,6 +200,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       await limit([th, ip], "post", 1, 600);
       await s.from("oneliners").insert({ caller_id: c.id, handle: c.handle, body: v.value, token_hash: th, ip_hash: ip });
       await s.rpc("board_credit",{_caller:c.id,_event:"oneliner:"+today(),_amount:CREDIT_AWARDS.oneliner});
+      await inspectMail(s,c,str(b.board,20)||"crawl");
       return { ok: true };
     }
     case "beat": {
@@ -238,7 +243,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const files = count ?? 0;
       await s.from("callers").update({ files_viewed: files, speed_unlocked: ACCESS[accessLevel((await record(s,c)).level)].speed }).eq("id", c.id);
       await s.rpc("board_credit",{_caller:c.id,_event:"art:"+pack+"/"+file,_amount:CREDIT_AWARDS.art});
-      const r=await record(s,c);return {files,speed:ACCESS[accessLevel(r.level)].speed,level:r.level};
+      await inspectMail(s,c,str(b.board,20)||"crawl");const r=await record(s,c);return {files,speed:ACCESS[accessLevel(r.level)].speed,level:r.level};
     }
     case "top": {
       await limit([ip], "read", 120, 600);
@@ -282,6 +287,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
       const score = Math.floor(Number(b.score)), floor = Math.floor(Number(b.floor));
       if (!(score >= 0 && score <= 20000 && floor >= 0 && floor <= 5)) throw new NetError(400, "bad score");
       await s.from("door_scores").insert({ caller_id: c.id, handle: c.handle, score, floor });
+      await dailyTopMail(s,c,"crawl","crawl");
       await s.rpc("board_credit",{_caller:c.id,_event:"door:"+today(),_amount:CREDIT_AWARDS.door});
       return { ok: true };
     }
@@ -314,9 +320,10 @@ async function sysop(b: Json, ip: string): Promise<Json> {
     }
     case "wall": {const {data}=await s.from('wall_posts').select('id,handle,body,hidden').order('created_at',{ascending:false}).limit(30);return {rows:data??[]};}
     case "messageReports": {const {data}=await s.from('message_reports').select('kind,message_id,created_at').order('created_at',{ascending:false}).limit(30);return {rows:data??[]};}
-    case "hideWall": {const {data}=await s.from('wall_posts').update({hidden:true}).eq('id',Number(arg)||0).select('id');return {ok:!!data?.length};}
+    case "hideWall": {const {data}=await s.from('wall_posts').update({hidden:true}).eq('id',Number(arg)||0).select('id,caller_id');if(data?.length){const {data:c}=await s.from('callers').select('*').eq('id',data[0].caller_id).maybeSingle();const {count}=await s.from('message_reports').select('id',{count:'exact',head:true}).eq('kind','wall').eq('message_id',data[0].id);if(count)await queueMail(s,c,'moderation','crawl');}return {ok:!!data?.length};}
     case "hideOneliner": {
-      const { data } = await s.from("oneliners").update({ hidden: true }).eq("id", Number(arg) || 0).select("id");
+      const { data } = await s.from("oneliners").update({ hidden: true }).eq("id", Number(arg) || 0).select("id,caller_id");
+      if(data?.length){const {data:c}=await s.from('callers').select('*').eq('id',data[0].caller_id).maybeSingle();const {count}=await s.from('message_reports').select('id',{count:'exact',head:true}).eq('kind','oneliner').eq('message_id',data[0].id);if(count)await queueMail(s,c,'moderation','crawl');}
       return { ok: !!data?.length };
     }
     case "ban": {

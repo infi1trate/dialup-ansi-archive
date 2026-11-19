@@ -25,6 +25,7 @@ import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
+import {mailbox} from "./mail";
 import {callScan} from "./new-scan";
 import { yourRecord, promotionNotice } from "./record";
 import { wall, innerCircle } from "./wall";
@@ -79,6 +80,8 @@ export class Board {
   caller: CallerInfo | null = null;
   private session = newSessionId();
   private callSession: string | undefined;
+  mailWaiting=0;
+  async mail(){await mailbox(this);}
   ioEntryId(){return this.io.entry.id;}
   ioTimeout(ms:number){return this.io.keyTimeout(ms);}
   clearPending(){this.io.clearOutput();}
@@ -194,7 +197,7 @@ export class Board {
   status(x: Ansi, row = 24) {
     if(row===24 && ["vault","strobe","crawl"].includes(this.io.entry.id)) row=25;
     const left = Math.max(0, Math.min(this.io.entry.id==="maple"?30:60,Math.ceil(this.io.timeLeftMs() / 60000)));
-    x.at(row, 1).c(15, 1).t(pad(` ${this.user} / ${this.level}`, 38)).c(11, 1).t(pad(`node ${this.node}`, 8))
+    x.at(row, 1).c(15, 1).t(pad(` ${this.user} / ${this.level}${this.mailWaiting?" MAIL":""}`, 38)).c(11, 1).t(pad(`node ${this.node}`, 8))
       .c(14, 1).t(pad(`${this.io.speed} bps`, 12)).c(15, 1).t(rpad(`${left} min `, 21)).reset();
     return x;
   }
@@ -434,6 +437,7 @@ export class Board {
         if(r.promotion)await promotionNotice(this,r.promotion);
       }
     }
+    this.mailWaiting=(await net("mail",{guest:this.guest}))?.unread??0;
     this.startPresence();
   }
 
@@ -497,7 +501,7 @@ export class Board {
     let msg: [number, string];
     if (!v.ok) msg = [12, v.why];
     else {
-      const r = await net("post", { body: v.value });
+      const r = await net("post", { body: v.value,board:this.io.entry.id });
       msg = !r ? [12, "The message base is offline. Your line fell on the floor."]
         : r.ok ? [10, "Scrawled on the wall."] : [12, r.why || r.error || "Rejected."];
     }
@@ -507,11 +511,11 @@ export class Board {
 
   // ── main menu ──────────────────────────────────────────────────
   menuItems():[string,string][] {
-    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye'],['0','Your record']];
-    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record']];
-    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record']];
-    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record']];
-    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','Bulletins / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record']];
+    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye'],['0','Your record'],['M','Mail']];
+    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record'],['M','Mail']];
+    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
+    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
+    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','Bulletins / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
   }
   private menuCallers = CALLERS.slice(0,3).map(c=>c[0]);
   private menuOneliner = ONELINERS[0][1];
@@ -546,9 +550,9 @@ export class Board {
         if(items.some(([v])=>v===c)||c==='!')break;
       }
       this.io.clearOutput();
-      if(this.io.entry.id==='maple'){if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
-      if(this.io.entry.id==='c93'){if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
-      switch(c){case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
+      if(this.io.entry.id==='maple'){if(c==='M')await this.mail();else if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
+      if(this.io.entry.id==='c93'){if(c==='M')await this.mail();else if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
+      switch(c){case 'M':await this.mail();break;case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
     }
   }
 
@@ -1056,7 +1060,7 @@ export class Board {
       const before = maxSpeed(io.profile);
       if (!opts.local && !io.profile.filesSeen.includes(seen)) { if(this.guest)this.creditsLeft++;io.profile.filesSeen.push(seen); io.save(); }
       if (!opts.local) { this.setDoing(`viewing ${f.name}`.slice(0, 40)); artViewed(); }
-      if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name,guest:this.guest }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
+      if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name,guest:this.guest,board:this.io.entry.id }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
       const url = typeof location !== "undefined" ? `${location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
       const unlocked = maxSpeed(io.profile) !== before ? maxSpeed(io.profile) : 0;
       let finished = false, info = false;
@@ -1087,7 +1091,7 @@ export class Board {
           continue;
         }
         if(c === "C" && this.io.entry.id === "c93"){this.colorBack=!this.colorBack;io.clearOutput();this.screenMode(mode);io.send(stream);finished=false;continue;}
-        if(c === "E" && !opts.local){const k=await io.key();const rating=(k.ch??0)-48;if(rating>=1&&rating<=5)await net("rating",{pack:pack.name,file:f.name,rating});continue;}
+        if(c === "E" && !opts.local){const k=await io.key();const rating=(k.ch??0)-48;if(rating>=1&&rating<=5)await net("rating",{pack:pack.name,file:f.name,rating,board:this.io.entry.id,guest:this.guest});continue;}
         if (c === "I") { clearNotice(); info = !info; showInfo(); continue; }
         if (c === "R" && !opts.local) { await this.report(pack, f); showInfo(); viewHints(finished); continue; }
         if (c === "N" && idx < files.length - 1) { next = 1; break; }
@@ -1252,6 +1256,7 @@ export class Board {
       await this.login();
       await this.logon();
       await this.newScan();
+      if(this.mailWaiting){this.send(this.header(a(),"Mail waiting").at(8,5).k(this.sk.a,`${this.mailWaiting} private notes waiting. M reads / ENTER menu`));this.hint([{key:"M",ch:"M",label:"MAIL"},{key:"Enter",label:"MENU"}]);const k=await this.key();this.io.clearOutput();if(String.fromCharCode(k.ch??0).toUpperCase()==="M")await this.mail();}
       
       await this.mainMenu();
       await this.goodbye();

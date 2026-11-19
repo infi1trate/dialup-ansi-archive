@@ -29,6 +29,13 @@
       "when": 1795064950575,
       "tag": "0003_sprint_e_access",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795065650188,
+      "tag": "0004_sprint_e_sysop_mail",
+      "breakpoints": true
     }
   ]
 }

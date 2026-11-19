@@ -1,0 +1,8 @@
+import {it,expect} from 'vitest';
+import {MAIL_RULES,mailText,variant,eligibleMail} from '@/server/mail-rules';
+import {queueMail} from '@/server/mail';
+it('each of ten rules queues once per handle using its unique rule key',async()=>{const keys=new Set();const s={from:()=>({upsert:async(row:any,opts:any)=>{expect(opts.ignoreDuplicates).toBe(true);keys.add(row.caller_id+':'+row.rule_key);return {};}})};for(const rule of MAIL_RULES){await queueMail(s,{id:'x',handle:'Relay',calls:1},rule,'crawl');await queueMail(s,{id:'x',handle:'Relay',calls:1},rule,'crawl');}expect(keys.size).toBe(10);});
+it('delivery requires a strictly later call',()=>{expect(eligibleMail([{occurred_call:1,delivered_call:null}],1)).toHaveLength(0);expect(eligibleMail([{occurred_call:1,delivered_call:null}],2)).toHaveLength(1);});
+it('at most two messages arrive per call including repeat delivery checks',()=>{const pending=Array(5).fill({occurred_call:1,delivered_call:null});expect(eligibleMail(pending,2)).toHaveLength(2);expect(eligibleMail([{occurred_call:1,delivered_call:2},...pending],2)).toHaveLength(1);});
+it('each rule has three reachable deterministic variants and board voice',()=>{for(const rule of MAIL_RULES){const variants=new Set();for(let i=0;i<30;i++){const t=mailText('Relay'+i,rule,'maple','Halftone');expect(t).toEqual(mailText('Relay'+i,rule,'maple','Halftone'));variants.add(t.body);}expect(variants.size).toBe(3);}expect(mailText('Relay','artist','crawl','Real Artist').body).toContain('Real Artist');expect(mailText('Relay','first','maple').body).toContain('Mr. Hutchins');});
+it('weekly repeated rule variants depend on occurrence',()=>{expect(new Set(Array.from({length:10},(_,i)=>variant('Relay','dailyTop2026-W'+i))).size).toBe(3);});
