@@ -25,6 +25,7 @@ import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
+import {callScan} from "./new-scan";
 import { yourRecord, promotionNotice } from "./record";
 import { wall, innerCircle } from "./wall";
 import { ACCESS, accessLevel } from "@/lib/access";
@@ -79,6 +80,9 @@ export class Board {
   private session = newSessionId();
   private callSession: string | undefined;
   ioEntryId(){return this.io.entry.id;}
+  ioTimeout(ms:number){return this.io.keyTimeout(ms);}
+  clearPending(){this.io.clearOutput();}
+  async newPacks(names:string[]){if(!names.length)return;await this.pagedPacks("Packs new to you","archive",async()=>({items:names.map(name=>({name,year:1993,groups:[]})),page:1,pages:1,total:names.length}));}
   get level(){return accessLevel(this.guest?null:this.caller?.level);}
   private doing = "logging on";
   private lastBeat = 0;
@@ -1129,7 +1133,7 @@ export class Board {
   async shelf(){const rows=this.guest?guestShelf():(await net('shelf'))?.rows??[];const enriched=[];for(const row of rows){if(this.io.entry.id==='maple'&&!familyAllowed(row.pack,row.file))continue;let title=row.title||fileTitle(row.pack,row.file)||'';if(!title){try{const p=await getPack(row.pack);title=p.files.find(f=>f.name===row.file)?.title||'';if(!title)title=prepareArt(row.file,await getFile(row.pack,row.file)).sauce?.title||'';}catch{}}enriched.push({...row,title});}await this.fileResults('Your shelf',enriched);}
   async search(){const query=await this.ask(22,'Artist / group / title',60);if(!query)return;this.send(this.header(a(),'Searching',query));let rows:any[]=[];if(this.io.entry.id==='maple')rows=FAMILY_SHELF.filter(f=>`${f.file} ${f.artist} ${f.pack}`.toLowerCase().includes(query.toLowerCase()));else{const r=await net('search',{query});rows=r?.rows??[];for(const p of discovered.values())for(const f of p.files)if(f.viewable&&`${f.name} ${f.title} ${f.artists.join(' ')} ${p.groups.join(' ')}`.toLowerCase().includes(query.toLowerCase())&&!rows.some(r=>r.pack===p.name&&r.file===f.name))rows.push({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')});if(!rows.length){try{const gs=await getGroupPacks(query,1990,1996);if(gs.length){await this.pagedPacks(`Group: ${query}`,'archive credits',async()=>({items:gs,page:1,pages:1,total:gs.length}));return;}const d=await directLookup('artist',query);const packs=d.results?.packs??{};for(const [year,names]of Object.entries(packs))for(const name of names as string[]){const p=await getPack(name);for(const f of p.files.filter(f=>f.artists.some(a=>a.toLowerCase().includes(query.toLowerCase()))))rows.push({pack:name,file:f.name,year:+year,artist:f.artists.join(', ')});if(rows.length>=80)break;}}catch{}}}await this.fileResults(`Search: ${query}`,rows);}
   async artistIndex(){const letters='ABCDEFGHIJKLMNOPQRSTUVWXYZ';this.send(this.header(a(),'Artist index A-Z').at(5,4).k(11,letters.split('').join(' ')).at(8,4).k(8,'Pick an initial / ESC return'));const k=await this.key();if(k.key==='Escape')return;const letter=String.fromCharCode(k.ch??0).toUpperCase();if(!letters.includes(letter))return;const artists=[...new Set([...discovered.values()].flatMap(p=>p.files.flatMap(f=>f.artists)))].filter(a=>a.toUpperCase().startsWith(letter)).sort();this.send(this.header(a(),`Artists: ${letter}`).at(23,3).k(8,'ENTER search / ESC return'));const r=await this.lightbar({row:5,col:3,width:74,height:16,items:artists.map(a=>({text:a,color:11}))});if(r){const result=await net('search',{query:artists[r.index]});await this.fileResults(artists[r.index],result?.rows??[]);}}
-  async newScan(){const result=await net('newScan');const unviewed=[...discovered.values()].filter(p=>!this.io.profile.filesSeen.some(f=>f.startsWith(p.name+'/')));const x=this.header(a(),'New since your last call');x.at(6,5).k(this.sk.a,`${result?.lines??0} new oneliners / ${result?.scores??0} new THE CORNER scores`);x.at(8,5).k(15,`${unviewed.length} discovered packs new to you.`);unviewed.slice(0,8).forEach((p,i)=>x.at(10+i,5).k(this.sk.c,p.name));if(!this.guest){const b=await net('balance');this.creditsLeft=b?.balance??this.creditsLeft;if(this.creditsLeft===0)x.at(20,5).k(12,'Mail from Static: your ratio is empty. Art earns your way back.');}x.at(22,5).k(8,'Any key returns');this.send(x);await this.key();this.io.clearOutput();}
+  async newScan(){await callScan(this); }
   async textList(){const packs=[...discovered.values()];if(!packs.length){try{packs.push(await getPack('ensiart'));}catch{}}const rows=packs.flatMap(p=>p.files.filter(f=>/\.(nfo|diz|asc|txt)$/i.test(f.name)).map(f=>({pack:p.name,file:f.name,title:f.title,artist:f.artists.join(', ')})));await this.fileResults('text first',rows);}
   private zeroDayCache: PackSummary[] | null=null;
   async zeroDay(){const month=new Date().getUTCMonth()+1;this.send(this.header(a(),'0-DAY ART',`month ${month} / 199x`));if(!this.zeroDayCache){const packs:PackSummary[]=[];for(let year=1996;year>=1990;year--){this.send(a().at(6,4).eol().k(8,`Checking ${year} disks for month ${month}...`));let page=1;for(;;){const p=await getYearPacks(year,page,100);packs.push(...p.items.filter(p=>releasedInMonth(p,month)));if(page>=p.pages)break;page++;}}this.zeroDayCache=packs.sort((a,b)=>b.year-a.year||b.name.localeCompare(a.name));}if(!this.zeroDayCache.length){this.send(a().at(8,4).k(8,'No packs released in this calendar month.'));await this.anyKey(22);return;}await this.pagedPacks('0-DAY ART','this month in the scene, 199x',async()=>({items:this.zeroDayCache??[],page:1,pages:1,total:this.zeroDayCache?.length??0}));}
@@ -1248,7 +1252,7 @@ export class Board {
       await this.login();
       await this.logon();
       await this.newScan();
-      if(this.io.entry.id === "crawl"){await this.lastCallers();await this.news();await this.oneliners();}
+      
       await this.mainMenu();
       await this.goodbye();
     } catch (e) {

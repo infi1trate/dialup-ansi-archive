@@ -1,6 +1,6 @@
 # Sprint E part 1
 - [x] 1. Access levels, Your record, THE WALL, INNER CIRCLE; 142 tests; e01-e05 uploaded; commit
-- [ ] 2. New since last call, board-specific scans; tests; e06-e07; commit
+- [x] 2. New since last call, board-specific scans; 145 tests; e06-e07 uploaded; commit
 - [ ] 3. Deferred sysop mailbox and rules; tests; e08-e10; commit
 - [ ] 4. Daily/all-time scores, yesterday winners and streaks; tests; e11; commit
 

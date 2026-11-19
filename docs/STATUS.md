@@ -1,5 +1,6 @@
 # Dial-Up status (Sprint B photographic room)
 ## Sprint E
+- Item 2 complete: previous-call snapshot counts oneliners, wall and both doors, area-filtered unseen indexed packs; first call/empty scan auto-continues after a skippable 1.5 seconds. Keyboard O/W/D/M/P destinations and board-specific chrome; e06/e07 captured from real caller state and uploaded. 145 tests pass. Mail counts join this scan in item 3.
 - Item 1 complete: server-earned access, level caps, records, promotion, wall with report/hide path and gated rated/weekly INNER CIRCLE. 142 tests pass; e01-e05 private seven-day links verified. Browser: E1Relay1119 made three calls across injected UTC dates, opened 15 real pieces through the proxy, became VALIDATED with 14400 cap; then earned ELITE through six UTC dates, 60 views, three ratings and a finished server-replayed CORNER run. Promotion notice and records rendered through modem. No production clock override.
 - Evidence is captured and committed after each item, not at the end.
 - Owner to-do: test handles E1Relay1119 (ELITE), E1Wall1119 (unused NEW USER), E1WallTwo1119 (VALIDATED); retained, no data deleted.

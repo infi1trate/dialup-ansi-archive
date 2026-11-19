@@ -1,5 +1,6 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import {newScan} from "./new-scan";
 import { requestClock } from "./clock";
 import { accessAction, logonAccess, record, publicLevels } from "./access";
 import { ACCESS, accessLevel } from "@/lib/access";
@@ -100,6 +101,7 @@ export async function handle(b: Json, req: Request): Promise<Json> {
   const ip = await ipHash(req);
   const now=requestClock(req);
   const action = str(b.action, 20);
+  if(action==="newScan"){const th=await tokenHash(b.token);await limit([th,ip],"newScan",120,600);return newScan(s,b.guest?null:await callerByToken(th),str(b.board,20));}
   if (["record","wall","wallPost","innerCircle","messageReport"].includes(action)) {
     const th=await tokenHash(b.token);await limit([th,ip],"accessRead",180,600);
     return accessAction(b,s,b.guest?null:await callerByToken(th),th,ip);
