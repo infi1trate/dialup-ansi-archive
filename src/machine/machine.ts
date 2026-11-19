@@ -81,6 +81,8 @@ export class Machine {
   private creaked = false;
   /** Keys the current screen accepts (out of band, for the touch context bar). */
   hints = new Signal<KeyHint[]>([]);
+  private clockExempt=false;
+  private clockRemaining=1800;
   private sessionSeconds=CALL_MINUTES*60;
   private get callMinutes() { return this.debug.minutes ?? this.sessionSeconds/60; }
 
@@ -209,6 +211,7 @@ export class Machine {
       keyTimeout: (ms) => this.keys.nextOr(this.sleep(ms)), hint: (k) => this.hints.set(k), drain: async () => {}, flush: () => {},
       pause: () => {}, resume: () => {}, isPaused: () => false, clearOutput: () => {},
       client: {
+        active:()=>this.tube.value,
         setMode: (m) => { term.setMode(m); term.reset(); }, scroll: (d) => term.scrollView(d),
         scrollTo: (w) => term.scrollViewTo(w === "top" ? term.scrollbackLines : 0), markTop: () => {},
         overlay: (bytes) => {
@@ -717,7 +720,7 @@ export class Machine {
   private async session(entry: DirEntry, speed: number, g: number) {
     this.state.set("session");
     const started = Date.now();
-    this.sessionSeconds=CALL_MINUTES*60;
+    this.sessionSeconds=CALL_MINUTES*60;this.clockRemaining=1800;this.clockExempt=(this.profile.calls===0);
     this.lastInput = started; this.inactivityWarned = false;
     const node = 1;
     const term = this.engine.term;
@@ -736,7 +739,8 @@ export class Machine {
       isPaused: () => modem.paused,
       clearOutput: () => modem.clear(),
       client: {
-        access: (v) => {modem.bps=v.speed;this.sessionSeconds=Math.max(0,v.remainingSeconds);},
+        access: (v) => {modem.bps=v.speed;this.sessionSeconds=Math.max(0,v.remainingSeconds);this.clockRemaining=this.sessionSeconds;this.clockExempt=v.exempt??this.clockExempt;},
+        active:()=>this.tube.value,
         setMode: (m) => { term.setMode(m); term.reset(); },
         scroll: (d) => term.scrollView(d),
         scrollTo: (w) => term.scrollViewTo(w === "top" ? term.scrollbackLines : 0),
@@ -754,7 +758,7 @@ export class Machine {
       },
       speed, node, entry, profile: this.profile,
       save: () => saveProfile(this.profile),
-      timeLeftMs: () => Math.max(0, this.callMinutes * 60000 - (Date.now() - started)),
+      timeLeftMs: () => Math.max(0,this.clockRemaining*1000),
       deepLink: this.deepLink ?? undefined,
     };
     this.deepLink = null;
@@ -789,17 +793,17 @@ export class Machine {
     this.timeTimer = setInterval(() => {
       if (g !== this.gen) return this.stopTimer();
       const idle = Date.now() - this.lastInput;
-      if (idle >= Machine.HANGUP_MS) {
+      if (!this.clockExempt && idle >= Machine.HANGUP_MS) {
         this.boardOverlay=null;this.artOpen=false;this.engine.term.overlay=null;
         this.engine.modem.resume(); this.engine.modem.clear();
         this.engine.modem.write(a().reset().cls().at(10,8).k(12,"Five minutes without a key. Static needs the line.").at(12,8).k(7,"Call back when you're at the keyboard. NO CARRIER.").build());
         this.stopTimer(); setTimeout(() => { if(g===this.gen) this.keys.abort("idle"); },2500); return;
       }
-      if (idle >= Machine.WARNING_MS && !this.inactivityWarned) {
+      if (!this.clockExempt && idle >= Machine.WARNING_MS && !this.inactivityWarned) {
         this.inactivityWarned=true;
         this.engine.modem.write(a().at(25,1).k(14,"Still there? Press a key; the line drops in one minute.").build());
       }
-      if (Date.now() - started >= this.callMinutes * 60000) { this.stopTimer(); this.keys.abort("timeup"); }
+      if(this.tube.value&&!this.clockExempt)this.clockRemaining=Math.max(0,this.clockRemaining-1);
     }, 1000);
   }
   private stopTimer() { if (this.timeTimer) clearInterval(this.timeTimer); this.timeTimer = null; }

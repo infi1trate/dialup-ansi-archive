@@ -49,13 +49,13 @@ export async function accessAction(b:Record<string,any>,s:any,c:any,th:string,ip
 }
 export function isoWeek(date:Date){const d=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate()));d.setUTCDate(d.getUTCDate()+4-(d.getUTCDay()||7));const year=d.getUTCFullYear(),start=new Date(Date.UTC(year,0,1));return `${year}-W${String(Math.ceil(((+d-+start)/86400000+1)/7)).padStart(2,'0')}`;}
 function hash(s:string){let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;}
-export async function logonAccess(s:any,c:any,board:string,speed:number,now=new Date()){
+export async function logonAccess(s:any,c:any,board:string,speed:number,now=new Date(),exempt=false){
   const r=await record(s,c),level=accessLevel(r.level),cap=ACCESS[level];
-  if(!c)return {record:r,level,speed:Math.min(speed,cap.speed),minutes:cap.minutes,remainingSeconds:cap.minutes*60};
+  if(!c)return {record:r,level,speed:Math.min(speed,cap.speed),minutes:cap.minutes,remainingSeconds:1800,exempt};
   const {data:a}=await s.from('caller_access').select('*').eq('caller_id',c.id).single();
   const promotion=a?.announced_level!==level?level:null;
   await s.from('caller_access').update({announced_level:level,previous_call_at:c.last_call_at}).eq('caller_id',c.id);
-  const {data:session,error}=await s.from('call_sessions').insert({caller_id:c.id,board,day:now.toISOString().slice(0,10),started_at:now.toISOString(),charged_at:now.toISOString()}).select('id').single();if(error)throw new NetError(503,'Call timer offline.');
-  const {data:used}=await s.rpc('charge_call',{_session:session.id,_caller:c.id});
-  return {record:r,level,promotion,speed:Math.min(speed,cap.speed),minutes:cap.minutes,remainingSeconds:Math.max(0,cap.minutes*60-(used??0)),callSession:session.id};
+  const {data:session,error}=await s.from('call_sessions').insert({caller_id:c.id,board,day:now.toISOString().slice(0,10),started_at:now.toISOString(),charged_at:now.toISOString(),exempt}).select('id').single();if(error)throw new NetError(503,'Call timer offline.');
+  const {data:bank}=await s.rpc('time_bank',{_session:session.id,_caller:c.id,_allowance:cap.minutes*60,_now:now.toISOString()});
+  return {record:r,level,promotion,speed:Math.min(speed,cap.speed),minutes:cap.minutes,remainingSeconds:bank?.remainingSeconds??cap.minutes*60,exempt,callSession:session.id};
 }

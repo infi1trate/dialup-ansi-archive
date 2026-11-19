@@ -1,6 +1,6 @@
 # Sprint E part 2
 - [x] 1. Calendar scene bulletin and daily cache; 155 tests; e12-e13 1600x900 leaned-in evidence; commit
-- [ ] 2. Time bank, UTC accounting, warnings and first-device-call exemption; tests; e14-e16; commit
+- [x] 2. Time bank, UTC accounting and first-device-call exemption; 160 tests; e14-e16; commit
 - [ ] 3. Monthly phone bill, paper export and printer sound; tests; e17-e19; scripted verification; commit
 
 # Sprint E part 1

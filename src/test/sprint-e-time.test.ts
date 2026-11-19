@@ -1,0 +1,7 @@
+import {it,expect} from 'vitest';
+import {rollTime,withdrawTime,clockApplies,guestTime} from '@/lib/time-bank';
+it('unused allowance accrues at UTC midnight including intervening days',()=>{expect(rollTime({day:'2026-10-31',allowance:1800,used:600,bank:0,withdrawn:0},'2026-11-01',1800).bank).toBe(1200);expect(rollTime({day:'2026-10-30',allowance:1800,used:600,bank:0,withdrawn:0},'2026-11-01',1800).bank).toBe(3000);});
+it('bank is capped at 120 minutes',()=>expect(rollTime({day:'2026-10-01',allowance:3600,used:0,bank:7000,withdrawn:0},'2026-11-01',3600).bank).toBe(7200));
+it('withdrawal moves exactly 15 minutes into today without minting time',()=>{const a={day:'2026-11-19',allowance:1800,used:1800,bank:1200,withdrawn:0};expect(withdrawTime(a)).toEqual({...a,bank:300,withdrawn:900});expect(withdrawTime({...a,bank:899})).toBeNull();});
+it('first-ever device call is never subject to warnings or cutoff',()=>{expect(clockApplies(true,false)).toBe(false);expect(clockApplies(true,true)).toBe(false);expect(clockApplies(false,false)).toBe(true);expect(clockApplies(false,false,false)).toBe(false);});
+it('GUEST receives a fresh 30 minutes and no bank on every call',()=>{expect(guestTime().remainingSeconds).toBe(1800);expect(guestTime().bank_seconds).toBe(0);expect(guestTime()).toEqual(guestTime());});

@@ -25,6 +25,7 @@ import { strobeFont } from "@/term/board-font";
 import { Terminal } from "@/term/terminal";
 import { MUSIC } from "@/machine/programs";
 import { boardLogo, drawMenu, menuSelection, listChrome, goodbyeDesign, strobeMotion } from "./designs";
+import {timeBank} from "./time-bank";
 import {sceneBulletin} from "./scene";
 import type {ScenePack} from "@/lib/scene";
 import {mailbox} from "./mail";
@@ -83,6 +84,10 @@ export class Board {
   private session = newSessionId();
   private callSession: string | undefined;
   mailWaiting=0;
+  clockExempt=false;
+  private clockWarning=0;
+  async bankRead(withdraw=false){const r=await net(withdraw?"withdraw":"timeBank",{guest:this.guest,callSession:this.callSession,minutes:15,active:this.io.client.active?.()??true});if(r&&!r.error){this.clockExempt=r.exempt??this.clockExempt;this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.remainingSeconds,level:this.level,exempt:this.clockExempt});}return r;}
+  async clockCheck(){if(!this.clockExempt&&this.io.timeLeftMs()<=0)throw new Aborted("timeup");const left=this.io.timeLeftMs()/60000;if(!this.clockExempt&&left<=5&&(this.clockWarning===0||(left<=1&&this.clockWarning===5))){this.clockWarning=left<=1?1:5;this.send(a().at(25,1).k(14,pad(`${this.config.sysop}: ${this.clockWarning} minute${this.clockWarning===1?"":"s"} left. Time bank is K.`,79)));}}
   async mail(){await mailbox(this);}
   ioEntryId(){return this.io.entry.id;}
   ioTimeout(ms:number){return this.io.keyTimeout(ms);}
@@ -111,7 +116,8 @@ export class Board {
   async beat(doing?: string) {
     if (doing) this.doing = doing;
     this.lastBeat = Date.now();
-    const r = await net("beat", { session: this.session, doing: this.doing, speed: this.io.speed, guest: this.guest, callSession:this.callSession });
+    const r = await net("beat", { session: this.session, doing: this.doing, speed: this.io.speed, guest: this.guest,board:this.io.entry.id, callSession:this.callSession,active:this.io.client.active?.()??true });
+    if(r?.time)this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.time.remainingSeconds,level:this.level,exempt:this.clockExempt});
     if (r?.online) { const me = r.online.findIndex((o: any) => o.me); if (me >= 0) this.node = me + 1; }
     return r;
   }
@@ -124,13 +130,13 @@ export class Board {
     if (!this.online || this.beatTimer) return;
     setLiveSession(this.session);
     void this.beat();
-    this.beatTimer = setInterval(() => void this.beat(), 60_000);
+    this.beatTimer = setInterval(() => void this.beat(), 30_000);
   }
   stopPresence() {
     if (!this.beatTimer) return;
     clearInterval(this.beatTimer); this.beatTimer = null;
     setLiveSession(null);
-    void net("leave", { session: this.session,callSession:this.callSession });
+    void net("leave", { session: this.session,callSession:this.callSession,active:this.io.client.active?.()??true });
   }
   offlineNote(x: Ansi, row: number) {
     return x.at(row, 4).k(12, "░ the message base is offline ░").k(8, " this is the printout Static taped up");
@@ -156,7 +162,7 @@ export class Board {
 
   // ── output helpers ─────────────────────────────────────────────
   send(x: Ansi | Uint8Array) { this.io.send(x instanceof Ansi ? x.build() : x); }
-  async key(): Promise<Key> { return this.io.key(); }
+  async key(): Promise<Key> {const k=await this.io.key();if(!this.clockExempt&&this.io.timeLeftMs()<=0)throw new Aborted("timeup");return k;}
 
   async anyKey(row?: number) {
     const x = a();
@@ -431,11 +437,12 @@ export class Board {
 
   async logon() {
     if (this.online) {
-      const r = await net("logon", { speed: this.io.speed, guest: this.guest, callSession:this.callSession });
+      const r = await net("logon", { speed: this.io.speed, guest: this.guest,board:this.io.entry.id, callSession:this.callSession,active:this.io.client.active?.()??true });
       if (!r || r.error) this.online = !!r;
       else if (r.banned) await this.suspended();
-      else { if(r.caller)this.become(r.caller);this.callSession=r.callSession;
-        this.io.speed=r.speed??9600;this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.remainingSeconds??1800,level:this.level});
+      else {this.clockExempt=r.exempt===true; if(r.caller)this.become(r.caller);this.callSession=r.callSession;
+        this.io.speed=r.speed??9600;this.io.client.access?.({speed:this.io.speed,remainingSeconds:r.remainingSeconds??1800,level:this.level,exempt:this.clockExempt});
+        if(!this.clockExempt&&r.remainingSeconds<=0&&!(await timeBank(this,true)))throw new Aborted("timeup");
         if(r.promotion)await promotionNotice(this,r.promotion);
       }
     }
@@ -513,11 +520,11 @@ export class Board {
 
   // ── main menu ──────────────────────────────────────────────────
   menuItems():[string,string][] {
-    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye'],['0','Your record'],['M','Mail']];
-    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record'],['M','Mail']];
-    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
-    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
-    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','This week / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail']];
+    if(this.io.entry.id==='maple')return [['1','Picture of the Day'],['2','Club-approved shelf'],['3','Surprise me'],['4','Club bulletins'],['5','Your shelf'],['6','New to you'],['7','Search the club shelf'],['8','Artist credits'],['9','Goodbye'],['0','Your record'],['M','Mail'],['K','Time bank']];
+    if(this.io.entry.id==='c93')return [['L','List text files'],['R','Read pack / file'],['S','Search by handle / title'],['N','New to you'],['T','Tagged queue'],['F','Your shelf'],['B','Bulletins'],['C','Toggle color'],['A','All archive files'],['Q','Quit'],['V','Your record'],['M','Mail'],['K','Time bank']];
+    if(this.io.entry.id==='vault')return [['F','Groups / packs'],['I','Artist index A-Z'],['S','Search'],['T','Tagged slideshow'],['N','New to you'],['Y','Your shelf'],['B','Studio bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank']];
+    if(this.io.entry.id==='strobe')return [['J','Jukebox'],['A','Animations'],['R','Roulette'],['F','Archive'],['S','Search'],['T','Tagged queue'],['Y','Your shelf'],['B','Bulletins'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank']];
+    return [['F','File areas'],['Z','0-DAY ART'],['S','Search'],['Y','Your shelf'],['N','New scan'],['X','Warez'],['D','Doors'],['O','Oneliners'],['W',"Who's online"],['U','Last callers'],['B','This week / Top 10'],['P','Page sysop'],['C','Credits'],['G','Goodbye'],['V','Your record'],['M','Mail'],['K','Time bank']];
   }
   private menuCallers = CALLERS.slice(0,3).map(c=>c[0]);
   private menuOneliner = ONELINERS[0][1];
@@ -530,6 +537,7 @@ export class Board {
   async mainMenu(): Promise<'bye'> {
     let selected=0;
     for(;;){
+      await this.clockCheck();
       this.setDoing('at the main menu');
       if(this.io.entry.id==='crawl'){
         const [callers,lines,balance]=await Promise.all([net('callers'),net('oneliners'),this.guest?Promise.resolve(null):net('balance')]);
@@ -552,9 +560,9 @@ export class Board {
         if(items.some(([v])=>v===c)||c==='!')break;
       }
       this.io.clearOutput();
-      if(this.io.entry.id==='maple'){if(c==='M')await this.mail();else if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
-      if(this.io.entry.id==='c93'){if(c==='M')await this.mail();else if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
-      switch(c){case 'M':await this.mail();break;case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':if(this.io.entry.id==='crawl')await sceneBulletin(this);else await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
+      if(this.io.entry.id==='maple'){if(c==='K')await timeBank(this);else if(c==='M')await this.mail();else if(c==='V'||c==='0')await yourRecord(this);else if(c==='9'){if(await this.confirmBye())return 'bye';}else if(c==='1')await this.openFamily(pictureOfDay(new Date()));else if(c==='2')await this.familyList();else if(c==='3')await this.openFamily(FAMILY_SHELF[Math.floor(Math.random()*FAMILY_SHELF.length)]);else if(c==='4')await this.bulletins();else if(c==='5')await this.shelf();else if(c==='6')await this.newScan();else if(c==='7')await this.search();else if(c==='8')await this.credits();continue;}
+      if(this.io.entry.id==='c93'){if(c==='K')await timeBank(this);else if(c==='M')await this.mail();else if(c==='V')await yourRecord(this);else if(c==='Q'){if(await this.confirmBye())return 'bye';}else if(c==='L')await this.textList();else if(c==='R'){const path=await this.ask(22,'pack/file',70);await this.openPath(path);}else if(c==='S')await this.search();else if(c==='N')await this.newScan();else if(c==='T')await this.playTags();else if(c==='F')await this.shelf();else if(c==='B')await this.bulletins();else if(c==='C')this.colorBack=!this.colorBack;else if(c==='A')await this.yearList();continue;}
+      switch(c){case 'K':await timeBank(this);break;case 'M':await this.mail();break;case 'V':await yourRecord(this);break;case 'F':await this.files();break;case 'Z':await this.zeroDay();break;case 'S':await this.search();break;case 'Y':await this.shelf();break;case 'N':await this.newScan();break;case 'T':await this.playTags();break;case 'I':await this.artistIndex();break;case 'J':await this.juke();break;case 'R':await this.roulette();break;case 'X':if(this.io.entry.id==='crawl')await this.warez();break;case 'A':await this.animations();break;case 'B':if(this.io.entry.id==='crawl')await sceneBulletin(this);else await this.bulletins();break;case 'O':await this.oneliners();break;case 'W':await this.whosOnline();break;case 'U':await this.lastCallers();break;case 'P':await this.pageSysop();break;case 'D':await this.doors();break;case 'C':await this.credits();break;case 'G':if(await this.confirmBye())return 'bye';break;case '!':await this.sysopConsole();break;}
     }
   }
 
@@ -789,17 +797,9 @@ export class Board {
   }
 
   async timesUp() {
-    this.io.clearOutput();
-    this.io.client.overlay(null);
-    this.io.client.setMode({ cols: 80, ice: false, ninePixel: true });
-    const x = a().cls();
-    box(x, 8, 15, 50, 8, 12, "TIME'S UP");
-    x.at(10, 18).k(15, "Your 60 minutes are up for this call.");
-    x.at(12, 18).k(7, "Other callers need the line too, you know.");
-    x.at(13, 18).k(7, "Call back after a snack.");
-    this.send(x);
+    this.io.clearOutput();this.io.client.overlay(null);this.screenMode();
+    this.send(this.header(a(),'Until the next call').at(8,5).k(15,`${this.config.sysop}: thank you for sharing the line.`).at(11,5).k(14,'Your minutes return at 00:00 UTC. Time bank is K next call.'));
     await this.io.drain();
-    await new Promise((r) => setTimeout(r, 2500));
   }
 
   // ── file areas ─────────────────────────────────────────────────
@@ -1076,7 +1076,7 @@ export class Board {
       let next = 0;
       while (!next) {
         const k = finished ? await io.key() : await io.keyOrDrain();
-        if (k === null) { finished = true; viewHints(true); continue; }
+        if (k === null) { finished = true;await this.clockCheck();viewHints(true);continue; }
         const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
         if (k.key === " " && !finished) { if (io.isPaused()) io.resume(); else io.pause(); continue; }
         if (k.key === "Enter") { io.flush(); continue; }

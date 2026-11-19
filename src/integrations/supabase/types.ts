@@ -64,29 +64,35 @@ export type Database = {
       }
       call_log: {
         Row: {
+          board: string
           caller_id: string | null
           city: string
           created_at: string
           handle: string | null
           id: string
+          session_id: string | null
           speed: number
           token_hash: string
         }
         Insert: {
+          board?: string
           caller_id?: string | null
           city?: string
           created_at?: string
           handle?: string | null
           id?: string
+          session_id?: string | null
           speed?: number
           token_hash: string
         }
         Update: {
+          board?: string
           caller_id?: string | null
           city?: string
           created_at?: string
           handle?: string | null
           id?: string
+          session_id?: string | null
           speed?: number
           token_hash?: string
         }
@@ -99,6 +105,7 @@ export type Database = {
           charged_at: string
           closed: boolean
           day: string
+          exempt: boolean
           id: string
           started_at: string
           used_seconds: number
@@ -109,6 +116,7 @@ export type Database = {
           charged_at?: string
           closed?: boolean
           day?: string
+          exempt?: boolean
           id?: string
           started_at?: string
           used_seconds?: number
@@ -119,6 +127,7 @@ export type Database = {
           charged_at?: string
           closed?: boolean
           day?: string
+          exempt?: boolean
           id?: string
           started_at?: string
           used_seconds?: number
@@ -275,6 +284,21 @@ export type Database = {
           count?: number
           day?: string
           step?: string
+        }
+        Relationships: []
+      }
+      device_calls: {
+        Row: {
+          calls: number
+          token_hash: string
+        }
+        Insert: {
+          calls?: number
+          token_hash: string
+        }
+        Update: {
+          calls?: number
+          token_hash?: string
         }
         Relationships: []
       }
@@ -551,6 +575,33 @@ export type Database = {
         }
         Relationships: []
       }
+      time_accounts: {
+        Row: {
+          allowance_seconds: number
+          bank_seconds: number
+          caller_id: string
+          day: string
+          used_seconds: number
+          withdrawn_seconds: number
+        }
+        Insert: {
+          allowance_seconds?: number
+          bank_seconds?: number
+          caller_id: string
+          day: string
+          used_seconds?: number
+          withdrawn_seconds?: number
+        }
+        Update: {
+          allowance_seconds?: number
+          bank_seconds?: number
+          caller_id?: string
+          day?: string
+          used_seconds?: number
+          withdrawn_seconds?: number
+        }
+        Relationships: []
+      }
       views: {
         Row: {
           created_at: string
@@ -617,6 +668,19 @@ export type Database = {
       deliver_sysop_mail: {
         Args: { _call: number; _caller: string }
         Returns: number
+      }
+      first_device_call: { Args: { _hash: string }; Returns: boolean }
+      time_bank: {
+        Args: {
+          _active?: boolean
+          _allowance: number
+          _caller: string
+          _close?: boolean
+          _now: string
+          _session?: string
+          _withdraw?: number
+        }
+        Returns: Json
       }
       top_files: {
         Args: { _limit: number }

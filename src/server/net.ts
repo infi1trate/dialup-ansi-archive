@@ -1,5 +1,6 @@
 // Server-only: the multi-caller message base. Every table is RLS-locked; only this module touches it.
 // Import dynamically from inside server route handlers only.
+import {bankAction} from "./time-bank";
 import {sceneAction} from "./scene";
 import {dailyScores} from "./daily";
 import {inspectMail,queueMail,mailAction,dailyTopMail} from "./mail";
@@ -104,6 +105,7 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
   const ip = await ipHash(req);
   const now=requestClock(req);
   const action = str(b.action, 20);
+  if(action==="timeBank"||action==="withdraw"){const th=await tokenHash(b.token);await limit([th,ip],"bank",120,600);return bankAction(s,b.guest?null:await callerByToken(th),b,now);}
   if(action==="scene"){await limit([ip],"scene",120,600);return sceneAction(s,now,defer);}
   if(action==="mail"||action==="mailRead"){const th=await tokenHash(b.token);await limit([th,ip],"mail",120,600);return mailAction(s,b.guest?null:await callerByToken(th),b);}
   if(action==="newScan"){const th=await tokenHash(b.token);await limit([th,ip],"newScan",120,600);return newScan(s,b.guest?null:await callerByToken(th),str(b.board,20));}
@@ -165,7 +167,8 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
       if (c?.banned) return { banned: true };
       const requested = [2400, 9600, 14400, 28800].includes(b.speed) ? b.speed : 9600;
       if(c){await inspectMail(s,c,str(b.board,20)||'crawl');if(c.last_call_at&&+now-+new Date(c.last_call_at)>=7*86400000)await queueMail(s,c,'return',str(b.board,20)||'crawl');if(b.board==='void')await queueMail(s,c,'void','void');}
-      const access=await logonAccess(s,c,str(b.board,20),requested,now);const speed=access.speed;
+      const {data:exempt}=await s.rpc("first_device_call",{_hash:th});
+      const access=await logonAccess(s,c,str(b.board,20),requested,now,exempt===true);const speed=access.speed;
       let prevDay: string | null = null;
       if (c) prevDay = c.last_call_at ? String(c.last_call_at).slice(0, 10) : null;
       else {
@@ -173,7 +176,7 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
         prevDay = data ? String(data.created_at).slice(0, 10) : null;
       }
       const calledBack = !!prevDay && prevDay < today();
-      if(c)await s.from("call_log").insert({ caller_id: c?.id ?? null, token_hash: th, handle: c?.handle ?? null, city: c?.city ?? "", speed,created_at:now.toISOString() });
+      if(c)await s.from("call_log").insert({ caller_id: c?.id ?? null, token_hash: th, handle: c?.handle ?? null, city: c?.city ?? "", speed,board:str(b.board,20)||"crawl",session_id:access.callSession,created_at:now.toISOString() });
       if (c) await s.from("callers").update({ calls: c.calls + 1, last_call_at: now.toISOString() }).eq("id", c.id);
       if(c){await s.rpc("deliver_sysop_mail",{_caller:c.id,_call:c.calls+1});await queueMail(s,{...c,calls:c.calls+1},"first",str(b.board,20)||"crawl");}
       await bump("logged_in");
@@ -220,15 +223,15 @@ export async function handle(b: Json, req: Request, defer:(p:Promise<void>)=>voi
         doing: str(b.doing, 40).replace(/[^\x20-\x7e]/g, "") || "idle", updated_at: new Date().toISOString(),
       });
       if (Math.random() < 0.05) await s.from("presence").delete().lt("updated_at", new Date(Date.now() - 3600_000).toISOString());
-      if(c&&typeof b.callSession==='string')await s.rpc('charge_call',{_session:b.callSession,_caller:c.id});
+      const time=c&&typeof b.callSession==='string'?await bankAction(s,c,{...b,action:'timeBank'},now):null;
       const list = await onlineList();
       const {data:levels}=await s.from('callers').select('handle,id');
       const leveled=await publicLevels(s,list.map(r=>({...r,caller_id:levels?.find(v=>v.handle===r.handle)?.id})));
-      return { online: leveled.map((r:any) => ({ level:r.level, handle: r.handle, city: r.city, speed: r.speed, doing: r.doing, me: r.session_id === sid })) };
+      return {time, online: leveled.map((r:any) => ({ level:r.level, handle: r.handle, city: r.city, speed: r.speed, doing: r.doing, me: r.session_id === sid })) };
     }
     case "leave": {
       const th = await tokenHash(b.token);
-      const c=await callerByToken(th);if(c&&typeof b.callSession==='string')await s.rpc('charge_call',{_session:b.callSession,_caller:c.id,_close:true});
+      const c=await callerByToken(th);if(c&&typeof b.callSession==='string')await bankAction(s,c,{...b,action:'timeBank',close:true},now);
       await s.from("presence").delete().eq("session_id", str(b.session, 40)).eq("token_hash", th);
       return { ok: true };
     }
