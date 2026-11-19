@@ -96,7 +96,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   useEffect(() => {
-    document.getElementById("boot-splash")?.remove();
+    if (!document.querySelector(".photo-room")) document.getElementById("boot-splash")?.remove();
   }, []);
 
   return (

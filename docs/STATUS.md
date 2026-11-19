@@ -1,6 +1,6 @@
-# Dial-Up status (Sprint C in progress)
-
+# Dial-Up status (Sprint B photographic room)
 ## 1. Verified working (test browser = Playwright Chromium, software GL)
+**Sprint B:** Original locked-camera plates, lamp fade, luminance-masked additive screen tint, real 4:3 WebGL CRT and registered lean transform checked in Chromium. First six links committed before live details. Twelve private JPEG links verified HTTP 200/image/jpeg. 114 tests pass. First-visit lamp/note, wheel/outside/backtick/keyboard lean-back, launcher and actual 45-second starfield/wake checked. All nine requested viewports inspected; CRT remains 4:3. Real archive ACID-SC2.ANS streamed through existing proxy/modem, lamp on/off and close view inspected against reference.
 **Sprint C, Part 2:** Fifteen 1600x900 quality-82 JPEGs recreated on the real terminal; private archive-cache/review-shots/c uploads and seven-day URLs verified HTTP 200/image/jpeg; links committed first. Forty-five native-size Terminal/rasterizer outputs opened individually; 42 retained, three conservatively removed; table in docs/family-shelf-review.md. 98 tests pass. Real browser verified first-visit lamp, wheel/outside/backtick lean-back, launcher and an actual 45-second idle saver/wake. DEAD CARRIER live tag marker, queue interruption and search results reached.
 **Sprint C:** 87 regression tests pass; latest preview build OK. Five keyboard-only calls completed. EARTH.ANS opened through all five board deep links. Thirty-day scored THE CORNER run completed as RivetC1964, score 0 read back from shared scores. Balance 14 then EMBER purchase reduced it to 11. Seven program entry points exercised; real guest transfer then launcher-run verified.
 **Sprint A:** 71 tests pass; preview build OK. Real guest loop, launcher/TELEWIRE Esc, wheel in/out, outside click/backtick, 4-minute warning and 5-minute hangup checked. Ten private review JPEG links verified HTTP 200/image/jpeg. Archive audit: 304 files, 37 years (1990–2026), zero unknown parser sequences.
@@ -25,13 +25,12 @@
   - VOID//NODE logo fixed (bottom strokes were drawn in black) and re-checked on screen.
   - Screenshots in docs/shots/*.b64 decode to JPEGs: room-menu 800x450 25 KB, tube-art 640x480 27 KB, sheet 800x450 26 KB.
 - 54 tests pass; typecheck clean; production build OK.
-
 - Pass 6: 09-tube-art re-shot leaned in mid-scroll on ACID1193.ANS: no doubled lines. Phosphor decay is now per-frame-time (tau 27 ms, ghost gain 0.35: ~19% after one 60 fps frame, ~4% after two); bloom unchanged.
 - Pass 6: ACDL1293 pack header now reads "1993" with no group text (no group in listing, pack record or the first files' SAUCE). "unknown group" removed everywhere, share-card line included.
 - Pass 6: phone 390x844: tube pinned to the top (y=0, full width), handwritten hint note above keycaps, keycaps 56 px tall in at most two rows. 16-phone re-shot.
 - Pass 6: tests cover decay, SAUCE group fallback, DOS download dates (pack year) and word-wrapped sysop lines (58 tests pass).
-
 ## 2. Built but untested
+**Sprint B:** Native touch pinch, sound by ear, physical GPU performance and DPR2 sharpness not certified. Full keyboard DEAD CARRIER GUEST call reached archive screens, goodbye and returned to the TELEWIRE directory. Alarm clock uses the photographed fixed 10:47 digits: a live replacement could not be matched convincingly.
 **Sprint C, Part 2:** All-board tag/search combinations, new scans, handle/guest shelf readback, all-seven DOS/launcher programs, trainer day rollover, full ratio and courier multi-call progression, and live 0-DAY month/empty-month remain unverified. Audio by ear remains unverified.
 **Sprint C:** Tag/slideshow and new-scan combinations are not exhaustively checked. Trainer bonus and installed saver selection need full end-to-end verification. Family shelf now has 42 individually reviewed pieces; menu-route verification remains outstanding. Sound not listened to.
 **Sprint A:** Native two-finger scrolling/pinch and DPR2 visual comparisons remain unverified. Saver selection preview checked; 45-second automatic wake is unit-covered, not waited in-browser. Physical GPU 60 fps and sound by ear remain unverified.
@@ -43,11 +42,10 @@
 - Always-answer on the first page after 20 files viewed (unit-tested rule only).
 - .MOD/.XM/.IT playback (only S3M tried). 512-glyph XBin fonts, real ADF/IDF, sysop console with a real key.
 - 60 fps on real integrated graphics; audio by ear; haptics.
-
 - Pass 6: breathing standby LED (3 s cycle, steady under reduced motion) and the pointer-cursor audit (knobs/speaker knob now pointer; leaned-in stage no longer zoom-out) were not screenshotted.
 - Pass 6: sysop chat word wrap is unit-tested on the layout, not watched live in the browser.
-
 ## 3. Known bugs and gaps
+**Sprint B:** Portrait requirements conflict: fitting a 94%-width monitor and retaining the PC/keyboard leaves space below the finite 16:9 plate on tall phones; no duplicate photograph or artificial light was added to fill it. The old portrait turn-phone terminal message remains unchanged. b08 LED close-up was captured with real bus events replayed, not a timed download. No new reset/floppy/drive-door behavior: those objects were decorative before this sprint.
 **Sprint C, Part 2:** Favorite UI assertion failed during live search-result flow; no fix claim. Exhaustive family menu-route checks remain unfinished despite boundary denial tests. Nested warez keys, CD/parent/DIR/TYPE and distinct executable markers implemented but not fully exercised via live transfer. 0-DAY progress/cache implemented and month matching unit-tested, not live-verified.
 **Sprint C:** Sprint is not complete: fifteen JPEGs uploaded and links verified in Part 2. Nested fictional disk paths now implemented; live directory checks remain outstanding. No final first-load size measurement.
 **Sprint A:** 40 corpus entries refused as non-text/RIP; 21 remaining metric flags need interpretation. ALIVE.TRN remains unclassified; stale SAUCE heights and filled right margins create false positives. No claim of perfect archive coverage.
@@ -57,11 +55,10 @@
 - Sysop chat screenshot shows Static's reply still being typed; long replies wrap onto a second line.
 - VOID password is in the shipped board code (puzzle, not security).
 - DOS download dates use pack year (Pass 6 test).
-
 - Group fallback skips the group endpoint: the API has no pack-to-group lookup that is cheap, so it goes straight to "omit". The SAUCE fallback reads at most two art files, and only when you open a pack.
 - Phone portrait leaves an empty band between the tube and the note, because the tube is limited by the screen width.
-
 ## 4. Choices made
+**Sprint B:** All original plates preserved unchanged as CDN pointers; reference board is not shipped. Small versions generated at WebP quality 84. One photographed speaker receives both tracker channels; old staircase creak suppressed because its source is gone. Removed old room props/drawing modules/assets, light pools and grain. First-note close-up on yellow paper; secret second paper on cork board. Volume controls moved to photographed modem/speaker; power/turbo to case buttons; all active controls also in escape hatch. Glass mask is grayscale luminance, not alpha, so clipping uses luminance mode.
 **Sprint C, Part 2:** No new test handles created; checks used fresh GUEST profiles. Prior RivetC1964 scored run remains from Sprint C. No destructive cleanup performed. Review the unfinished checklist before calling Sprint C complete.
 **Sprint C:** Five skins share the byte-only board/terminal/modem path; legacy board IDs retained. Invented fictional releases only; real archive credits preserved. THE CORNER uses seeded server replay; daily scored slot is reserved at start. Guest runs never post. Ledger purchase events unique per request.
 **Sprint A:** First visit lamp on; stored setting wins. Spill follows a 300 ms frame-independent filter; lamp eases 180 ms. Static grain and no brightness oscillator. Three remembered savers; local Games launches the existing door. Fonts from BSD-licensed libansilove; legacy codes and Tundra convert to modem bytes.
@@ -74,16 +71,16 @@
 - Sysop answers roughly every 4th page; scripted keyword replies only.
 - Screensaver after 45 seconds at local menus/prompt/directory; no call saver, warning at four minutes, hangup at five.
 - noindex is on site-wide; remove it at launch in the root route.
-
 ## 5. Owner to-do
+**Sprint B:** Review twelve seven-day links in docs/shots/sprint-b.txt. No test handles created, no destructive SQL or approvals. Decide portrait framing tradeoff if the bottom band is unacceptable; native device/audio review remains needed.
 **Sprint C, Part 2:** Preserved byte-only board output and caching proxy. Added nested release keys to the existing capped IndexedDB store; allowlist gates at viewer/path/queue/quick-scan boundaries. Trainer duplicate insertion now checks the unique-key result instead of claiming success on failed writes.
 **Sprint C:** Review remaining checklist before calling Sprint C done. Test handles RivetProbeC and RivetC* remain; no destructive cleanup performed. Earlier test rows retained. Review JPEG links not delivered yet.
 **Sprint A:** Review docs/shots/sprint-a.txt within seven days. No secrets requested, approval tools used or database rows deleted. Physical touch/GPU verification remains a review item.
 - Set SYSOP_KEY (long random string) as a backend secret to enable the console; set IP_HASH_SALT for IP hashing.
 - Test data was NOT deleted (approval declined). Remove by hand: callers Probe9957, Tester8804, Probe30410, Alpha769, Beta566, Burst474, Gamma*, every P4test* caller, and P5Crawler (pass 5), with their call_log, oneliners, presence, reports, views, rate hits, door_scores (2 rows), door_turns and test daily_counters rows.
 - Lift noindex at launch. Publish and check share cards and 60 fps on a real laptop.
-
 ## 6. Weight (production build, gzip -9)
+**Sprint B:** Three 2560 originals total 555 KB; with mask/reflection under 570 KB. Three 1280 plates total 180,018 bytes (under 350 KB including glass). Lamp plates decode before room loading cover disappears; screen-light plate may load afterward. No new dependencies; latest preview build OK. JavaScript gzip not remeasured.
 **Sprint C, Part 2:** No final first-load measurement this pass; no new dependencies. Preview build log reports build OK after edits; all 98 tests passed. Private review links were issued 2026-11-19 for seven days.
 **Sprint C:** Preview build OK, 87 tests pass. New content remains behind power-on paths. Production gzip weights have not been remeasured; historical figures below are not Sprint C certification.
 **Sprint A:** Current preview build OK; fresh production gzip totals were not measured. Extra bitmap font banks load with the power-on terminal chunk, not the dark first frame. Prior weights below are historical, not re-certified.

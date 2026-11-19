@@ -2,6 +2,8 @@ import { forwardRef, useState, type ReactNode } from "react";
 import { Knob } from "@/components/room/Knob";
 
 interface MonitorProps {
+  onPointerDown?: React.PointerEventHandler<HTMLCanvasElement>;
+  onPointerUp?: React.PointerEventHandler<HTMLCanvasElement>;
   powered: boolean;
   onPower: () => void;
   /** CRT brightness multiplier. */
@@ -29,7 +31,7 @@ export const Monitor = forwardRef<HTMLCanvasElement, MonitorProps>(function Moni
   const setB = (v: number) => { setLocalB(v); p.onBrightnessKnob?.(v); p.onBrightness?.(0.6 + v * 0.65); };
   const setC = (v: number) => { setLocalC(v); p.onContrastKnob?.(v); p.onContrast?.(0.7 + v * 0.55); };
   if (p.glass) return <div className="photo-monitor">
-    <canvas ref={ref} className="monitor-screen" aria-label="CRT screen" />
+    <canvas ref={ref} className="monitor-screen" aria-label="CRT screen" onPointerDown={p.onPointerDown} onPointerUp={p.onPointerUp} />
   </div>;
   return (
     <div className="monitor-case">
@@ -37,7 +39,7 @@ export const Monitor = forwardRef<HTMLCanvasElement, MonitorProps>(function Moni
       <span className="monitor-screw monitor-screw-r" aria-hidden />
       <div className="monitor-bezel">
         <div className="monitor-tube">
-          <canvas ref={ref} className="monitor-screen" aria-label="CRT screen" />
+          <canvas ref={ref} className="monitor-screen" aria-label="CRT screen" onPointerDown={p.onPointerDown} onPointerUp={p.onPointerUp} />
           {p.glass && <div className="monitor-glass" aria-hidden />}
         </div>
       </div>

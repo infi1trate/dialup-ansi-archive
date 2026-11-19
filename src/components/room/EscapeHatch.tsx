@@ -1,8 +1,10 @@
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 
 interface Props {
   muted: boolean; reduced: boolean; lamp: boolean;
+  physical?: React.ReactNode;
   onMute: () => void; onReduced: () => void; onLamp: () => void; onSkip: () => void;
 }
 
@@ -12,19 +14,21 @@ export function EscapeHatch(p: Props) {
   const act = (f: () => void) => (e: React.MouseEvent<HTMLButtonElement>) => { f(); e.currentTarget.blur(); };
   return (
     <nav className={`hatch ${open ? "is-open" : ""}`} aria-label="Settings">
+      <Button variant="ghost" className="hatch-toggle hatch-lamp-direct" aria-label="Toggle desk lamp" aria-pressed={p.lamp} onClick={act(p.onLamp)}>☼</Button>
       {open && (
         <ul className="hatch-menu">
-          <li><button type="button" aria-pressed={p.muted} onClick={act(p.onMute)}>{p.muted ? "Unmute" : "Mute"}</button></li>
-          <li><button type="button" onClick={act(p.onSkip)}>Skip to art</button></li>
-          <li><button type="button" aria-pressed={p.reduced} onClick={act(p.onReduced)}>Reduced motion: {p.reduced ? "on" : "off"}</button></li>
-          <li><button type="button" aria-pressed={p.lamp} onClick={act(p.onLamp)}>Lamp: {p.lamp ? "on" : "off"}</button></li>
+          <li><Button variant="ghost" aria-pressed={p.lamp} onClick={act(p.onLamp)}>Lamp: {p.lamp ? "on" : "off"}</Button></li>
+          {p.physical}
+          <li><Button variant="ghost" type="button" aria-pressed={p.muted} onClick={act(p.onMute)}>{p.muted ? "Unmute" : "Mute"}</Button></li>
+          <li><Button variant="ghost" type="button" onClick={act(p.onSkip)}>Skip to art</Button></li>
+          <li><Button variant="ghost" type="button" aria-pressed={p.reduced} onClick={act(p.onReduced)}>Reduced motion: {p.reduced ? "on" : "off"}</Button></li>
           <li><Link to="/gallery">Plain gallery</Link></li>
           <li><Link to="/credits">Credits</Link></li>
         </ul>
       )}
-      <button type="button" className="hatch-toggle" aria-expanded={open} aria-label={open ? "Close settings" : "Open settings"} onClick={act(() => setOpen(!open))}>
+      <Button variant="ghost" type="button" className="hatch-toggle" aria-expanded={open} aria-label={open ? "Close settings" : "Open settings"} onClick={act(() => setOpen(!open))}>
         <span aria-hidden>{open ? "×" : "···"}</span>
-      </button>
+      </Button>
     </nav>
   );
 }

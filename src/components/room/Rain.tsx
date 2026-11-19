@@ -24,7 +24,7 @@ export function Rain({ still }: { still: boolean }) {
     const step = (now: number) => {
       raf = requestAnimationFrame(step);
       const dt = Math.min(0.1, (now - last) / 1000); last = now; acc += dt;
-      if (acc < 1 / 30) return; // 30 fps is plenty for rain
+      if (acc < 1 / 12) return;
       const t = acc; acc = 0;
       for (let i = drops.length - 1; i >= 0; i--) {
         const d = drops[i];
@@ -37,8 +37,7 @@ export function Rain({ still }: { still: boolean }) {
       if (drops.length > 110) drops.shift();
       draw();
     };
-    draw();
-    if (!still) raf = requestAnimationFrame(step);
+    if (!still) { draw(); raf = requestAnimationFrame(step); }
     return () => cancelAnimationFrame(raf);
   }, [still]);
   return <canvas ref={ref} className="rain" aria-hidden />;

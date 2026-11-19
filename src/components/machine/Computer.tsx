@@ -47,7 +47,6 @@ export function Computer({ deepLink, lost }: Props) {
     setCfg(s);
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setOsReduced(mq.matches);
-    const narrow = window.innerWidth < 900 || window.innerHeight > window.innerWidth;
     const touch = window.matchMedia("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 820;
     setLayout(touch || window.innerWidth < 640 ? "tube" : "room");
     setLeaned(s.lean ?? false);
@@ -123,6 +122,8 @@ export function Computer({ deepLink, lost }: Props) {
     <Monitor
       ref={canvas}
       powered={tube}
+      onPointerDown={layout==="tube"?onTubePointerDown:undefined}
+      onPointerUp={layout==="tube"?onTubePointerUp:undefined}
       glass
       brightness={cfg.brightness}
       contrast={cfg.contrast}
@@ -135,6 +136,7 @@ export function Computer({ deepLink, lost }: Props) {
 
   const hatch = (
       <EscapeHatch
+      physical={<><li><Button variant="ghost" onClick={()=>machine.current?.pressPcPower()}>PC power: {powered?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.pressMonitorPower()}>Monitor: {tube?"on":"off"}</Button></li><li><Button variant="ghost" onClick={()=>machine.current?.toggleTurbo()}>Turbo: {turbo?"on":"off"}</Button></li><li><label>Brightness <input type="range" min="0" max="1" step=".01" value={cfg.brightness} onChange={e=>{const v=+e.target.value;update({brightness:v});if(machine.current)machine.current.engine.crt.brightness=brightnessGain(v);}}/></label></li><li><label>Contrast <input type="range" min="0" max="1" step=".01" value={cfg.contrast} onChange={e=>{const v=+e.target.value;update({contrast:v});if(machine.current)machine.current.engine.crt.contrast=contrastGain(v);}}/></label></li><li><label>Modem volume <input type="range" min="0" max="1" step=".01" value={cfg.modemVolume} onChange={e=>{const v=+e.target.value;update({modemVolume:v});audio.setMix({modemVolume:v});}}/></label></li><li><label>Speaker volume <input type="range" min="0" max="1" step=".01" value={cfg.musicVolume} onChange={e=>{const v=+e.target.value;update({musicVolume:v});audio.setMix({musicVolume:v});}}/></label></li><li><Button variant="ghost" onClick={()=>lean(!leanRef.current)}>Lean {leaned?"back":"in"}</Button></li></>}
       muted={cfg.muted}
       reduced={reduced}
       lamp={cfg.lamp}

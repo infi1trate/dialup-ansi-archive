@@ -4,6 +4,7 @@ import { audio } from '@/audio/bus';
 import { camera, fractionStyle, GLASS, HOTSPOTS } from './plate-layout';
 import { plates, plateSet } from './plates';
 import { useRoomLive } from './useRoomLive';
+import { Rain } from './Rain';
 export interface RoomProps {
  monitor: ReactNode; controls?: ReactNode; powered: boolean; turbo: boolean; lamp: boolean; leaned: boolean; reduced: boolean;
  modemVolume: number; musicVolume: number; onMusicVolume:(v:number)=>void; getState:()=>string;
@@ -12,12 +13,14 @@ export interface RoomProps {
 export const NOTE = ['PWR ON.','ENTER = dial.','login: GUEST','ENTER skips anything.','I = who made it.','Then kill the lamp.'];
 export function Room(p: RoomProps) {
  const root=useRef<HTMLElement>(null),stage=useRef<HTMLDivElement>(null);
+ const settle=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [ready,setReady]=useState(false),[note,setNote]=useState<0|1|2>(0),[attract,setAttract]=useState(false);
+ const [large,setLarge]=useState(false);
  useRoomLive({root,getState:p.getState,reduced:p.reduced,lamp:p.lamp});
- const place=useCallback(()=>{ const st=stage.current;if(!st)return;const c=camera(window.innerWidth,window.innerHeight,p.leaned);st.style.transform=`translate3d(${c.x}px,${c.y}px,0) scale(${c.scale})`; },[p.leaned]);
+ const place=useCallback(()=>{ const st=stage.current;if(!st)return;const c=camera(window.innerWidth,window.innerHeight,p.leaned);st.dataset.moving="true";st.style.transform=`translate3d(${c.x}px,${c.y}px,0) scale(${c.scale})`;if(settle.current)clearTimeout(settle.current);settle.current=setTimeout(()=>{st.dataset.moving="false";},450); },[p.leaned]);
  useLayoutEffect(place,[place]);
  useEffect(()=>{window.addEventListener('resize',place);return()=>window.removeEventListener('resize',place);},[place]);
- useEffect(()=>{let active=true; const size=window.innerWidth*window.devicePixelRatio>1280?1:0;
+ useEffect(()=>{let active=true; const size=window.innerWidth*window.devicePixelRatio>1280?1:0;setLarge(size===1);
  Promise.all([plates.on[size],plates.off[size]].map(async src=>{const image=new Image();image.src=src;await image.decode();})).then(()=>{if(active){setReady(true);document.getElementById('boot-splash')?.remove();}}).catch(()=>{if(active)setReady(true);});return()=>{active=false;};},[]);
  useEffect(()=>{const t=setTimeout(()=>setAttract(true),6000);const stop=()=>{clearTimeout(t);setAttract(false);}; window.addEventListener('pointerdown',stop,{once:true});window.addEventListener('keydown',stop,{once:true});window.addEventListener('wheel',stop,{once:true});return()=>{stop();window.removeEventListener('pointerdown',stop);window.removeEventListener('keydown',stop);window.removeEventListener('wheel',stop);};},[]);
  useEffect(()=>{const r=root.current;if(!r)return;let distance=0;
@@ -32,7 +35,7 @@ export function Room(p: RoomProps) {
  <div ref={stage} className="plate-stage">
  <img className="room-plate plate-off" src={plates.off[0]} srcSet={plateSet(plates.off)} sizes="100vw" fetchPriority="high" alt="" draggable={false}/>
  <img className="room-plate plate-on" src={plates.on[0]} srcSet={plateSet(plates.on)} sizes="100vw" fetchPriority="high" alt="" draggable={false}/>
- <div className="plate-screen-light" style={{maskImage:`url(${plates.light[1]})`}} aria-hidden/>
+ <div className="plate-screen-light" style={{maskImage:`url(${plates.light[large?1:0]})`}} aria-hidden/>
  <div className="plate-glass" style={{...fractionStyle(GLASS),maskImage:`url(${plates.mask})`}} onClick={()=>p.onLean(true)}>{p.monitor}<img className="plate-reflection" src={plates.reflection} alt="" draggable={false}/></div>
  {p.controls}
  {hotspot('lamp','Desk lamp',p.onLamp)}
@@ -42,6 +45,12 @@ export function Room(p: RoomProps) {
  <Button variant="ghost" tabIndex={-1} data-touch aria-label="Turbo button" aria-pressed={p.turbo} className="plate-hotspot" style={fractionStyle([.699,.8125,.014,.0347])} onClick={p.onTurbo}/>
  {hotspot('keyboard',p.leaned?'Lean back':'Keyboard',()=>p.onLean(!p.leaned))}
  {volume('modem',p.modemVolume,p.onModemVolume)}{volume('speaker',p.musicVolume,p.onMusicVolume)}
+ <div className="plate-note-writing" style={fractionStyle(HOTSPOTS.sticky_note)} aria-hidden>{NOTE.map(line=><p key={line}>{line}</p>)}</div>
+ <div className="plate-rain" style={fractionStyle(HOTSPOTS.window)}><Rain still={p.reduced}/></div>
+ <span className={`plate-led pc-power ${p.powered?'is-on':'is-standby'}`} style={{left:'68.1%',top:'77.6%'}}/>
+ <span className="plate-led drive-light" data-led="hdd" style={{left:'69.3%',top:'77.6%'}}/>
+ <span className="plate-led monitor-light" data-led="monitor" style={{left:'61.5%',top:'61.3%'}}/>
+ {['MR','OH','CD','RD','SD','HS','TR','AA'].map((led,i)=><span key={led} data-led={led} className="plate-led modem-light" style={{left:`${87.3+i*1.43}%`,top:'81.5%'}}/>)}
  </div>
  {!ready&&<div className="plate-loading" aria-label="Loading room" role="status">DIAL-UP <span>█</span></div>}
  {note!==0&&<div className="note-closeup" data-touch onClick={()=>setNote(0)}><div className="paper-enlarged" style={{'--paper-light':p.lamp?1:.025} as React.CSSProperties}>{(note===1?NOTE:['call 555-0113']).map(line=><p key={line}>{line}</p>)}</div></div>}

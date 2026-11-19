@@ -1,11 +1,11 @@
 # Sprint B
-- [ ] 1/2/4/5: photographic stage, plate light, physical controls and registered lean transform
-- [ ] First six private evidence pictures uploaded and committed
-- [ ] Live LEDs, paper notes and window rain; clock match or documented fallback
-- [ ] Decode-safe loading and all nine viewport checks
-- [ ] Regression tests, Sprint A checks and DEAD CARRIER call
-- [ ] Twelve private evidence links and four-state comparison
-- [ ] Sprint B status blocks and final commit
+- [x] 1/2/4/5: photographic stage, plate light, physical controls and registered lean transform
+- [x] First six private evidence pictures uploaded and committed
+- [x] Live LEDs, paper notes and window rain; photographed clock fallback documented
+- [ ] Decode-safe loading and all nine viewport checks — nine sizes checked; tall portrait cannot simultaneously cover the viewport and fit the entire photographed monitor at 94% width, so a bottom band remains.
+- [x] Regression tests, Sprint A checks and DEAD CARRIER call — 114 tests; live guest archive call ended with goodbye and TELEWIRE directory readback.
+- [x] Twelve private evidence links and four-state comparison
+- [x] Sprint B status blocks and final commit
 
 # Sprint C
 - [x] Five distinct public boards and two unlockable boards

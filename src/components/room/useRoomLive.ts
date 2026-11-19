@@ -8,7 +8,10 @@ export function useRoomLive({root,getState,reduced,lamp=true}:Opts){
  useEffect(()=>{const el=root.current;if(!el)return;let raf=0,last=performance.now(),level=lampTarget.current?1:0,from=level,start=last,on=lampTarget.current;
  let monitor=audio.status.tube,warmStart=monitor?last-1600:last;let tgt=[0,0,0],cur=[0,0,0],velocity=[0,0,0];
  const unsub=screenAverageColor.subscribe(v=>{tgt=v;});
- const off=[audio.on('monitorOn',()=>{monitor=true;warmStart=performance.now();}),audio.on('monitorOff',()=>{monitor=false;})];
+ let pc=audio.status.pc,oh=false,cd=false,hs=false,rd=0,sd=0,disk=0;
+ const leds=Object.fromEntries(['MR','OH','CD','HS','TR','AA','RD','SD','hdd','monitor'].map(n=>[n,el.querySelector(`[data-led="${n}"]`)]));
+ const set=(name:string,on:boolean)=>leds[name]?.classList.toggle('is-on',on);
+ const off=[audio.on('monitorOn',()=>{monitor=true;warmStart=performance.now();}),audio.on('monitorOff',()=>{monitor=false;}),audio.on('powerOn',()=>{pc=true;}),audio.on('powerOff',()=>{pc=false;oh=cd=hs=false;}),audio.on('offHook',()=>{oh=true;}),audio.on('connect',speed=>{cd=true;hs=speed>=14400;}),audio.on('hangup',()=>{oh=cd=hs=false;}),audio.on('byteFlow',()=>{rd=performance.now()+180;}),audio.on('keyDown',()=>{if(cd)sd=performance.now()+90;}),audio.on('diskSeek',()=>{disk=performance.now()+240;}),audio.on('floppySeek',()=>{disk=performance.now()+180;})];
  const tick=(now:number)=>{raf=requestAnimationFrame(tick);const dt=Math.min(.04,(now-last)/1000);last=now;
  if(on!==lampTarget.current){on=lampTarget.current;from=level;start=now;}level=lampEase(from,on,now-start);
  const omega= reduced?4/1.5:4/.25;
@@ -17,7 +20,7 @@ export function useRoomLive({root,getState,reduced,lamp=true}:Opts){
  el.style.setProperty('--lamp-level',String(level));el.style.setProperty('--screen-opacity',String(screenLightOpacity(monitor,brightness,level,warm)));
  el.style.setProperty('--screen-tint',`rgb(${cur.map(v=>mx>0?Math.round(v/mx*255):0).join(' ')})`);
  el.style.setProperty('--reflection',String(Math.min(1,level)*(.35-.25*brightness)));
- void getState;
+ set('monitor',monitor);set('MR',pc);set('OH',pc&&oh);set('CD',pc&&cd);set('HS',pc&&hs);set('TR',pc&&getState()!=='off');set('AA',false);set('RD',pc&&cd&&now<rd);set('SD',pc&&now<sd);set('hdd',pc&&now<disk);
  };raf=requestAnimationFrame(tick);return()=>{cancelAnimationFrame(raf);unsub();off.forEach(f=>f());};},[root,getState,reduced]);
 }
 // Retained exported compatibility function for the previous regression suite.

@@ -7,7 +7,7 @@ type B = typeof Bus;
 type Src = AudioScheduledSourceNode;
 
 /** Pan positions of the objects in the shot (-1 left .. 1 right). */
-const PAN = { window: -0.72, lamp: -0.7, pc: 0, monitor: -0.04, keyboard: 0.02, modem: 0.62, speakerL: -0.42, speakerR: 0.36 };
+const PAN = { window: -0.72, lamp: -0.7, pc: 0, monitor: -0.04, keyboard: 0.02, modem: 0.62, speakerL: 0.48, speakerR: 0.48 };
 
 let started = false;
 export function startSynth(ctx: AudioContext, bus: B) {
@@ -62,7 +62,7 @@ class Synth {
     this.modemVol = c.createGain();
     this.modemIn.connect(shaper).connect(hp1).connect(hp2).connect(lp1).connect(lp2).connect(peak).connect(this.modemVol).connect(this.buses.modem);
 
-    // desk speakers: two small cones flanking the monitor; split L/R and pan each to its box
+    // The single photographed speaker receives both tracker channels.
     this.musicVol = c.createGain();
     const mhp = this.biquad("highpass", 140, 0.8), mlp = this.biquad("lowpass", 7500, 0.7), mpk = this.biquad("peaking", 2600, 1.1); mpk.gain.value = 4;
     const split = c.createChannelSplitter(2);
@@ -90,7 +90,7 @@ class Synth {
     bus.on("handshakeStart", (s) => this.handshake(s));
     bus.on("connect", () => this.cutLine());
     bus.on("hangup", () => { this.cutLine(); this.relay(); });
-    bus.on("stairCreak", () => this.creak(0.85)); // the basement stairs, top right of the shot
+    // No staircase exists in the photographed room; the old automatic creak has no source.
     bus.on("lampToggle", () => this.switchClick(PAN.lamp, 0.5));
 
     this.roomTone();

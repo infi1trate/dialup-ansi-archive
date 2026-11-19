@@ -332,3 +332,30 @@
 .photo-room .ctxbar { position:fixed; bottom:48px; left:0; right:0; z-index:15; }
 .photo-room .plate-controls, .photo-room .plate-monitor-power { z-index:4; }
 .reduce .plate-loading span { animation:none; }
+.plate-glass { mask-mode:luminance; }
+.plate-note-writing { position:absolute; padding:12px 7px; font-family:'Nanum Pen Script',cursive; font-size:19px; line-height:1.04; color:var(--note-ink); transform:rotate(-5deg); mix-blend-mode:multiply; opacity:calc(.035 + var(--lamp-level)*.965); pointer-events:none; }
+.plate-note-writing p { margin:0; }
+.plate-rain { position:absolute; overflow:hidden; pointer-events:none; opacity:.16; mix-blend-mode:screen; }
+.plate-rain .rain { width:100%;height:100%; }
+.plate-led { position:absolute; width:5px;height:4px; border-radius:50%;opacity:0;pointer-events:none; }
+.plate-led.is-on { opacity:1; }
+.pc-power,.monitor-light { background:var(--led-on);box-shadow:0 0 3px var(--led-on); }
+.drive-light { background:var(--drive-amber);box-shadow:0 0 3px var(--drive-amber); }
+.modem-light { background:var(--modem-red);box-shadow:0 0 3px var(--modem-red); }
+.modem-light.is-on::after { content:''; position:absolute; top:28px;left:-3px;width:11px;height:2px;background:var(--modem-red);filter:blur(3px);opacity:.22; }
+.pc-power.is-standby { opacity:.2;animation:plate-standby 3s ease-in-out infinite; }
+.arrival-attract .pc-power.is-standby { animation:plate-arrival 3s ease-in-out infinite; }
+@keyframes plate-standby { 50% {opacity:.4;} }
+@keyframes plate-arrival { 50% {opacity:.8;} }
+.reduce .pc-power.is-standby { animation:none;opacity:.3; }
+.hatch-lamp-direct { display:none; }
+@media (orientation:portrait), (max-height:540px) { .hatch-lamp-direct { display:block; } }
+@media (prefers-reduced-motion:reduce) { .pc-power.is-standby { animation:none; } }
+
+.photo-room .hatch-menu label { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 10px;color:var(--foreground); }
+.photo-room .hatch-menu input { width:85px; }
+.photo-room .secret-paper { cursor:default; }
+.photo-room .monitor-screen { touch-action:none; }
+
+@media (hover:hover) { .arrival-attract:not(.reduce) .plate-hotspot[aria-label="Desk lamp"]::after { animation:photo-lamp-glint 4s ease-in-out infinite; } }
+@keyframes photo-lamp-glint { 0%,82%,100% {opacity:0;} 90% {opacity:.05;} }

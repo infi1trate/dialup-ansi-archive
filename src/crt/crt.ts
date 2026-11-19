@@ -73,8 +73,7 @@ void main(){
   float lines = outSize.y / srcSize.y;
   float sl = lines >= 2.0 ? 0.055 : 0.0;
   col *= 1. - sl*(0.5+0.5*cos(u.y*srcSize.y*6.28318));
-  // vignette
-  vec2 v = u*(1.-u.yx); col *= pow(clamp(v.x*v.y*22., 0., 1.), 0.22);
+  // The photographic glass supplies the frame; no synthetic glass vignette.
   // Fixed, low-amplitude grain: no brightness oscillator or per-frame reseeding.
   float n = hash(u*srcSize);
   col += (n-0.5)*0.006;
@@ -154,6 +153,7 @@ export class CRTDisplay {
 
   /** Resize the display canvas to its CSS box at device pixel ratio. */
   resize() {
+    if (this.canvas.width > 2 && this.canvas.closest<HTMLElement>(".plate-stage")?.dataset.moving === "true") return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const r = this.canvas.getBoundingClientRect();
     const w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
