@@ -5,7 +5,7 @@ import { TermRenderer } from "@/term/renderer";
 import { Modem } from "@/modem/modem";
 import { CRTDisplay, type PowerState } from "@/crt/crt";
 import { audio } from "@/audio/bus";
-import { screenAverageColor } from "./signals";
+import { screenAverageColor, screenPictureBrightness } from "./signals";
 
 export class Engine {
   term = new Terminal();
@@ -70,6 +70,7 @@ export class Engine {
       const k = this.powered && this.tube ? 1 : 0;
       const [r, g, b] = this.renderer.avg;
       screenAverageColor.set([r * k, g * k, b * k]);
+      screenPictureBrightness.set(this.renderer.pictureBrightness*k);
     }
     this.onFrame?.(dt);
   }

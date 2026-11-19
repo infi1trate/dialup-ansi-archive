@@ -1,10 +1,10 @@
 # Sprint C part 3
 - [x] Part 1: five compositions, inverse selection, directory spacing and 80x25 checks
 - [x] Part 1: twelve private evidence links and commit before Part 2
-- [ ] Part 2: favorites, faithful quick scan, four NFO styles, cracktros and blue room light
-- [ ] Part 2: nine private evidence links and commit before Part 3
-- [ ] Part 3: seven programs through DOS and launcher; ratio; family gates; live 0-DAY
-- [ ] Part 3: all tests, per-check status and test-handle list
+- [ ] Part 2: favorites, faithful quick scan, four NFO styles, cracktros and blue room light — gain corrected/tested; remaining fixes and browser evidence unfinished
+- [ ] Part 2: nine private evidence links and commit before Part 3 — d13-d21 not captured; Part 3 not started
+- [ ] Part 3: seven programs through DOS and launcher; ratio; family gates; live 0-DAY — waiting on completed Part 2
+- [ ] Part 3: all tests, per-check status and test-handle list — 125 tests pass; keyboard checks outstanding; no new test handles
 
 # Sprint B
 - [x] Part 2: additive plate-shaped screen colour with luminance gain and 250 ms smoothing

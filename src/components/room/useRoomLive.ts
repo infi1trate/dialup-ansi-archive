@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { audio } from '@/audio/bus';
-import { screenAverageColor } from '@/machine/signals';
+import { screenAverageColor, screenPictureBrightness } from '@/machine/signals';
 import { lampEase, screenLight } from './plate-layout';
 interface Opts {root:React.RefObject<HTMLElement|null>;getState:()=>string;reduced:boolean;lamp?:boolean}
 export function useRoomLive({root,getState,reduced,lamp=true}:Opts){
  const lampTarget=useRef(lamp);lampTarget.current=lamp;
  useEffect(()=>{const el=root.current;if(!el)return;let raf=0,last=performance.now(),level=lampTarget.current?1:0,from=level,start=last,on=lampTarget.current;
- let monitor=audio.status.tube,warmStart=monitor?last-1600:last;let tgt=screenAverageColor.value,cur=[0,0,0],velocity=[0,0,0];
+ let monitor=audio.status.tube,warmStart=monitor?last-1600:last;let tgt=screenAverageColor.value,cur=[0,0,0],velocity=[0,0,0],picture=0;
  const matrix=el.querySelector('feColorMatrix[data-room-light]');
  const unsub=screenAverageColor.subscribe(v=>{tgt=v;});
  let pc=audio.status.pc,oh=false,cd=false,hs=false,rd=0,sd=0,disk=0;
@@ -18,7 +18,8 @@ export function useRoomLive({root,getState,reduced,lamp=true}:Opts){
  const omega=4/.25;
  for(let i=0;i<3;i++){const delta=cur[i]-tgt[i],c=velocity[i]+omega*delta,e=Math.exp(-omega*dt);const next=tgt[i]+(delta+c*dt)*e;velocity[i]=(velocity[i]-omega*c*dt)*e;cur[i]+=Math.max(-255*dt,Math.min(255*dt,next-cur[i]));}
  const mx=Math.max(...cur,0),brightness=Math.min(1,mx/255),warm=Math.min(1,Math.max(0,(now-warmStart-250)/1350));
- const {gain,tint}=screenLight(cur,monitor,level,warm),[r,g,b]=tint.map(v=>v*gain);
+ picture+=(screenPictureBrightness.value-picture)*(1-Math.exp(-dt/.25));
+ const {gain,tint}=screenLight(cur,monitor,level,warm,picture),[r,g,b]=tint.map(v=>v*gain);
  el.style.setProperty('--lamp-level',String(level));el.style.setProperty('--screen-opacity',String(gain));
  matrix?.setAttribute('values',`${r} 0 0 0 0 0 ${g} 0 0 0 0 0 ${b} 0 0 0 0 0 1 0`);
  el.style.setProperty('--reflection',String(Math.min(1,level)*(.35-.25*brightness)));

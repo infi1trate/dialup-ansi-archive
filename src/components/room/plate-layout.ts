@@ -37,9 +37,9 @@ export function lampEase(from: number, on: boolean, elapsed: number) {
 export function screenLightOpacity(monitor: boolean, brightness: number, lamp: number, warmup=1) {
   return monitor ? Math.max(0,Math.min(1,2.2*brightness))*Math.max(0,Math.min(1,warmup))*(1-.4*Math.min(1,lamp)) : 0;
 }
-export function screenLight(rgb: readonly number[], monitor: boolean, lamp: number, warmup=1) {
- const max=Math.max(...rgb,0), luminance=(.2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2])/255;
- const gain=screenLightOpacity(monitor,luminance,lamp,warmup);
+export function screenLight(rgb: readonly number[], monitor: boolean, lamp: number, warmup=1, pictureBrightness=Math.max(...rgb,0)/255) {
+ const max=Math.max(...rgb,0);
+ const gain=screenLightOpacity(monitor,pictureBrightness,lamp,warmup);
  return {gain,tint:rgb.map(v=>max>0?v/max:0)};
 }
 // Digit window measured inside the original photographed alarm_clock hotspot.

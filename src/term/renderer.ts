@@ -46,6 +46,7 @@ export class TermRenderer {
   private lastKey = "";
   /** Average RGB of the last rendered frame, 0-255. */
   avg: [number, number, number] = [0, 0, 0];
+  pictureBrightness = 0;
 
   constructor() {
     this.canvas = document.createElement("canvas");
@@ -112,10 +113,13 @@ export class TermRenderer {
   }
 
   private sampleAverage(px: Uint32Array, W: number, H: number) {
-    let r = 0, g = 0, b = 0, n = 0;
+    let r = 0, g = 0, b = 0, n = 0, peak = 0;
     for (let y = 3; y < H; y += 8) for (let x = 2; x < W; x += 7) {
       const v = px[y * W + x]; r += v & 255; g += (v >> 8) & 255; b += (v >> 16) & 255; n++;
     }
+    // Equal-size cells: average each pixel's strongest channel, then average cells.
+    for(let i=0;i<px.length;i++){const v=px[i];peak+=Math.max(v&255,v>>8&255,v>>16&255);}
+    this.pictureBrightness=px.length?peak/(px.length*255):0;
     this.avg = n ? [r / n, g / n, b / n] : [0, 0, 0];
   }
 }

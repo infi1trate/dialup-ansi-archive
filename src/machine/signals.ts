@@ -8,3 +8,4 @@ export class Signal<T> {
 
 /** Average RGB of the terminal framebuffer, updated ~10x/second (for room lighting later). */
 export const screenAverageColor = new Signal<[number, number, number]>([0, 0, 0]);
+export const screenPictureBrightness = new Signal(0);
