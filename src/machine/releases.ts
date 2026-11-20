@@ -13,6 +13,7 @@ export async function runRelease(env:LocalEnv,id:string){
 }
 async function runProgram(env:LocalEnv,id:string){
  const r=releaseById(id);if(!r||!PROGRAM_IDS.includes(id))return;
+ window.__lovableEvents?.track?.("project.program_run",{program:id});
  const sleep=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
  if(id==='EMBER'||id==='CHROMA'){
   let frame=0;audio.emit('music',true);audio.emit('introMusic',true);

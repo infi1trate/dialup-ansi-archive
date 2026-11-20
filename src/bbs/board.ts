@@ -790,7 +790,7 @@ export class Board {
 
   async doors() {
     this.setDoing("in a door: BASEMENT CRAWL");
-    for(;;){this.send(this.header(a(),"Doors").at(6,6).k(15,"1 BASEMENT CRAWL").at(8,6).k(14,"2 THE CORNER").at(12,6).k(8,"ESC main menu"));const k=await this.key();this.io.clearOutput();if(k.key==="Escape")return;if(k.ch===49)await this.hushed(()=>doorMenu({io:this.io,send:y=>this.send(y),user:this.user,guest:this.guest,hint:h=>this.hint(h)}));if(k.ch===50)await this.hushed(()=>cornerDoor(this.io,this.guest,this.user));}
+    for(;;){this.send(this.header(a(),"Doors").at(6,6).k(15,"1 BASEMENT CRAWL").at(8,6).k(14,"2 THE CORNER").at(12,6).k(8,"ESC main menu"));const k=await this.key();this.io.clearOutput();if(k.key==="Escape")return;if(k.ch===49||k.ch===50)window.__lovableEvents?.track?.("project.door_started",{door:k.ch===49?"basement_crawl":"the_corner",board:this.io.entry.id});if(k.ch===49)await this.hushed(()=>doorMenu({io:this.io,send:y=>this.send(y),user:this.user,guest:this.guest,hint:h=>this.hint(h)}));if(k.ch===50)await this.hushed(()=>cornerDoor(this.io,this.guest,this.user));}
   }
 
   async credits() {
@@ -1114,7 +1114,7 @@ export class Board {
       if (this.online && !opts.local) void net("view", { pack: pack.name, file: f.name,guest:this.guest,board:this.io.entry.id }).then((r) => { if (r?.files != null) { io.profile.serverFiles = r.files; io.save(); } });
       const url = typeof location !== "undefined" ? `${(import.meta.env.DEV && (globalThis as { __filmOrigin?: string }).__filmOrigin) || location.origin}/dial/${this.io.entry.number}/${pack.year}/${pack.name}/${encodeURIComponent(f.name)}` : "";
       const unlocked = maxSpeed(io.profile) !== before ? maxSpeed(io.profile) : 0;
-      let finished = false, info = false;
+      let finished = false, info = false, drawnTracked = false, skipped = false;
       const viewHints = (done: boolean) => this.hint([
         ...(done ? [{ label: "↑", key: "ArrowUp" }, { label: "↓", key: "ArrowDown" }, { label: "PGUP", key: "PageUp" }, { label: "PGDN", key: "PageDown" }]
           : [{ label: "SPACE pause", key: " " }, ...(opts.animation ? [] : [{ label: "ENTER finish", key: "Enter" }])]),
@@ -1125,10 +1125,14 @@ export class Board {
       let next = 0;
       while (!next) {
         const k = finished ? await this.key() : await io.keyOrDrain();
-        if (k === null) { finished = true;await this.clockCheck();viewHints(true);continue; }
+        if (k === null) {
+          finished = true;
+          if (!drawnTracked) { drawnTracked = true; window.__lovableEvents?.track?.("project.art_drawn", { board: this.io.entry.id, speed: io.speed, format: (f.name.split(".").pop() || "").toUpperCase().slice(0, 4), skipped, local: !!opts.local }); }
+          await this.clockCheck();viewHints(true);continue;
+        }
         const c = k.ch !== null ? String.fromCharCode(k.ch).toUpperCase() : "";
         if (k.key === " " && !finished) { if (io.isPaused()) io.resume(); else io.pause(); continue; }
-        if (k.key === "Enter") { io.flush(); continue; }
+        if (k.key === "Enter") { if (!finished) skipped = true; io.flush(); continue; }
         if (k.key === "Escape") {
           if (info) { info = false; showInfo(); continue; }
           io.clearOutput(); io.resume(); restore(); io.client.artOpen(false); return;

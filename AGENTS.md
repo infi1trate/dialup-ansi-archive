@@ -59,3 +59,5 @@ use the editor.
 - Board identities and chrome are configured in src/bbs/config.ts; legacy dialing IDs stay stable so saved deep links continue working.
 
 - MAPLE RIDGE applies the reviewed allowlist at viewer, queue, quick-scan and path boundaries, not only menus. Why: saved shelves and deep links must not bypass the club promise.
+
+- Product analytics are `project.*` events sent with `window.__lovableEvents?.track?.` at the moment they happen (board viewer, doors, postcards, machine power/connect, releases) and catalogued in `.lovable/events.json`; they carry no handles or text. Why: telemetry is off-screen, so it does not breach the bytes-only board contract.

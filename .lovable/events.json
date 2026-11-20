@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "events": {
+    "project.art_drawn": {
+      "event_schema_version": 1,
+      "description": "An art piece finished drawing in the board viewer (stream fully delivered, or finished early with Enter). Once per piece opened.",
+      "privacy": {
+        "contains_pii": false,
+        "purpose": "product_analytics"
+      },
+      "properties_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "board",
+          "speed",
+          "format",
+          "skipped",
+          "local"
+        ],
+        "properties": {
+          "board": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number"
+          },
+          "format": {
+            "type": "string"
+          },
+          "skipped": {
+            "type": "boolean"
+          },
+          "local": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "project.call_connected": {
+      "event_schema_version": 1,
+      "description": "The modem finished its handshake and connected to a board.",
+      "privacy": {
+        "contains_pii": false,
+        "purpose": "product_analytics"
+      },
+      "properties_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "board",
+          "speed",
+          "postcard"
+        ],
+        "properties": {
+          "board": {
+            "type": "string"
+          },
+          "speed": {
+            "type": "number"
+          },
+          "postcard": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "project.door_started": {
+      "event_schema_version": 1,
+      "description": "A caller opened a door game from a board's Doors menu.",
+      "privacy": {
+        "contains_pii": false,
+        "purpose": "product_analytics"
+      },
+      "properties_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "door",
+          "board"
+        ],
+        "properties": {
+          "door": {
+            "type": "string",
+            "enum": [
+              "basement_crawl",
+              "the_corner"
+            ]
+          },
+          "board": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "project.pc_powered_on": {
+      "event_schema_version": 1,
+      "description": "The visitor powered on the PC in the room (or a postcard/deep link powered it on).",
+      "privacy": {
+        "contains_pii": false,
+        "purpose": "product_analytics"
+      },
+      "properties_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "postcard",
+          "deep_link"
+        ],
+        "properties": {
+          "postcard": {
+            "type": "boolean"
+          },
+          "deep_link": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "project.postcard_sent": {
+      "event_schema_version": 1,
+      "description": "A caller posted an ANSI postcard and got its link.",
+      "privacy": {
+        "contains_pii": false,
+        "purpose": "product_analytics"
+      },
+      "properties_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "board",
+          "reply"
+        ],
+        "properties": {
+          "board": {
+            "type": "string"
+          },
+          "reply": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "project.program_run": {
+      "event_schema_version": 1,
+      "description": "A fictional warez program (EMBER, CHROMA, DRIFTER, etc.) was started on the PC.",
+      "privacy": {
+        "contains_pii": false,
+        "purpose": "product_analytics"
+      },
+      "properties_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "program"
+        ],
+        "properties": {
+          "program": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

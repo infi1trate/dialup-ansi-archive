@@ -193,6 +193,7 @@ export class Machine {
     this.engine.powerOn();
     audio.emit("powerOn");
     count("powered_on");
+    window.__lovableEvents?.track?.("project.pc_powered_on", { postcard: !!this.postcard, deep_link: !!deepLink });
     this.callsThisPower = 0;
     if (!this.creaked) { this.creaked = true; const g0 = this.gen; setTimeout(() => { if (g0 === this.gen) audio.emit("stairCreak"); }, 20000); }
     void this.run(this.gen);
@@ -917,6 +918,7 @@ export class Machine {
     this.out(a().k(15, `CONNECT ${speed}`).nl(2));
     audio.emit("connect", speed);
     count("connected");
+    window.__lovableEvents?.track?.("project.call_connected", { board: entry.id, speed, postcard: !!opts?.onConnect });
     this.engine.modem.bps = speed;
     if (opts?.onConnect) return opts.onConnect();
     await this.session(entry, speed, g);

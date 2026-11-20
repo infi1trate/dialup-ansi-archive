@@ -68,6 +68,7 @@ export async function composePostcard(b: Board, enclosed: Enclosed | null = null
         await b.ioTimeout(2500);
         continue;
       }
+      window.__lovableEvents?.track?.("project.postcard_sent", { board: b.ioEntryId(), reply: !!replyTo });
       return await linkScreen(b, design, String(r.id));
     }
   }
